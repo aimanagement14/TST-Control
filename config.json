@@ -6,7 +6,7 @@
     "secret_key": "tst-local-dev-key-change-in-production"
   },
   "llm": {
-    "provider": "custom",
+    "provider": "openai",
     "options": {
       "manual": "Generar prompts estructurados para usar en cualquier LLM externo (ChatGPT, Claude, Gemini, etc.)",
       "openai": "API de OpenAI o cualquier endpoint OpenAI-compatible (LM Studio, Ollama, etc.)",
