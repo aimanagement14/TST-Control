@@ -4,7 +4,7 @@
 {% block title %}Exportar · {{ project.name }}{% endblock %}
 
 {% block content %}
-{% call ui.stage_head(project, '08', 'Exportar',
+{% call ui.stage_head(project, '07', 'Exportar',
         'El proyecto empaquetado en Markdown y JSON, listo para tu pipeline de producción.') %}
 <form method="post">
     <button class="btn btn-primary btn-lg">Generar paquete ZIP</button>
@@ -37,13 +37,11 @@
                 <b>{{ scripts|length }}</b></li>
             <li><span><code>04_escenas/escenas.md</code> — texto de audio e imagen por escena</span>
                 <b>{{ scenes|length }}</b></li>
-            <li><span><code>05_prompts/prompts.md</code> — prompts visuales EN y ES</span>
-                <b>{{ prompts|length }}</b></li>
-            <li><span><code>06_metadata/</code> — una ficha por plataforma</span>
+            <li><span><code>05_metadata/</code> — una ficha por plataforma</span>
                 <b>{{ metadata|length }}</b></li>
-            <li><span><code>07_prompts_usados.md</code> — prompts con los que se generó todo</span>
+            <li><span><code>06_prompts_usados.md</code> — prompts con los que se generó todo</span>
                 <b>siempre</b></li>
-            <li><span><code>08_paquete_completo.json</code> — todo en JSON</span><b>siempre</b></li>
+            <li><span><code>07_paquete_completo.json</code> — todo en JSON</span><b>siempre</b></li>
         </ul>
         <p class="hint mt-2">Al generarlo, el ZIP se descarga y queda una copia en <code>projects/</code>.</p>
     </div>
@@ -56,7 +54,6 @@
                 <li><span>Concepto</span><b>{% if has_concept %}listo{% else %}falta{% endif %}</b></li>
                 <li><span>Guiones</span><b>{{ scripts|length }}</b></li>
                 <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
-                <li><span>Prompts visuales</span><b>{{ prompts|length }}</b></li>
                 <li><span>Plataformas</span><b>{{ metadata|length }}</b></li>
             </ul>
         </div>

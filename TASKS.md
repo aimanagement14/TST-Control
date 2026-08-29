@@ -5,9 +5,33 @@ publicarse una versión.
 
 ## Pendientes
 
-- [ ] Ninguna abierta en este momento.
+- [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
+  tienen escenas solo para el guion largo. La etapa Escenas ahora
+  exige ambos sets antes de marcarse como lista.
 
 ## Cerradas (vista resumida)
+
+### Reducción de pipeline 2026-08-29
+
+- [x] Eliminar etapa 06 «Prompts visuales» (ruta, plantilla, builder,
+  export, QC, config.json).
+- [x] Renumerar etapas: 07→06 (Metadata) y 08→07 (QC).
+- [x] Renumerar export: `05_metadata/`, `06_prompts_usados.md`,
+  `07_paquete_completo.json`.
+- [x] Renombrar ruta `/projects/<id>/prompts/backfill` a
+  `/projects/<id>/stage-prompts/backfill` (no tiene que ver con la etapa
+  visual).
+- [x] Escenas: status LISTO exige mínimo de escenas para AMBOS guiones.
+- [x] Escenas: tab activo calculado con `namespace()` (Jinja2) para
+  que `script_id` de la URL se respete siempre; estilo más claro del
+  tab activo (borde inferior ámbar).
+- [x] Actualizar `README.md`, `docs/ARCHITECTURE.md`,
+  `docs/DECISIONS.md`, `CHANGELOG.md` con la nueva estructura.
+- [x] `verify_fosiles.py`: saltarse etapa 06 (ya no existe) y validar
+  el nuevo `07_paquete_completo.json`.
+- [x] `test_core.py`: quitar inserciones de `prompts` y aserción sobre
+  `08_paquete_completo.json`.
+- [x] Re-validar `test_core.py` + `verify_fosiles.py` tras los cambios.
 
 ### Auditoría 2026-08-29
 

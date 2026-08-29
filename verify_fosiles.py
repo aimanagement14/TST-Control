@@ -271,134 +271,6 @@ SCENES_JSON = """\
 ]
 """
 
-PROMPTS_BATCH = [
-    """```json
-{
-  "subject": "Amanecer sobre pico nevado del Himalaya con glaciar descendiendo",
-  "environment": "Alta montaña himalaya, ladera rocosa con grietas, hielo compactado",
-  "era": "contemporáneo",
-  "lighting": "Luz dorada de amanecer rasante desde la izquierda, tonos cálidos y fríos contrastados",
-  "camera": "Plano aéreo descendente, gran angular, vista de dron",
-  "composition": "Regla de los tercios con la cima en el tercio superior, glaciar en diagonal",
-  "atmosphere": "Niebla ligera moviéndose entre los picos, vapor del deshielo",
-  "style": "Cinematográfico hiperrealista, referencia a Emmanuel Lubezki",
-  "full_prompt_en": "Aerial cinematic shot of a Himalayan peak at sunrise, golden warm light grazing the snow, a glacier descending the rocky slope revealing dark crevasses, thin mist drifting across the ridges, drone descending slowly, hyperrealistic photography style, 8K, color graded with warm highlights and cold shadows, reference to Emmanuel Lubezki cinematography",
-  "full_prompt_es": "Plano aéreo cinematográfico de un pico del Himalaya al amanecer, luz dorada cálida rozando la nieve, glaciar descendiendo por la ladera rocosa revelando grietas oscuras, niebla fina entre las crestas, dron descendiendo lentamente, estilo fotográfico hiperrealista, 8K, etalonaje con luces cálidas y sombras frías, referencia a la cinematografía de Emmanuel Lubezki"
-}
-```""",
-    """```json
-{
-  "subject": "Time-lapse de glaciar retrocediendo entre morrenas",
-  "environment": "Valle glaciar de alta montaña, morrenas laterales, río de deshielo",
-  "era": "contemporáneo",
-  "lighting": "Luz cenital de mediodía, claridad absoluta",
-  "camera": "Travelling lateral a baja altura, plano fijo, comparación temporal",
-  "composition": "Línea del horizonte en tercio superior, glaciar ocupando el centro, primer término con roca",
-  "atmosphere": "Partículas de hielo en suspensión, vapor tenue",
-  "style": "Documental científico, paleta fría, contraste marcado",
-  "full_prompt_en": "Documentary time-lapse of a Himalayan glacier retreating between lateral moraines, midday zenith light, suspended ice particles in the air, meltwater stream running through the valley, side-on travelling shot, cold blue palette, sharp contrast, scientific documentary aesthetic, 8K, photorealistic",
-  "full_prompt_es": "Time-lapse documental de un glaciar del Himalaya retrocediendo entre morrenas laterales, luz cenital de mediodía, partículas de hielo en suspensión, arroyo de deshielo corriendo por el valle, plano lateral en travelling, paleta azul fría, contraste marcado, estética documental científica, 8K, fotorrealista"
-}
-```""",
-    """```json
-{
-  "subject": "Animación de placas tectónicas colisionando, fondo marino plegándose",
-  "environment": "Corte esquemático del manto terrestre y corteza",
-  "era": "Geológico (Eoceno)",
-  "lighting": "Iluminación didáctica, naranja para el manto, azul para el océano, gris para la corteza",
-  "camera": "Zoom in progresivo desde vista global hasta detalle del plegamiento",
-  "composition": "Corte transversal centrado, profundidad sugerida con capas",
-  "atmosphere": "Partículas representando sedimento levantado",
-  "style": "Ilustración científica moderna, líneas limpias, paleta limitada",
-  "full_prompt_en": "Scientific animation of tectonic plates colliding, oceanic plate subducting under continental plate, Tethys seafloor folding and uplifting, didactic lighting with warm mantle and cool ocean colors, progressive zoom in from global view to fold detail, modern scientific illustration style, clean lines, limited palette, 4K",
-  "full_prompt_es": "Animación científica de placas tectónicas colisionando, placa oceánica subduciendo bajo la continental, fondo del Tetis plegándose y elevándose, iluminación didáctica con manto cálido y océano frío, zoom in progresivo desde vista global al detalle del pliegue, estilo ilustración científica moderna, líneas limpias, paleta limitada, 4K"
-}
-```""",
-    """```json
-{
-  "subject": "Ammonite fosilizado en roca sedimentaria gris",
-  "environment": "Afloramiento rocoso del Himalaya, matriz gris pizarrosa",
-  "era": "Cretácico-Eoceno",
-  "lighting": "Luz rasante lateral dorada, sombras profundas que resaltan la espiral",
-  "camera": "Primer plano extremo, macro, profundidad de campo reducida",
-  "composition": "Espiral del fósil en el centro, diagonales de la estratificación",
-  "atmosphere": "Polvo en suspensión iluminado por el haz lateral",
-  "style": "Fotografía científica de patrimonio, enfoque pictórico",
-  "full_prompt_en": "Extreme close-up of a fossilized ammonite embedded in gray slate rock from the Himalayas, side grazing golden light revealing the spiral chambers, dust particles floating in the light beam, shallow depth of field, scientific heritage photography style with pictorial influence, 8K, macro lens",
-  "full_prompt_es": "Primer plano extremo de un ammonites fosilizado incrustado en roca pizarrosa gris del Himalaya, luz dorada rasante lateral que revela las cámaras espirales, partículas de polvo flotando en el haz de luz, profundidad de campo reducida, estilo fotografía científica de patrimonio con influencia pictórica, 8K, objetivo macro"
-}
-```""",
-    """```json
-{
-  "subject": "Investigadores extrayendo muestras de sedimento en glaciar",
-  "environment": "Base de glaciar himalayo, nieve compacta, grietas azules",
-  "era": "contemporáneo",
-  "lighting": "Luz fría azulada de alta montaña, sombras azul profundo",
-  "camera": "Paneo lento de izquierda a derecha siguiendo al investigador principal",
-  "composition": "Investigador en el tercio izquierdo, glaciar dominando el fondo",
-  "atmosphere": "Vapor frío saliendo de las grietas del glaciar, viento sutil",
-  "style": "Documental de campo, paleta fría, aspecto ligeramente desaturado",
-  "full_prompt_en": "Field researchers in red parkas extracting sediment samples at the base of a Himalayan glacier, cold blue high-altitude light, vapor rising from glacier crevasses, labeled sample tubes in foreground, slow pan from left to right, cold palette documentary style, slightly desaturated look, 8K, photorealistic",
-  "full_prompt_es": "Investigadores de campo en parkas rojas extrayendo muestras de sedimento en la base de un glaciar del Himalaya, luz fría azulada de alta montaña, vapor saliendo de las grietas del glaciar, tubos de muestra etiquetados en primer plano, paneo lento de izquierda a derecha, estilo documental de paleta fría, aspecto ligeramente desaturado, 8K, fotorrealista"
-}
-```""",
-    """```json
-{
-  "subject": "Detalle de microfósil bajo microscopio de campo",
-  "environment": "Campamento base científico, mesa de campaña, microscopio portátil",
-  "era": "contemporáneo",
-  "lighting": "Iluminación dirigida del microscopio sobre fondo oscuro, halo cálido",
-  "camera": "Zoom in progresivo, transición de plano medio a primerísimo plano",
-  "composition": "Microfósil centrado, fondo totalmente desenfocado",
-  "atmosphere": "Sin atmósfera visible, ambiente limpio de laboratorio",
-  "style": "Macro científico, alto contraste, detalle fino",
-  "full_prompt_en": "Microscopic detail of a tiny fossil under a field microscope, warm directed lighting on a completely dark background, gloves holding the slide, progressive zoom in, scientific macro style, high contrast, fine detail, 4K",
-  "full_prompt_es": "Detalle microscópico de un microfósil bajo microscopio de campo, iluminación dirigida cálida sobre fondo totalmente oscuro, guantes sosteniendo el portaobjetos, zoom in progresivo, estilo macro científico, alto contraste, detalle fino, 4K"
-}
-```""",
-    """```json
-{
-  "subject": "Interior de monasterio nepalí con cajas antiguas",
-  "environment": "Monasterio budista tibetano, sala con luz de velas, techo con tejidos",
-  "era": "tradicional",
-  "lighting": "Luz cálida de velas y lámparas de mantequilla, sombras profundas, atmósfera mística",
-  "camera": "Plano estático fijo con ligero travelling interior",
-  "composition": "Cuadros y cajas en el tercio inferior, techo decorado en el superior",
-  "atmosphere": "Humo de incienso flotando en los haces de luz",
-  "style": "Documental etnográfico, color grading cálido",
-  "full_prompt_en": "Interior of a Nepalese Tibetan monastery at dusk, warm candlelight and butter lamp illumination, deep shadows, ancient wooden boxes containing ceremonial relics on a side altar, incense smoke drifting through the light beams, static shot with subtle interior travelling, ethnographic documentary style, warm color grading, 8K",
-  "full_prompt_es": "Interior de un monasterio tibetano nepalí al atardecer, iluminación cálida de velas y lámparas de mantequilla, sombras profundas, cajas antiguas de madera con reliquias ceremoniales en un altar lateral, humo de incienso flotando en los haces de luz, plano estático con travelling interior sutil, estilo documental etnográfico, etalonaje cálido, 8K"
-}
-```""",
-    """```json
-{
-  "subject": "Cumbre del Everest al atardecer rodeada de nubes",
-  "environment": "Vista cenital de la cima más alta, nubes por debajo, cordillera infinita",
-  "era": "contemporáneo",
-  "lighting": "Atardecer alpino con luz anaranjada y violeta, alto contraste",
-  "camera": "Plano aéreo cenital, drone estático",
-  "composition": "Cumbre centrada, nubes fluyendo en el tercio inferior",
-  "atmosphere": "Nubes densas envolviendo la base de la montaña",
-  "style": "Cinematográfico épico, escala monumental",
-  "full_prompt_en": "Aerial top-down shot of the Everest summit at sunset, dense clouds wrapping the base of the mountain, infinite Himalayan range in the background, alpine sunset with orange and violet light, epic cinematic scale, monumental sense of scale, 8K, color graded for IMAX",
-  "full_prompt_es": "Plano aéreo cenital de la cumbre del Everest al atardecer, nubes densas envolviendo la base de la montaña, cordillera infinita del Himalaya al fondo, atardecer alpino con luz anaranjada y violeta, escala cinematográfica épica, sensación monumental, 8K, etalonaje para IMAX"
-}
-```""",
-    """```json
-{
-  "subject": "Geólogo sentado en roca mirando el Himalaya al atardecer",
-  "environment": "Risco de alta montaña, vista panorámica del Himalaya",
-  "era": "contemporáneo",
-  "lighting": "Luz rasante de atardecer, contraluz suave sobre el geólogo",
-  "camera": "Travelling lateral de izquierda a derecha, plano medio-largo",
-  "composition": "Geólogo en el tercio derecho, cordillera ocupando el resto del encuadre",
-  "atmosphere": "Viento sutil moviendo el cabello, polvo en suspensión",
-  "style": "Cinematográfico contemplativo, paleta cálida",
-  "full_prompt_en": "Geologist in field gear sitting on a rocky outcrop looking at the Himalayan panorama at sunset, side grazing backlight, subtle wind moving hair, dust in suspension, lateral travelling shot from left to right, contemplative cinematic style, warm palette, 8K, anamorphic",
-  "full_prompt_es": "Geólogo con equipo de campo sentado en un risco mirando la panorámica del Himalaya al atardecer, contraluz rasante lateral, viento sutil moviendo el cabello, polvo en suspensión, travelling lateral de izquierda a derecha, estilo cinematográfico contemplativo, paleta cálida, 8K, anamórfico"
-}
-```""",
-]
 
 METADATA_YOUTUBE_TEXT = """\
 ## TITULOS (5 opciones)
@@ -577,42 +449,8 @@ def main():
         ).fetchone()["n"]
     log("Escenas guardadas", f"{n_scenes} (>= 6)", n_scenes >= 6)
 
-    # ---- 6) Prompts visuales (lote) ----
-    print("\n=== 6) Prompts visuales ===")
-    with app.get_db() as conn:
-        scenes_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number",
-            (PROJECT_ID,),
-        ).fetchall()]
-    form_data = {"action": "save_all"}
-    for sc, ptext in zip(scenes_rows, PROMPTS_BATCH):
-        form_data[f"text_{sc['id']}"] = ptext
-    r = client.post(
-        f"/projects/{PROJECT_ID}/prompts",
-        data=form_data,
-        follow_redirects=True,
-    )
-    log("Prompts POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        n_prompts = conn.execute(
-            "SELECT COUNT(*) AS n FROM prompts WHERE project_id=?", (PROJECT_ID,)
-        ).fetchone()["n"]
-    log("Prompts guardados", f"{n_prompts} (debe coincidir con escenas)",
-        n_prompts == len(scenes_rows))
-
-    # Verificar que tienen full_prompt_en y full_prompt_es
-    with app.get_db() as conn:
-        prompts_sample = [dict(r) for r in conn.execute(
-            "SELECT * FROM prompts WHERE project_id=? LIMIT 1",
-            (PROJECT_ID,),
-        ).fetchall()]
-    if prompts_sample:
-        p = prompts_sample[0]
-        log("Prompt EN", bool(p["full_prompt_en"]), bool(p["full_prompt_en"]))
-        log("Prompt ES", bool(p["full_prompt_es"]), bool(p["full_prompt_es"]))
-
-    # ---- 7) Metadata YouTube ----
-    print("\n=== 7) Metadata YouTube ===")
+    # ---- 6) Metadata YouTube ----
+    print("\n=== 6) Metadata YouTube ===")
     r = client.post(
         f"/projects/{PROJECT_ID}/metadata",
         data={
@@ -639,8 +477,8 @@ def main():
     log("Hashtags YT", f"{len(hashtags)} (>= 3)", len(hashtags) >= 3)
     log("Descripción YT", bool(m_yt["description"]), bool(m_yt["description"]))
 
-    # ---- 8) Metadata Shorts ----
-    print("\n=== 8) Metadata Shorts ===")
+    # ---- 7) Metadata Shorts ----
+    print("\n=== 7) Metadata Shorts ===")
     r = client.post(
         f"/projects/{PROJECT_ID}/metadata",
         data={
@@ -664,8 +502,8 @@ def main():
     log("Hashtags Shorts", f"{len(sh_hashtags)} (>= 5)", len(sh_hashtags) >= 5)
     log("Texto pantalla Shorts", f"{len(sh_text)} (>= 3)", len(sh_text) >= 3)
 
-    # ---- 9) QC ----
-    print("\n=== 9) Control de calidad ===")
+    # ---- 8) QC ----
+    print("\n=== 8) Control de calidad ===")
     r = client.post(f"/projects/{PROJECT_ID}/qc", follow_redirects=True)
     log("QC POST", f"status {r.status_code}", r.status_code == 200)
     issues = app.run_qc(PROJECT_ID)
@@ -685,8 +523,8 @@ def main():
         ).fetchone()["status"]
     log("Status del proyecto", f"'{status}' (esperado 'ready')", status == "ready")
 
-    # ---- 10) Export ZIP ----
-    print("\n=== 10) Exportación ZIP ===")
+    # ---- 9) Export ZIP ----
+    print("\n=== 9) Exportación ZIP ===")
     r = client.post(f"/projects/{PROJECT_ID}/export", follow_redirects=False)
     log("Export POST", f"status {r.status_code}", r.status_code == 200)
     log("Content-Type zip", "zip" in r.headers.get("Content-Type", "").lower()
@@ -700,10 +538,9 @@ def main():
         "03_guiones/guion_long.md",
         "03_guiones/guion_short.md",
         "04_escenas/",
-        "05_prompts/",
-        "06_metadata/metadata_youtube.md",
-        "06_metadata/metadata_shorts.md",
-        "08_paquete_completo.json",
+        "05_metadata/metadata_youtube.md",
+        "05_metadata/metadata_shorts.md",
+        "07_paquete_completo.json",
     ]
     for s in expected_substrings:
         present = any(s in n for n in names)
@@ -713,7 +550,7 @@ def main():
     resumen = zf.read([n for n in names if n.endswith("00_RESUMEN.md")][0]).decode("utf-8")
     log("Resumen contiene tema", "Fósiles" in resumen or "fosiles" in resumen.lower(),
         "Fósiles" in resumen or "fosiles" in resumen.lower())
-    bundle = json.loads(zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0])
+    bundle = json.loads(zf.read([n for n in names if n.endswith("07_paquete_completo.json")][0])
                         .decode("utf-8"))
     log("Bundle JSON", f"keys: {list(bundle.keys())[:6]}...",
         {"project", "research", "concept", "scripts"}.issubset(bundle.keys()))

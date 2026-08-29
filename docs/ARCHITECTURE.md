@@ -56,7 +56,7 @@ secciones marcadas con comentarios `---`:
 | Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto/prompt guardado. |
 | Auto-prompt | `_STAGE_BUILDERS` + `_ensure_stage_prompt` que regenera y guarda los prompts canónicos cuando una etapa se persiste por primera vez. |
 | LLM client | `call_llm` con cuatro proveedores (`manual`, `openai`, `anthropic`, `custom`). Resuelve un preset activo sobre el bloque legacy. |
-| Parsers | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_prompt_json`, `parse_metadata`. Toleran respuestas del LLM con prosa alrededor. |
+| Parsers | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_metadata`. Toleran respuestas del LLM con prosa alrededor. |
 | QC | `run_qc` (lista de tuplas `stage/severity/message/field`) + `save_qc_issues`. |
 | Rutas | Una vista por etapa + dashboard + perfiles + settings + export. |
 | Contexto plantilla | Inyecta `app_name`, `app_tagline`, `app_version` en cada render. |
@@ -70,7 +70,7 @@ Toda la configuración editable en runtime vive aquí:
 - `llm`: provider, bloques legacy `openai` / `anthropic`, presets,
   temperatura, max_tokens.
 - `prompts`: `system` + `format` por etapa (`research`, `concept`,
-  `script_long`, `script_short`, `scenes`, `prompts`,
+  `script_long`, `script_short`, `scenes`,
   `metadata_youtube`, `metadata_shorts`).
 - `qc.checks`: umbrales de palabras, duraciones objetivo, mínimo de
   fuentes, mínimo de escenas, umbral de repetición.
@@ -99,12 +99,16 @@ flash messages. No se usa Tailwind ni preprocesadores.
 
 ## Modelo de datos
 
-10 tablas. Las cinco entidades centrales (`projects`, `research`,
-`concept`, `scripts`, `scenes`, `prompts`, `metadata_records`) tienen
-`project_id` con `ON DELETE CASCADE`. `stage_prompts` almacena los
-prompts SYS + USER editados por etapa (`UNIQUE(project_id, stage)`).
+10 tablas (la tabla `prompts` queda en el esquema por compatibilidad pero
+ya no se usa: cada escena almacena su `visual_description` que sirve
+directamente como prompt de imagen). Las seis entidades centrales
+(`projects`, `research`, `concept`, `scripts`, `scenes`,
+`metadata_records`) tienen `project_id` con `ON DELETE CASCADE`.
+`stage_prompts` almacena los prompts SYS + USER editados por etapa
+(`UNIQUE(project_id, stage)`).
 
 `scripts.type` distingue `long` (5 min) de `short` (1 min).
+`scenes.script_id` vincula cada escena con su guion.
 `metadata_records.platform` distingue `youtube` de `shorts`. Ambas con
 `UNIQUE(project_id, type/platform)` para impedir duplicados.
 

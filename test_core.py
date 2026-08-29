@@ -453,12 +453,6 @@ def test_qc_passes_complete_project(tmp_path):
                     duration_seconds, camera_movement, transition, updated_at)
                 VALUES (1, ?, 'narración escena', 'visual escena', 30, 'zoom', 'fade', '2025-01-01')
             """, (i + 1,))
-        # Prompts para todas
-        for i in range(6):
-            conn.execute("""
-                INSERT INTO prompts (project_id, scene_id, subject, full_prompt_en, full_prompt_es, updated_at)
-                VALUES (1, ?, 'subject', 'en', 'es', '2025-01-01')
-            """, (i + 1,))
         # Metadata
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, updated_at)
@@ -500,11 +494,6 @@ def test_export_creates_zip(tmp_path):
                     duration_seconds, updated_at)
                 VALUES (1, ?, 'narración', 'visual', 30, '2025-01-01')
             """, (i + 1,))
-        for i in range(3):
-            conn.execute("""
-                INSERT INTO prompts (project_id, scene_id, subject, full_prompt_en, full_prompt_es, updated_at)
-                VALUES (1, ?, 'subject', 'en prompt', 'es prompt', '2025-01-01')
-            """, (i + 1,))
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, description, updated_at)
             VALUES (1, 'youtube', '["t1"]', 'desc', '2025-01-01')
@@ -528,7 +517,7 @@ def test_export_creates_zip(tmp_path):
             names = zf.namelist()
             assert any("00_RESUMEN.md" in n for n in names)
             assert any("01_investigacion.md" in n for n in names)
-            assert any("08_paquete_completo.json" in n for n in names)
+            assert any("07_paquete_completo.json" in n for n in names)
         print(f"  ✓ export crea ZIP con {len(names)} archivos")
     finally:
         app.PROJECTS_DIR = original

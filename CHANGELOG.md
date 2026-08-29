@@ -15,8 +15,7 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 - Navegación entre etapas al pie de cada página (anterior / siguiente) y
   «siguiente acción» calculada en el dashboard y en la hoja de ruta.
 - Botón de copiar con confirmación en todos los prompts, en los guiones
-  guardados, en los prompts visuales (EN y ES) y en la metadata
-  (descripción, tags, hashtags, caption).
+  guardados y en la metadata (descripción, tags, hashtags, caption).
 - Contadores en vivo de palabras y duración estimada bajo cada área de
   pegado, con el rango objetivo del formato marcado en color.
 - `static/app.js`: portapapeles con reserva para contextos no seguros,
@@ -30,12 +29,24 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
   condensada, cifras monoespaciadas tabulares y color como señal de estado
   (ámbar = te toca, verde = listo, rojo = bloquea, azul = información).
 - Etapas con contenido guardado muestran primero el contenido y esconden
-  el área de pegado en un desplegable (guiones, prompts visuales, metadata).
+  el área de pegado en un desplegable (guiones, metadata).
 - Estados del proyecto en lenguaje de usuario («Listo para exportar») en
   lugar de los valores internos de base de datos.
 - Metadata: el guion base se preselecciona según la plataforma y cada
   panel muestra los campos propios del formato (caption, hook y textos en
   pantalla en vertical; títulos, capítulos y tags en YouTube).
+- **Eliminada la etapa «Prompts visuales»** por ser redundante con
+  Escenas (cada escena ya almacena un `IMAGEN` cinematográfico
+  completo). El pipeline pasa de 8 a 7 etapas; las exportaciones se
+  renumeran (`05_metadata/`, `06_prompts_usados.md`,
+  `07_paquete_completo.json`).
+- La etapa Escenas exige escenas para **ambos guiones** (largo y
+  corto) antes de marcar la celda como lista; antes bastaba con
+  escenas en uno solo para considerarla completa.
+- Tabs de selección de guion en Escenas: el activo se calcula con
+  `namespace()` (Jinja2) para que `script_id` de la URL se respete
+  siempre; el tab activo se distingue con borde inferior ámbar y
+  atenuado el resto.
 - Control de calidad: avisos ordenados por severidad, nombres de etapa y
   campo legibles, marcas de tiempo del último análisis y estado propio
   para «sin avisos».
@@ -59,8 +70,6 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
   cuando la llamada al LLM no devuelve contenido.
 - `copyToClipboard()` en Concepto tomaba el primer formulario de la
   página, no el del prompt, así que copiaba en vacío.
-- Los prompts visuales guardados se serializaban a mano dentro del
-  `textarea`, lo que rompía el JSON si algún campo contenía comillas.
 - Investigación fallaba al generar el prompt porque la plantilla contaba
   `facts` y `sources` sin comprobar que existieran.
 - `run_qc` + `qc()` solo movían el proyecto a `status='ready'` cuando
@@ -91,7 +100,7 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 - Importación inicial de Todo Sobre Todo, centro local de planificación
   de contenido audiovisual (Flask + Jinja2 + SQLite).
 - Aplicación monolítica `app.py` con flujo TEMA → INVESTIGACIÓN → CONCEPTO →
-  GUION → ESCENAS → PROMPTS → METADATA → CONTROL DE CALIDAD → EXPORTAR.
+  GUION → ESCENAS → METADATA → CONTROL DE CALIDAD → EXPORTAR.
 - Modos manual y API multi-proveedor (OpenAI, Anthropic, Azure, Ollama,
   LM Studio y presets personalizables vía `config.json`).
 - Verificador CLI de calidad (`verify_fosiles.py`) y suite de tests
@@ -99,7 +108,7 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 - Perfiles reutilizables de contenido (tipo, audiencia, tono, misterio,
   drama, velocidad, plataformas).
 - Exportación de cada proyecto como ZIP con `00_RESUMEN.md`,
-  `01_investigacion.md`, guiones, escenas, prompts, metadata y JSON
+  `01_investigacion.md`, guiones, escenas, metadata y JSON
   consolidado.
 
 ### Changed

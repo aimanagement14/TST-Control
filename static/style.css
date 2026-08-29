@@ -326,17 +326,19 @@ code, .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular
 }
 .tab:hover { color: var(--paper); background: rgba(255, 255, 255, .03); }
 .tab.active {
-    color: var(--amber);
-    background: var(--slate);
+    color: var(--paper);
+    background: var(--slate-2);
     border-color: var(--line);
-    border-bottom-color: var(--slate);
+    border-bottom-color: var(--slate-2);
     margin-bottom: -1px;
+    box-shadow: inset 0 -2px 0 var(--amber);
 }
 .tab-meta {
     font-size: .72rem;
     color: var(--mute);
     font-weight: normal;
 }
+.tab.active .tab-meta { color: var(--amber); }
 
 /* ===== Paneles ===== */
 .panel {

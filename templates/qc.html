@@ -10,7 +10,6 @@
     'script_short': 'Guion 1 min',
     'scripts': 'Guiones',
     'scenes': 'Escenas',
-    'prompts': 'Prompts visuales',
     'metadata': 'Metadata',
     'metadata_youtube': 'Metadata YouTube',
     'metadata_shorts': 'Metadata Shorts',
@@ -26,12 +25,11 @@
     'cta': 'CTA',
     'sources': 'fuentes',
     'scenes': 'escenas',
-    'prompts': 'prompts',
     'metadata': 'metadata',
 } %}
 
 {% block content %}
-{% call ui.stage_head(project, '08', 'Control de calidad',
+{% call ui.stage_head(project, '07', 'Control de calidad',
         'Duración, estructura, fuentes, repeticiones y coherencia. Se revisa antes de exportar.') %}
 <form method="post">
     <button class="btn {% if issues %}btn-ghost{% else %}btn-primary{% endif %}">
@@ -101,7 +99,7 @@
 {% else %}
 <div class="empty">
     <h2>Todavía sin analizar</h2>
-    <p>El análisis recorre las ocho etapas y devuelve lo que falta o no cuadra.</p>
+    <p>El análisis recorre las siete etapas y devuelve lo que falta o no cuadra.</p>
     <form method="post">
         <button class="btn btn-primary btn-lg">Ejecutar análisis</button>
     </form>
@@ -117,7 +115,6 @@
         <li>Presencia de hook, CTA y estructura</li>
         <li>Palabras repetidas por encima de {{ qc_checks.repetition_threshold }} veces</li>
         <li>Escenas mínimas: {{ qc_checks.min_scenes_long }} en 5 min, {{ qc_checks.min_scenes_short }} en 1 min</li>
-        <li>Coherencia entre escenas y prompts visuales</li>
         <li>Al menos {{ qc_checks.min_sources }} fuentes en la investigación</li>
         <li>Metadata de las plataformas del perfil</li>
         <li>Afirmaciones marcadas como no verificadas</li>

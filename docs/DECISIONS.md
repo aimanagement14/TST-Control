@@ -73,7 +73,7 @@ y helper `_ensure_stage_prompt()` que genera y guarda el prompt
 canónico automáticamente la primera vez que la etapa tiene contenido.
 
 **Consecuencias:**
-- El proyecto conserva los prompts SYS + USER en `07_prompts_usados.md`
+- El proyecto conserva los prompts SYS + USER en `06_prompts_usados.md`
   dentro del ZIP exportado.
 - `_ensure_stage_prompt` es no destructivo: solo rellena huecos, no
   sobrescribe prompts ya guardados.
@@ -102,14 +102,36 @@ era demasiado estricto y desincentivaba usar el QC.
 archivos grandes bien estructurados antes que muchos pequeños.
 
 **Decisión:** Cada etapa genera un único Markdown:
-`04_escenas/escenas.md` contiene todas las escenas y
-`05_prompts/prompts.md` todos los prompts EN + ES.
+`04_escenas/escenas.md` contiene todas las escenas con
+`**TEXTO AUDIO:**` y `**IMAGEN:**` por escena.
 
 **Consecuencias:**
-- Formato `## ESCENA N` con `**TEXTO AUDIO:**` y `**IMAGEN:**`
-  inmediato de parsear por herramientas externas.
-- `08_paquete_completo.json` mantiene la versión estructurada completa
+- Formato `## ESCENA N` inmediato de parsear por herramientas externas.
+- `07_paquete_completo.json` mantiene la versión estructurada completa
   para integraciones.
+
+## 2026-08-29 — Eliminar "Prompts visuales" como etapa propia
+
+**Contexto:** La etapa 06 obligaba a rellenar 10 campos JSON por escena
+(`subject`, `environment`, `era`, `lighting`, `camera`, `composition`,
+`atmosphere`, `style`, `full_prompt_en`, `full_prompt_es`) cuando cada
+escena ya almacenaba un `IMAGEN` cinematográfico completo en formato TST.
+Para el usuario era trabajo duplicado y conceptual: el IMAGEN de la
+escena ya era un prompt utilizable.
+
+**Decisión:** Eliminar la etapa, su ruta, su plantilla y el bloque del
+export. El pipeline pasa de 8 a 7 etapas. Las exportaciones se
+renumeran (`05_metadata/`, `06_prompts_usados.md`,
+`07_paquete_completo.json`). La tabla `prompts` se conserva en el
+esquema por compatibilidad pero ya no se referencia.
+
+**Consecuencias:**
+- Una etapa menos que mantener; un único sitio para el prompt visual
+  por escena.
+- El QC ya no exige "coherencia escenas/prompts": ahora exige que cada
+  guion tenga al menos sus escenas mínimas.
+- Los usuarios que quieran el desglose estructurado (subject,
+  environment, etc.) lo extraen del propio IMAGEN.
 
 ## 2026-08-29 — Servidor dual Flask/Waitress
 

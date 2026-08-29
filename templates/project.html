@@ -79,7 +79,7 @@
     <div class="panel-head">
         <h3>Prompts guardados</h3>
         <span class="chip">{{ saved_prompts|length }} de 7</span>
-        <form method="post" action="{{ url_for('backfill_prompts', project_id=project.id) }}"
+        <form method="post" action="{{ url_for('backfill_stage_prompts', project_id=project.id) }}"
               class="inline-form"
               onsubmit="return confirm('Se generan los prompts que falten en etapas que ya tienen contenido. Los prompts que editaste a mano se conservan.')">
             <button class="btn btn-ghost btn-sm">Rellenar los que falten</button>

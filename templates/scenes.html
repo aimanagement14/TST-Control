@@ -15,21 +15,22 @@
 </div>
 {% else %}
 
-{% set active_script = none %}
+{% set ns = namespace(active_script=none) %}
 {% for s in scripts %}
-    {% if active_script_id and s.id == active_script_id %}{% set active_script = s %}{% endif %}
+    {% if active_script_id and s.id == active_script_id %}{% set ns.active_script = s %}{% endif %}
 {% endfor %}
-{% if not active_script %}
-    {% for s in scripts %}
-        {% if not active_script and s.type == 'long' %}{% set active_script = s %}{% endif %}
-    {% endfor %}
-{% endif %}
-{% if not active_script %}{% set active_script = scripts|first %}{% endif %}
 {% if gen_script_id %}
     {% for s in scripts %}
-        {% if s.id|string == gen_script_id|string %}{% set active_script = s %}{% endif %}
+        {% if s.id|string == gen_script_id|string %}{% set ns.active_script = s %}{% endif %}
     {% endfor %}
 {% endif %}
+{% if not ns.active_script %}
+    {% for s in scripts %}
+        {% if not ns.active_script and s.type == 'long' %}{% set ns.active_script = s %}{% endif %}
+    {% endfor %}
+{% endif %}
+{% if not ns.active_script %}{% set ns.active_script = scripts|first %}{% endif %}
+{% set active_script = ns.active_script %}
 
 {% set total_seconds = scenes|sum(attribute='duration_seconds') %}
 {% set min_recomendado = qc_checks.min_scenes_long if active_script and active_script.type == 'long' else qc_checks.min_scenes_short %}

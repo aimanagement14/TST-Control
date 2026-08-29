@@ -44,9 +44,7 @@ CONCEPTO
  ↓
 GUION 5 min ── GUION 1 min
  ↓
-ESCENAS
- ↓
-PROMPTS
+ESCENAS (un set por guion, con prompt de imagen)
  ↓
 METADATA (YouTube + Shorts)
  ↓
@@ -85,7 +83,7 @@ Verifica:
 - Duración estimada según velocidad
 - Presencia de hook, CTA y estructura
 - Repeticiones
-- Coherencia escenas/prompts
+- Coherencia escenas (mínimo por guion)
 - Mínimo de fuentes
 - Afirmaciones sin verificar
 
@@ -103,13 +101,11 @@ PROYECTO.zip
 │   └── guion_short.md
 ├── 04_escenas/
 │   └── escenas.md         # un único archivo: TEXTO AUDIO + IMAGEN por escena
-├── 05_prompts/
-│   └── prompts.md         # un único archivo con todos los prompts EN + ES
-├── 06_metadata/
+├── 05_metadata/
 │   ├── metadata_youtube.md
 │   └── metadata_shorts.md
-├── 07_prompts_usados.md   # prompts SYS + USER editados durante el proyecto
-└── 08_paquete_completo.json
+├── 06_prompts_usados.md   # prompts SYS + USER editados durante el proyecto
+└── 07_paquete_completo.json
 ```
 
 Listo para conectar con tu pipeline de producción.
@@ -118,7 +114,7 @@ Listo para conectar con tu pipeline de producción.
 
 `verify_fosiles.py` ejecuta el flujo completo contra el test client de Flask
 utilizando datos simulados del LLM. Crea un proyecto si no existe, pasa por
-las 8 etapas, ejecuta el control de calidad y genera el ZIP.
+las 7 etapas, ejecuta el control de calidad y genera el ZIP.
 
 ```bash
 python verify_fosiles.py

@@ -267,6 +267,9 @@ def estimate_duration_seconds(text, wpm=150):
 
 def project_stage_status(project):
     """Devuelve un dict con el estado de cada etapa del proyecto."""
+    qc_cfg = CONFIG["qc"]["checks"]
+    min_scenes_long = qc_cfg["min_scenes_long"]
+    min_scenes_short = qc_cfg["min_scenes_short"]
     with get_db() as conn:
         stages = {
             "research": conn.execute(
@@ -285,19 +288,25 @@ def project_stage_status(project):
                 "SELECT COUNT(*) AS n FROM scripts WHERE project_id=? AND type='short'",
                 (project["id"],)
             ).fetchone()["n"] > 0,
-            "scenes": conn.execute(
-                "SELECT COUNT(*) AS n FROM scenes WHERE project_id=?",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
-            "prompts": conn.execute(
-                "SELECT COUNT(*) AS n FROM prompts WHERE project_id=?",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
-            "metadata": conn.execute(
-                "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
         }
+        scripts = [dict(r) for r in conn.execute(
+            "SELECT id, type FROM scripts WHERE project_id=?", (project["id"],),
+        ).fetchall()]
+        scenes_done = True
+        for s in scripts:
+            min_n = min_scenes_long if s["type"] == "long" else min_scenes_short
+            count = conn.execute(
+                "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
+                (project["id"], s["id"]),
+            ).fetchone()["n"]
+            if count < min_n:
+                scenes_done = False
+                break
+        stages["scenes"] = scenes_done
+        stages["metadata"] = conn.execute(
+            "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?",
+            (project["id"],)
+        ).fetchone()["n"] > 0
     return stages
 
 
@@ -316,23 +325,20 @@ PIPELINE_STAGES = (
      "endpoint": "scripts", "hint": "Versión vertical"},
     {"key": "scenes", "num": "05", "label": "Escenas", "short": "Escenas",
      "endpoint": "scenes", "hint": "Secuencia visual"},
-    {"key": "prompts", "num": "06", "label": "Prompts", "short": "Prompts",
-     "endpoint": "prompts", "hint": "Imagen y vídeo por escena"},
-    {"key": "metadata", "num": "07", "label": "Metadata", "short": "Metadata",
+    {"key": "metadata", "num": "06", "label": "Metadata", "short": "Metadata",
      "endpoint": "metadata", "hint": "Títulos, tags y CTA"},
-    {"key": "qc", "num": "08", "label": "Control de calidad", "short": "Calidad",
+    {"key": "qc", "num": "07", "label": "Control de calidad", "short": "Calidad",
      "endpoint": "qc", "hint": "Revisión antes de exportar"},
 )
 
 PAGE_ORDER = ("research", "concept", "scripts", "scenes",
-              "prompts", "metadata", "qc", "export")
+              "metadata", "qc", "export")
 
 PAGE_LABELS = {
     "research": "Investigación",
     "concept": "Concepto",
     "scripts": "Guiones",
     "scenes": "Escenas",
-    "prompts": "Prompts visuales",
     "metadata": "Metadata",
     "qc": "Control de calidad",
     "export": "Exportar",
@@ -344,7 +350,6 @@ STATUS_LABELS = {
     "concept": "En concepto",
     "scripts": "En guion",
     "scenes": "En escenas",
-    "prompts": "En prompts",
     "metadata": "En metadata",
     "ready": "Listo para exportar",
 }
@@ -721,21 +726,6 @@ def build_scenes_prompt(project, profile, script):
         f"Duración total objetivo: {script.get('word_count',0)/(profile['narration_speed'] if profile else 150)*60:.0f} segundos\n\n"
         f"Guion a convertir en escenas:\n{script.get('body_full','')}\n\n"
         f"Devuelve SOLO el JSON con las escenas, en este formato:\n\n{fmt}"
-    )
-    return sys_prompt, user_msg
-
-
-def build_prompts_prompt(project, profile, scene, scene_idx, total):
-    sys_prompt = CONFIG["prompts"]["prompts"]["system"]
-    fmt = CONFIG["prompts"]["prompts"]["format"]
-    style = profile["style"] if profile else "cinematográfico, oscuro, contrastado"
-    user_msg = (
-        f"Escena {scene_idx}/{total} del video '{project['topic']}'\n"
-        f"Narración: {scene['narration']}\n"
-        f"Descripción visual: {scene['visual_description']}\n"
-        f"Movimiento cámara: {scene['camera_movement']}\n"
-        f"Estilo general del proyecto: {style}\n\n"
-        f"Genera un prompt cinematográfico y devuelve SOLO el JSON en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
 
@@ -1338,21 +1328,6 @@ def run_qc(project_id):
                 f"Solo {len(scs)} escenas en el {label} (mínimo recomendado: {min_n})",
                 s["type"]))
 
-    # Prompts (también por guion, enlazados a sus escenas)
-    if scenes and not prompts:
-        issues.append(("prompts", "error", "Hay escenas pero no hay prompts visuales", "prompts"))
-    elif scenes and prompts:
-        for s in scripts:
-            scs = scenes_by_script.get(s["id"], [])
-            if not scs:
-                continue
-            linked = sum(1 for sc in scs if sc["id"] in prompts_by_scene)
-            if linked < len(scs):
-                label = "guion 5 min" if s["type"] == "long" else "guion 1 min"
-                issues.append(("prompts", "warning",
-                    f"Solo {linked} prompts para {len(scs)} escenas del {label}",
-                    s["type"]))
-
     # Metadata
     if scripts and not metadata:
         issues.append(("metadata", "info", "No se ha generado metadata", "metadata"))
@@ -1436,8 +1411,8 @@ def delete_project(project_id):
     return redirect(url_for("dashboard"))
 
 
-@app.route("/projects/<int:project_id>/prompts/backfill", methods=["POST"])
-def backfill_prompts(project_id):
+@app.route("/projects/<int:project_id>/stage-prompts/backfill", methods=["POST"])
+def backfill_stage_prompts(project_id):
     """Regenera y guarda los prompts de las etapas que tengan contenido."""
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
@@ -1781,117 +1756,6 @@ def scenes(project_id):
 
 # --- Prompts -----------------------------------------------------------------
 
-@app.route("/projects/<int:project_id>/prompts", methods=["GET", "POST"])
-def prompts(project_id):
-    with get_db() as conn:
-        project = fetch_project_or_404(project_id)
-        profile = get_profile(project["profile_id"])
-        scripts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-        ).fetchall()]
-
-    def default_script_id():
-        long_s = next((s for s in scripts_rows if s["type"] == "long"), None)
-        return long_s["id"] if long_s else (scripts_rows[0]["id"] if scripts_rows else None)
-
-    raw_script_id = request.values.get("script_id")
-    if raw_script_id and any(str(s["id"]) == str(raw_script_id) for s in scripts_rows):
-        active_script_id = int(raw_script_id)
-    else:
-        active_script_id = default_script_id()
-
-    with get_db() as conn:
-        scenes_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
-            (project_id, active_script_id),
-        ).fetchall()]
-        prompts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM prompts WHERE project_id=?", (project_id,)
-        ).fetchall()]
-
-    prompts_by_scene = {p["scene_id"]: p for p in prompts_rows}
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        if action == "generate_all":
-            generated_all = []
-            for idx, sc in enumerate(scenes_rows, start=1):
-                sys_p, user_p = build_prompts_prompt(project, profile, sc, idx, len(scenes_rows))
-                generated = call_llm(sys_p, user_p)
-                generated_all.append({
-                    "scene": sc,
-                    "generated": generated,
-                    "sys": sys_p,
-                    "user": user_p,
-                })
-            return render_template("prompts.html", project=project, profile=profile,
-                                   scripts=scripts_rows, scenes=scenes_rows,
-                                   prompts_by_scene=prompts_by_scene,
-                                   active_script_id=active_script_id,
-                                   batch=generated_all)
-        elif action == "save_all":
-            count = 0
-            with get_db() as conn:
-                for sc in scenes_rows:
-                    key = f"text_{sc['id']}"
-                    text = request.form.get(key, "").strip()
-                    if not text:
-                        continue
-                    parsed = parse_prompt_json(text)
-                    if not parsed:
-                        continue
-                    existing = conn.execute(
-                        "SELECT id FROM prompts WHERE scene_id=?", (sc["id"],)
-                    ).fetchone()
-                    if existing:
-                        conn.execute("""
-                            UPDATE prompts SET subject=?, environment=?, era=?, lighting=?,
-                                camera=?, composition=?, atmosphere=?, style=?,
-                                full_prompt_en=?, full_prompt_es=?, updated_at=?
-                            WHERE id=?
-                        """, (
-                            parsed.get("subject", ""), parsed.get("environment", ""),
-                            parsed.get("era", ""), parsed.get("lighting", ""),
-                            parsed.get("camera", ""), parsed.get("composition", ""),
-                            parsed.get("atmosphere", ""), parsed.get("style", ""),
-                            parsed.get("full_prompt_en", ""),
-                            parsed.get("full_prompt_es", ""),
-                            now_iso(), existing["id"],
-                        ))
-                    else:
-                        conn.execute("""
-                            INSERT INTO prompts (project_id, scene_id, subject, environment,
-                                era, lighting, camera, composition, atmosphere, style,
-                                full_prompt_en, full_prompt_es, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            project_id, sc["id"],
-                            parsed.get("subject", ""), parsed.get("environment", ""),
-                            parsed.get("era", ""), parsed.get("lighting", ""),
-                            parsed.get("camera", ""), parsed.get("composition", ""),
-                            parsed.get("atmosphere", ""), parsed.get("style", ""),
-                            parsed.get("full_prompt_en", ""),
-                            parsed.get("full_prompt_es", ""),
-                            now_iso(),
-                        ))
-                    count += 1
-                if count:
-                    conn.execute("UPDATE projects SET status='prompts', updated_at=? WHERE id=?",
-                                  (now_iso(), project_id))
-            flash(f"Guardados {count} prompts", "ok")
-            return redirect(url_for("prompts", project_id=project_id, script_id=active_script_id))
-        elif action == "delete":
-            prompt_id = request.form.get("prompt_id")
-            with get_db() as conn:
-                conn.execute("DELETE FROM prompts WHERE id=?", (prompt_id,))
-            return redirect(url_for("prompts", project_id=project_id, script_id=active_script_id))
-
-    return render_template("prompts.html", project=project, profile=profile,
-                           scripts=scripts_rows, scenes=scenes_rows,
-                           prompts_by_scene=prompts_by_scene,
-                           active_script_id=active_script_id)
-
-
 # --- Metadata ----------------------------------------------------------------
 
 @app.route("/projects/<int:project_id>/metadata", methods=["GET", "POST"])
@@ -2043,7 +1907,6 @@ def export(project_id):
         concept_obj = fetch_optional_dict(conn, "SELECT * FROM concept WHERE project_id=?", (project_id,))
         scripts_rows = [dict(r) for r in conn.execute("SELECT * FROM scripts WHERE project_id=?", (project_id,)).fetchall()]
         scenes_rows = [dict(r) for r in conn.execute("SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)).fetchall()]
-        prompts_rows = [dict(r) for r in conn.execute("SELECT * FROM prompts WHERE project_id=?", (project_id,)).fetchall()]
         meta_rows = [dict(r) for r in conn.execute("SELECT * FROM metadata_records WHERE project_id=?", (project_id,)).fetchall()]
 
     if request.method == "POST":
@@ -2143,7 +2006,6 @@ def export(project_id):
         if scenes_rows:
             edir = out_dir / "04_escenas"
             edir.mkdir(exist_ok=True)
-            prompts_by_scene = {p["scene_id"]: p for p in prompts_rows}
             with open(edir / "escenas.md", "w", encoding="utf-8") as f:
                 f.write(f"# Escenas — {project['name']}\n")
                 f.write(f"_Total: {len(scenes_rows)} escenas · "
@@ -2151,10 +2013,7 @@ def export(project_id):
                         f"{sum(s.get('duration_seconds', 0) for s in scenes_rows)}s_\n")
                 f.write("---\n")
                 for s in scenes_rows:
-                    p = prompts_by_scene.get(s["id"], {})
-                    # Preferir prompt_EN si existe; si no, fallback a la visual_description.
-                    imagen = (p.get("full_prompt_en") or "").strip() \
-                        or s.get("visual_description", "").strip()
+                    imagen = s.get("visual_description", "").strip()
                     f.write(f"## ESCENA {s['scene_number']}\n")
                     f.write(f"**TEXTO AUDIO:** {s.get('narration','').strip()}\n")
                     f.write(f"**IMAGEN:** {imagen}\n")
@@ -2163,38 +2022,9 @@ def export(project_id):
                             f"Duración: {s.get('duration_seconds',0)}s_\n")
                     f.write("---\n")
 
-        # 05_prompts/
-        # Un único archivo prompts.md con todos los prompts visuales.
-        if prompts_rows:
-            pdir = out_dir / "05_prompts"
-            pdir.mkdir(exist_ok=True)
-            with open(pdir / "prompts.md", "w", encoding="utf-8") as f:
-                f.write(f"# Prompts visuales — {project['name']}\n")
-                f.write(f"_Total: {len(prompts_rows)} prompts_\n")
-                f.write("---\n")
-                for p in prompts_rows:
-                    scene_num = next(
-                        (s["scene_number"] for s in scenes_rows if s["id"] == p["scene_id"]),
-                        0,
-                    )
-                    f.write(f"## PROMPT ESCENA {scene_num}\n")
-                    f.write(f"**Sujeto:** {p.get('subject','')}\n")
-                    f.write(f"**Entorno:** {p.get('environment','')}\n")
-                    f.write(f"**Época:** {p.get('era','')}\n")
-                    f.write(f"**Iluminación:** {p.get('lighting','')}\n")
-                    f.write(f"**Cámara:** {p.get('camera','')}\n")
-                    f.write(f"**Composición:** {p.get('composition','')}\n")
-                    f.write(f"**Atmósfera:** {p.get('atmosphere','')}\n")
-                    f.write(f"**Estilo:** {p.get('style','')}\n")
-                    f.write("### Prompt (EN)\n")
-                    f.write(f"{p.get('full_prompt_en','')}\n")
-                    f.write("### Prompt (ES)\n")
-                    f.write(f"{p.get('full_prompt_es','')}\n")
-                    f.write("---\n")
-
-        # 06_metadata/
+        # 05_metadata/
         if meta_rows:
-            mdir = out_dir / "06_metadata"
+            mdir = out_dir / "05_metadata"
             mdir.mkdir(exist_ok=True)
             for m in meta_rows:
                 fname = f"metadata_{m['platform']}.md"
@@ -2232,7 +2062,7 @@ def export(project_id):
                         for i, t in enumerate(ost, 1):
                             f.write(f"{i}. {t}\n")
 
-        # 07_prompts_usados.md
+        # 06_prompts_usados.md
         stage_prompts = list_saved_prompts(project_id)
         if stage_prompts:
             stage_labels = {
@@ -2244,7 +2074,7 @@ def export(project_id):
                 "metadata_youtube": "Metadata YouTube",
                 "metadata_shorts": "Metadata Shorts",
             }
-            with open(out_dir / "07_prompts_usados.md", "w", encoding="utf-8") as f:
+            with open(out_dir / "06_prompts_usados.md", "w", encoding="utf-8") as f:
                 f.write(f"# Prompts usados en {project['name']}\n\n")
                 f.write("Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n\n")
                 for stage, p in stage_prompts.items():
@@ -2257,7 +2087,7 @@ def export(project_id):
                     f.write(p.get("user_prompt", ""))
                     f.write("\n```\n\n---\n\n")
 
-        # 08_paquete_completo.json
+        # 07_paquete_completo.json
         bundle = {
             "project": project,
             "profile": profile,
@@ -2265,12 +2095,11 @@ def export(project_id):
             "concept": concept_obj,
             "scripts": scripts_rows,
             "scenes": scenes_rows,
-            "prompts": prompts_rows,
             "metadata": meta_rows,
             "stage_prompts": stage_prompts,
             "exported_at": now_iso(),
         }
-        with open(out_dir / "08_paquete_completo.json", "w", encoding="utf-8") as f:
+        with open(out_dir / "07_paquete_completo.json", "w", encoding="utf-8") as f:
             json.dump(bundle, f, ensure_ascii=False, indent=2)
 
         # Crear ZIP
@@ -2298,7 +2127,6 @@ def export(project_id):
                            has_concept=bool(concept_obj.get("angle")),
                            scripts=scripts_rows,
                            scenes=scenes_rows,
-                           prompts=prompts_rows,
                            metadata=meta_rows,
                            qc_errors=qc_errors)
 
