@@ -7,6 +7,40 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `run_qc` + `qc()` solo movían el proyecto a `status='ready'` cuando
+  no había issues de ningún tipo. Ahora los `warning` e `info` no
+  bloquean la transición: solo los `error` lo hacen. Los proyectos
+  completos pasan a `ready` aunque el QC detecte avisos.
+- README y `templates/export.html` anunciaban `07_paquete_completo.json`,
+  pero el código generaba `08_paquete_completo.json` con un fichero
+  previo `07_prompts_usados.md`. Documentación y plantilla alineadas
+  con la estructura real.
+- `verify_fosiles.py` asumía que el proyecto con `id=1` existía y
+  fallaba con 404 sobre una base de datos limpia. Ahora crea el
+  proyecto reutilizando el perfil por defecto si hace falta.
+- `_stage_context()` reasignaba `ctx["research"]` en tres ramas
+  distintas (`concept`, `script_*`, `concept` de nuevo). Reescrito para
+  cargar cada contexto una sola vez según la etapa.
+- `build_metadata_prompt()` mostraba `profile['platforms']` como JSON
+  crudo. Ahora se parsea y se presenta como lista legible.
+- `import urllib.request` se hacía dentro de `call_llm`. Movido al
+  bloque de imports del módulo.
+- Footer sin margen superior visible por orden de declaración CSS
+  (margin-top se sobrescribía con margin-left/right: auto). Corregido.
+
+### Changed
+
+- `test_core.py` añadía `gc.collect()` entre tests QC/export para
+  evitar `PermissionError` en la limpieza de `tempfile.TemporaryDirectory`
+  en Windows (SQLite conserva el handle del `.db` aunque el `with`
+  cierre la conexión).
+- Documentación: `docs/ARCHITECTURE.md` y `docs/DECISIONS.md` pasan de
+  plantilla vacía a una descripción completa de módulos, modelo de
+  datos y decisiones técnicas.
+- `TASKS.md` actualizado con el backlog real.
+
 ## [1.0.0] - 2026-08-29
 
 ### Added

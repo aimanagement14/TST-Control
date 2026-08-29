@@ -21,6 +21,8 @@ instance/
 *.sqlite
 *.sqlite3
 workflow.db
+projects/
+!projects/.gitkeep
 
 .idea/
 .vscode/

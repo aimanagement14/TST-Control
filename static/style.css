@@ -471,9 +471,9 @@ details summary:hover { color: var(--accent); }
 .footer {
     border-top: 1px solid var(--border);
     padding: 18px 24px;
-    margin-top: 40px;
+    margin: 40px auto 0;
     color: var(--text-3);
     font-size: .8rem;
     text-align: center;
-    display: flex; justify-content: space-between; max-width: 1280px; margin-left: auto; margin-right: auto;
+    display: flex; justify-content: space-between; max-width: 1280px;
 }

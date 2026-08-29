@@ -540,6 +540,9 @@ def test_export_creates_zip(tmp_path):
 
 def main():
     import tempfile
+    import gc
+    from pathlib import Path
+
     print("\n=== TESTS DE PARSERS ===")
     test_parse_research()
     test_parse_research_with_variations()
@@ -557,22 +560,24 @@ def main():
     test_count_words()
     test_estimate_duration()
 
+    def _run_qc_test(test_fn, label):
+        with tempfile.TemporaryDirectory() as tmp:
+            test_fn(Path(tmp))
+            # Forzar liberación de handles SQLite antes de borrar el tmp
+            # (necesario en Windows, donde el delete falla con WinError 32).
+            gc.collect()
+
     print("\n=== TESTS DE QC ===")
-    with tempfile.TemporaryDirectory() as tmp:
-        from pathlib import Path
-        test_qc_detects_missing_research(Path(tmp))
-    with tempfile.TemporaryDirectory() as tmp:
-        test_qc_detects_short_script(Path(tmp))
-    with tempfile.TemporaryDirectory() as tmp:
-        test_qc_detects_repetition(Path(tmp))
-    with tempfile.TemporaryDirectory() as tmp:
-        test_qc_detects_missing_sources(Path(tmp))
-    with tempfile.TemporaryDirectory() as tmp:
-        test_qc_passes_complete_project(Path(tmp))
+    _run_qc_test(test_qc_detects_missing_research, "missing_research")
+    _run_qc_test(test_qc_detects_short_script, "short_script")
+    _run_qc_test(test_qc_detects_repetition, "repetition")
+    _run_qc_test(test_qc_detects_missing_sources, "missing_sources")
+    _run_qc_test(test_qc_passes_complete_project, "complete_project")
 
     print("\n=== TESTS DE EXPORTACIÓN ===")
     with tempfile.TemporaryDirectory() as tmp:
         test_export_creates_zip(Path(tmp))
+        gc.collect()
 
     print("\n✅ Todos los tests pasaron\n")
 

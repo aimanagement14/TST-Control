@@ -19,7 +19,41 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import app
 
-PROJECT_ID = 1  # El proyecto ya existe
+PROJECT_ID = 1
+
+
+def ensure_project():
+    """Garantiza que existe un proyecto válido con id=PROJECT_ID.
+
+    Si no hay proyectos o el id solicitado no existe, crea uno reutilizando
+    el perfil por defecto. Devuelve el id del proyecto listo para usar.
+    """
+    with app.get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM projects WHERE id=?", (PROJECT_ID,)
+        ).fetchone()
+        if row:
+            return row["id"]
+        default_profile = conn.execute(
+            "SELECT id FROM profiles WHERE is_default=1 LIMIT 1"
+        ).fetchone()
+        if not default_profile:
+            default_profile = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()
+        profile_id = default_profile["id"] if default_profile else None
+        cur = conn.execute(
+            """INSERT INTO projects (id, name, topic, profile_id, status,
+               created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'research', ?, ?)""",
+            (
+                PROJECT_ID,
+                "Todo sobre los Fosiles",
+                "Fósiles del Himalaya",
+                profile_id,
+                "2026-01-01T00:00:00",
+                "2026-01-01T00:00:00",
+            ),
+        )
+        return cur.lastrowid or PROJECT_ID
 
 # ---------------------------------------------------------------------------
 # Datos simulados del LLM (modo manual) por etapa
@@ -434,6 +468,13 @@ def log(stage, msg, ok=True):
 
 def main():
     client = app.app.test_client()
+
+    # ---- Bootstrap: garantiza que el proyecto existe ----
+    print("=== Bootstrap ===")
+    ensure_project()
+    with app.get_db() as conn:
+        n = conn.execute("SELECT COUNT(*) AS n FROM projects").fetchone()["n"]
+        log("Proyecto bootstrap", f"{n} proyecto(s) en BD", True)
 
     # ---- 0) Verificar dashboard ----
     print("\n=== 0) Dashboard ===")

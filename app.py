@@ -13,6 +13,7 @@ import os
 import re
 import json
 import sqlite3
+import urllib.request
 import zipfile
 import shutil
 import uuid
@@ -438,14 +439,13 @@ def _stage_context(project_id, stage):
     """Carga el contexto necesario para regenerar el prompt de una etapa."""
     ctx = {}
     with get_db() as conn:
-        if stage in ("concept", "script_long", "script_short"):
+        if stage in ("concept", "script_long", "script_short",
+                     "scenes", "metadata_youtube", "metadata_shorts"):
             ctx["research"] = fetch_optional_dict(
                 conn, "SELECT * FROM research WHERE project_id=?", (project_id,),
             )
-        if stage in ("script_long", "script_short", "scenes", "metadata_youtube", "metadata_shorts"):
-            ctx["research"] = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?", (project_id,),
-            )
+        if stage in ("script_long", "script_short", "scenes",
+                     "metadata_youtube", "metadata_shorts"):
             ctx["concept"] = fetch_optional_dict(
                 conn, "SELECT * FROM concept WHERE project_id=?", (project_id,),
             )
@@ -453,10 +453,6 @@ def _stage_context(project_id, stage):
                 "short" if stage in ("script_short", "metadata_shorts") else "long"
             )
             ctx["script"] = get_script(project_id, script_type) or {}
-        if stage == "concept":
-            ctx["research"] = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?", (project_id,),
-            )
     return ctx
 
 
@@ -620,12 +616,20 @@ def build_metadata_prompt(project, profile, script, platform):
     else:
         sys_prompt = CONFIG["prompts"]["metadata_shorts"]["system"]
         fmt = CONFIG["prompts"]["metadata_shorts"]["format"]
+    platforms_raw = profile["platforms"] if profile else ""
+    platforms_list = []
+    if platforms_raw:
+        try:
+            platforms_list = json.loads(platforms_raw)
+        except Exception:
+            platforms_list = [platforms_raw]
+    platforms_txt = ", ".join(platforms_list) if platforms_list else "no definidas"
     user_msg = (
         f"Tema: {project['topic']}\n"
         f"Título del guion: {script.get('title','')}\n"
         f"Hook: {script.get('hook','')}\n"
         f"Tipo de contenido: {profile['content_type'] if profile else ''}\n"
-        f"Plataformas objetivo: {profile['platforms'] if profile else ''}\n\n"
+        f"Plataformas objetivo: {platforms_txt}\n\n"
         f"Guion completo:\n{script.get('body_full','')[:3000]}\n\n"
         f"Devuelve en este formato:\n\n{fmt}"
     )
@@ -675,7 +679,6 @@ def call_llm(sys_prompt, user_msg):
         if not api_key:
             return _manual_fallback(sys_prompt, user_msg, "No hay API key configurada")
         try:
-            import urllib.request
             data = json.dumps({
                 "model": model,
                 "messages": [
@@ -724,7 +727,6 @@ def call_llm(sys_prompt, user_msg):
         except ImportError:
             # Fallback a la API REST directa
             try:
-                import urllib.request
                 data = json.dumps({
                     "model": model,
                     "max_tokens": CONFIG["llm"]["max_tokens"],
@@ -1740,8 +1742,12 @@ def qc(project_id):
     if request.method == "POST":
         issues = run_qc(project_id)
         save_qc_issues(project_id, issues)
-        if not issues:
-            with get_db() as conn:
+        errors = [i for i in issues if i[1] == "error"]
+        with get_db() as conn:
+            if errors:
+                conn.execute("UPDATE projects SET updated_at=? WHERE id=?",
+                             (now_iso(), project_id))
+            else:
                 conn.execute("UPDATE projects SET status='ready', updated_at=? WHERE id=?",
                              (now_iso(), project_id))
         flash(f"Análisis completado: {len(issues)} avisos", "ok")

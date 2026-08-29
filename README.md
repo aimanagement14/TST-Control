@@ -108,10 +108,31 @@ PROYECTO.zip
 ├── 06_metadata/
 │   ├── metadata_youtube.md
 │   └── metadata_shorts.md
-└── 07_paquete_completo.json
+├── 07_prompts_usados.md   # prompts SYS + USER editados durante el proyecto
+└── 08_paquete_completo.json
 ```
 
 Listo para conectar con tu pipeline de producción.
+
+## Verificación end-to-end
+
+`verify_fosiles.py` ejecuta el flujo completo contra el test client de Flask
+utilizando datos simulados del LLM. Crea un proyecto si no existe, pasa por
+las 8 etapas, ejecuta el control de calidad y genera el ZIP.
+
+```bash
+python verify_fosiles.py
+```
+
+Útil para detectar regresiones sin depender de un LLM real.
+
+## Tests
+
+```bash
+python test_core.py
+```
+
+Cubre parsers, utilidades, QC engine y exportación.
 
 ## Principios
 
