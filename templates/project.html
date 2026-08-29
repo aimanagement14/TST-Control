@@ -2,113 +2,117 @@
 {% block title %}{{ project.name }} · {{ app_name }}{% endblock %}
 
 {% block content %}
-<section class="page-head">
+<section class="slate-head">
     <div>
-        <a href="{{ url_for('dashboard') }}" class="back-link">← Dashboard</a>
+        <p class="eyebrow">
+            <a href="{{ url_for('dashboard') }}">Proyectos</a>
+            &middot; <span class="num">#{{ project.id }}</span>
+        </p>
         <h1>{{ project.name }}</h1>
-        <p class="muted">{{ project.topic }}</p>
+        <p class="lede">{{ project.topic }}</p>
+        <p class="slate-meta">
+            <span>Estado <b>{{ status_label(project.status) }}</b></span>
+            <span>Etapas <b>{{ rail.done }}/{{ rail.total }}</b></span>
+            <span>Narración <b>{% if rail.runtime.has_script %}{{ rail.runtime.timecode }}{% else %}--:--{% endif %}</b> / {{ rail.runtime.target_timecode }}</span>
+            <span>Actualizado <b>{{ project.updated_at[:16]|replace('T', ' ') }}</b></span>
+        </p>
     </div>
-    <div class="page-head-actions">
-        <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}"
-              onsubmit="return confirm('¿Eliminar este proyecto y todo su contenido?')" style="display:inline">
-            <button class="btn btn-ghost btn-danger">Eliminar</button>
-        </form>
-        <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary">Exportar</a>
+    <div class="slate-actions">
+        {% if rail.next %}
+        <a class="btn btn-primary" href="{{ rail.next.url }}">Continuar en {{ rail.next.label }}</a>
+        <a class="btn btn-ghost" href="{{ url_for('export', project_id=project.id) }}">Exportar</a>
+        {% else %}
+        <a class="btn btn-primary" href="{{ url_for('export', project_id=project.id) }}">Exportar paquete</a>
+        <a class="btn btn-ghost" href="{{ url_for('qc', project_id=project.id) }}">Repasar calidad</a>
+        {% endif %}
     </div>
 </section>
 
 {% if profile %}
-<div class="profile-strip">
-    <span class="muted small">Perfil:</span>
-    <strong>{{ profile.name }}</strong>
-    <span class="muted small">· Tono {{ profile.tone }} · Estilo {{ profile.style }} · {{ profile.mystery_level }}/10 misterio · {{ profile.drama_level }}/10 drama · {{ profile.narration_speed }} ppm</span>
-</div>
+<details class="fold">
+    <summary>Perfil aplicado: {{ profile.name }}</summary>
+    <ul class="data-list">
+        <li><span>Tipo de contenido</span><b>{{ profile.content_type or '—' }}</b></li>
+        <li><span>Audiencia</span><b>{{ profile.audience or '—' }}</b></li>
+        <li><span>Tono</span><b>{{ profile.tone or '—' }}</b></li>
+        <li><span>Estilo visual</span><b>{{ profile.style or '—' }}</b></li>
+        <li><span>Misterio / drama</span><b>{{ profile.mystery_level }} · {{ profile.drama_level }}</b></li>
+        <li><span>Velocidad de narración</span><b>{{ profile.narration_speed }} ppm</b></li>
+    </ul>
+    <p class="hint">Los perfiles se editan en <a href="{{ url_for('profiles') }}">Perfiles</a>.</p>
+</details>
 {% endif %}
 
-<div class="stages-grid">
-    <a class="stage-card {% if project.stages.research %}done{% endif %}" href="{{ url_for('research', project_id=project.id) }}">
-        <div class="stage-num">01</div>
-        <h3>Investigación</h3>
-        <p>Hechos verificados, fuentes, teorías.</p>
+<h2 class="mt-3">Hoja de ruta</h2>
+<div class="rundown">
+    {% for cell in rail.cells %}
+    <a class="rundown-row{% if cell.done %} is-done{% endif %}{% if rail.next and cell.key == rail.next.key %} is-next{% endif %}"
+       href="{{ cell.url }}">
+        <span class="rundown-num">{{ cell.num }}</span>
+        <span>
+            <span class="rundown-label">{{ cell.label }}</span>
+            <span class="rundown-hint"> — {{ cell.hint }}</span>
+        </span>
+        {% if cell.done %}
+        <span class="chip chip-done">Listo</span>
+        {% elif rail.next and cell.key == rail.next.key %}
+        <span class="chip chip-next">Te toca</span>
+        {% else %}
+        <span class="chip">Pendiente</span>
+        {% endif %}
+        <span class="rundown-arrow">&rarr;</span>
     </a>
-    <a class="stage-card {% if project.stages.concept %}done{% endif %}" href="{{ url_for('concept', project_id=project.id) }}">
-        <div class="stage-num">02</div>
-        <h3>Concepto</h3>
-        <p>Ángulo, tesis, gancho emocional.</p>
-    </a>
-    <a class="stage-card {% if project.stages.scripts_long %}done{% endif %}" href="{{ url_for('scripts', project_id=project.id) }}">
-        <div class="stage-num">03</div>
-        <h3>Guion 5 min</h3>
-        <p>Documental cinematográfico completo.</p>
-    </a>
-    <a class="stage-card {% if project.stages.scripts_short %}done{% endif %}" href="{{ url_for('scripts', project_id=project.id) }}">
-        <div class="stage-num">04</div>
-        <h3>Guion 1 min</h3>
-        <p>Versión corta para Shorts/Reels/TikTok.</p>
-    </a>
-    <a class="stage-card {% if project.stages.scenes %}done{% endif %}" href="{{ url_for('scenes', project_id=project.id) }}">
-        <div class="stage-num">05</div>
-        <h3>Escenas</h3>
-        <p>Narración, visual, cámara, duración.</p>
-    </a>
-    <a class="stage-card {% if project.stages.prompts %}done{% endif %}" href="{{ url_for('prompts', project_id=project.id) }}">
-        <div class="stage-num">06</div>
-        <h3>Prompts visuales</h3>
-        <p>Plantilla cinematográfica por escena.</p>
-    </a>
-    <a class="stage-card {% if project.stages.metadata %}done{% endif %}" href="{{ url_for('metadata', project_id=project.id) }}">
-        <div class="stage-num">07</div>
-        <h3>Metadata</h3>
-        <p>YouTube + Shorts/Reels/TikTok/Facebook.</p>
-    </a>
-    <a class="stage-card" href="{{ url_for('qc', project_id=project.id) }}">
-        <div class="stage-num">08</div>
-        <h3>Control de calidad</h3>
-        <p>Duración, estructura, fuentes, repeticiones.</p>
-    </a>
-</div>
-
-<div class="status-strip">
-    <strong>Estado del proyecto:</strong>
-    <span class="status-pill status-{{ project.status }}">{{ project.status }}</span>
-    <span class="muted small">· Última actualización {{ project.updated_at[:16] }}</span>
+    {% endfor %}
 </div>
 
 {% if saved_prompts %}
-<div class="card mt-3">
-    <div class="card-head">
-        <h3>📝 Prompts del proyecto</h3>
-        <span class="muted small">{{ saved_prompts|length }} guardados</span>
+{% set stage_pages = {
+    'research': ('Investigación', 'research'),
+    'concept': ('Concepto', 'concept'),
+    'script_long': ('Guion 5 min', 'scripts'),
+    'script_short': ('Guion 1 min', 'scripts'),
+    'scenes': ('Escenas', 'scenes'),
+    'metadata_youtube': ('Metadata YouTube', 'metadata'),
+    'metadata_shorts': ('Metadata Shorts', 'metadata'),
+} %}
+<div class="panel mt-3">
+    <div class="panel-head">
+        <h3>Prompts guardados</h3>
+        <span class="chip">{{ saved_prompts|length }} de 7</span>
         <form method="post" action="{{ url_for('backfill_prompts', project_id=project.id) }}"
-              style="display:inline" onsubmit="return confirm('¿Regenerar los prompts de las etapas que ya tienen contenido? Solo se rellenan los huecos; los prompts editados a mano se conservan.')">
-            <button class="btn btn-ghost btn-sm" title="Regenera prompts para etapas con contenido pero sin prompt guardado">
-                ↻ Regenerar prompts pendientes
-            </button>
+              class="inline-form"
+              onsubmit="return confirm('Se generan los prompts que falten en etapas que ya tienen contenido. Los prompts que editaste a mano se conservan.')">
+            <button class="btn btn-ghost btn-sm">Rellenar los que falten</button>
         </form>
     </div>
-    <p class="muted small">Los prompts que has ido generando y editando. Se guardan dentro del proyecto y aparecen en la exportación.</p>
-    <div class="prompts-overview">
-        {% set stage_labels = {
-            'research': ('Investigación', 'research'),
-            'concept': ('Concepto', 'concept'),
-            'script_long': ('Guion 5 min', 'scripts'),
-            'script_short': ('Guion 1 min', 'scripts'),
-            'scenes': ('Escenas', 'scenes'),
-            'metadata_youtube': ('Metadata YouTube', 'metadata'),
-            'metadata_shorts': ('Metadata Shorts', 'metadata'),
-        } %}
-        {% for stage, p in saved_prompts.items() %}
-            {% set label, route = stage_labels.get(stage, (stage, 'research')) %}
-        <div class="prompt-overview-item">
-            <div class="prompt-overview-head">
-                <strong>{{ label }}</strong>
-                <span class="muted small">{{ p.updated_at[:16] }}</span>
-            </div>
-            <p class="muted small">{{ p.user_prompt[:140] }}{% if p.user_prompt|length > 140 %}…{% endif %}</p>
-            <a href="{{ url_for(route, project_id=project.id) }}" class="btn btn-ghost btn-sm">Editar</a>
-        </div>
+    <p class="hint">Cada etapa guarda el prompt con el que se generó su contenido. Se incluyen en la exportación.</p>
+    <ul class="data-list mt-2">
+        {% for stage, labels in stage_pages.items() %}
+        {% set prompt = saved_prompts.get(stage) %}
+        {% if prompt %}
+        <li>
+            <span>
+                <span class="rundown-label">{{ labels[0] }}</span>
+                <span class="hint">{{ prompt.user_prompt[:110] }}{% if prompt.user_prompt|length > 110 %}…{% endif %}</span>
+            </span>
+            <a href="{{ url_for(labels[1], project_id=project.id) }}" class="btn btn-ghost btn-sm">Abrir etapa</a>
+        </li>
+        {% endif %}
         {% endfor %}
-    </div>
+    </ul>
 </div>
 {% endif %}
+
+<div class="stepper">
+    <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}"
+          onsubmit="return confirm('Se elimina el proyecto y todo su contenido. Esta acción no se puede deshacer.')">
+        <button class="btn btn-danger btn-sm">Eliminar proyecto</button>
+    </form>
+    {% if rail.next %}
+    <a href="{{ rail.next.url }}" class="step-next">
+        <span class="step-label">Siguiente paso</span>
+        <span class="step-name">{{ rail.next.label }} &rarr;</span>
+    </a>
+    {% endif %}
+</div>
 {% endblock %}

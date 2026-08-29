@@ -1,88 +1,118 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'scripts' %}
 {% block title %}Guiones · {{ project.name }}{% endblock %}
 
-{% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Guiones</h1>
-        <p class="muted">Versión documental de 5 minutos y versión corta de 1 minuto, ambas desde la misma base.</p>
+{% set wpm = (profile.narration_speed if profile else 0) or qc_checks.default_wpm %}
+
+{% macro script_section(stype, num, label, lede, script, saved, sys_value, user_value,
+                        is_open, min_words, max_words) %}
+{% set words = (script.word_count if script else 0) or 0 %}
+{% set state = '' if not words else ('is-over' if words > max_words else ('is-warn' if words < min_words else 'is-ok')) %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow">Etapa <span class="num">{{ num }}</span></p>
+            <h2>{{ label }}</h2>
+        </div>
+        <p class="spec {{ state }}">
+            <span><b>{{ words }}</b> palabras</span>
+            <span><b>{{ timecode(words / wpm * 60) }}</b> a {{ wpm }} ppm</span>
+            <span>objetivo {{ min_words }}–{{ max_words }}</span>
+        </p>
+        <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="generate_prompt">
+            <input type="hidden" name="script_type" value="{{ stype }}">
+            <button class="btn btn-sm {% if saved %}btn-ghost{% else %}btn-primary{% endif %}">
+                {% if saved %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+            </button>
+        </form>
     </div>
-</section>
 
-{% macro prompt_block(stype, saved, sys_prompt_val, user_prompt_val, just_generated) %}
-<div class="card">
-    <div class="card-head">
-        <h2>{% if stype == 'long' %}📽️ Guion 5 min{% else %}📱 Guion 1 min{% endif %}</h2>
-        <span class="muted small">
-            {% if stype == 'long' %}{{ long_s.word_count if long_s else 0 }}{% else %}{{ short_s.word_count if short_s else 0 }}{% endif %} palabras
-            {% if saved %}<span class="status-pill status-ready">prompt guardado</span>{% endif %}
-        </span>
-    </div>
+    <p class="hint">{{ lede }}</p>
 
-    {% if not just_generated or just_generated != stype %}
-    <form method="post">
-        <input type="hidden" name="action" value="generate_prompt">
-        <input type="hidden" name="script_type" value="{{ stype }}">
-        <button type="submit" class="btn btn-primary btn-sm">⚡ Generar prompt ({{ stype }})</button>
-    </form>
-    {% endif %}
-
-    {% if (just_generated == stype) or saved %}
-    <div class="card mt-2">
-        <h4>📝 Prompt</h4>
+    {% if saved or sys_value %}
+    <details class="fold" data-prompt {% if is_open %}open{% endif %}>
+        <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
         <form method="post">
             <input type="hidden" name="action" value="save_prompt">
             <input type="hidden" name="script_type" value="{{ stype }}">
-            <label>Prompt del sistema
-                <textarea name="sys_prompt" rows="5">{{ sys_prompt_val or (saved.sys_prompt if saved else '') }}</textarea>
+            <label class="field">
+                <span class="label">Instrucciones del sistema</span>
+                <textarea name="sys_prompt" rows="4">{{ sys_value }}</textarea>
             </label>
-            <label>Prompt del usuario
-                <textarea name="user_prompt" rows="8">{{ user_prompt_val or (saved.user_prompt if saved else '') }}</textarea>
+            <label class="field">
+                <span class="label">Petición</span>
+                <textarea name="user_prompt" rows="8">{{ user_value }}</textarea>
             </label>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+            <div class="actions">
+                <button type="button" class="btn btn-sm" data-copy-button>Copiar prompt</button>
+                <button type="submit" class="btn btn-ghost btn-sm">Guardar cambios</button>
             </div>
         </form>
+    </details>
+    {% endif %}
+
+    {% if script %}
+    <div class="panel-inset mt-2">
+        <div class="panel-head">
+            <h4 class="title-plain">{{ script.title or 'Guion guardado' }}</h4>
+            <span class="chip chip-done">Guardado {{ script.updated_at[11:16] }}</span>
+        </div>
+        {% if script.body_full %}
+        <pre class="code" id="script-{{ stype }}">{{ script.body_full }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#script-{{ stype }}">
+                Copiar guion
+            </button>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
-    {% if just_generated == stype %}
-    <form method="post" class="mt-2">
-        <input type="hidden" name="action" value="save">
-        <input type="hidden" name="script_type" value="{{ stype }}">
-        <h4>Pegar respuesta del LLM</h4>
-        <textarea name="text" rows="12">{{ generated }}</textarea>
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Guardar guion {{ stype }}</button>
-        </div>
-    </form>
-    {% elif stype == 'long' and long_s %}
-    <div class="script-preview mt-2">
-        <h4>{{ long_s.title }}</h4>
-        {% if long_s.hook %}<p><strong>Hook:</strong> {{ long_s.hook }}</p>{% endif %}
-        {% if long_s.body_full %}
-        <details><summary>Ver guion completo</summary>
-        <pre class="code-block">{{ long_s.body_full }}</pre>
-        </details>
-        {% endif %}
-    </div>
-    {% elif stype == 'short' and short_s %}
-    <div class="script-preview mt-2">
-        <h4>{{ short_s.title }}</h4>
-        {% if short_s.hook %}<p><strong>Hook:</strong> {{ short_s.hook }}</p>{% endif %}
-        {% if short_s.body_full %}
-        <details><summary>Ver guion completo</summary>
-        <pre class="code-block">{{ short_s.body_full }}</pre>
-        </details>
-        {% endif %}
-    </div>
-    {% endif %}
-</div>
+    <details class="fold" {% if is_open or not script %}open{% endif %}>
+        <summary>{% if script %}Pegar una versión nueva{% else %}Respuesta del LLM{% endif %}</summary>
+        <form method="post">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="script_type" value="{{ stype }}">
+            <label class="field">
+                <span class="sr-only">Guion en texto</span>
+                <textarea name="text" rows="12"
+                          placeholder="Pega aquí el guion completo, con sus encabezados ## HOOK, ## CONTEXTO…">{% if is_open and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
+            </label>
+            <p class="spec" data-spec data-for="text" data-wpm="{{ wpm }}"
+               data-min="{{ min_words }}" data-max="{{ max_words }}">
+                <span><b data-words>0</b> palabras</span>
+                <span><b data-runtime>00:00</b> de narración</span>
+                <span>objetivo {{ min_words }}–{{ max_words }}</span>
+            </p>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">
+                    {% if script %}Reemplazar guion{% else %}Guardar guion{% endif %}
+                </button>
+            </div>
+        </form>
+    </details>
+</section>
 {% endmacro %}
 
-<div class="two-col-equal">
-    {{ prompt_block('long', saved_long, sys_prompt if gen_type == 'long' else None, user_prompt if gen_type == 'long' else None, gen_type) }}
-    {{ prompt_block('short', saved_short, sys_prompt if gen_type == 'short' else None, user_prompt if gen_type == 'short' else None, gen_type) }}
-</div>
+{% block content %}
+{{ ui.stage_head(project, '03–04', 'Guiones',
+    'La versión documental de 5 minutos y la versión vertical de 1 minuto, las dos desde la misma base.') }}
+
+{{ script_section('long', '03', 'Guion 5 min',
+    'Narración en off con tensión creciente: hook, contexto, bloques, revelaciones y cierre.',
+    long_s, saved_long,
+    sys_prompt if gen_type == 'long' else (saved_long.sys_prompt if saved_long else ''),
+    user_prompt if gen_type == 'long' else (saved_long.user_prompt if saved_long else ''),
+    gen_type == 'long',
+    qc_checks.min_words_long, qc_checks.max_words_long) }}
+
+{{ script_section('short', '04', 'Guion 1 min',
+    'Formato vertical: el hook entra en los primeros cinco segundos y el remate deja pensando.',
+    short_s, saved_short,
+    sys_prompt if gen_type == 'short' else (saved_short.sys_prompt if saved_short else ''),
+    user_prompt if gen_type == 'short' else (saved_short.user_prompt if saved_short else ''),
+    gen_type == 'short',
+    qc_checks.min_words_short, qc_checks.max_words_short) }}
 {% endblock %}

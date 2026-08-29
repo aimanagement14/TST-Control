@@ -4,156 +4,176 @@
 {% block content %}
 <section class="page-head">
     <div>
-        <h1>Configuración del LLM</h1>
-        <p class="muted">Cómo conectar la herramienta con tu modelo. Por defecto trabaja en modo manual (sin costos).</p>
+        <p class="eyebrow">Cómo se genera el contenido</p>
+        <h1>Configuración</h1>
+        <p class="lede">En modo manual la herramienta prepara los prompts y tú los llevas a tu LLM. Con una API los pide directamente.</p>
+    </div>
+    <div class="page-head-actions">
+        <span class="mode-chip {% if llm.key == 'api' %}is-api{% endif %}">
+            Ahora: {{ llm.label }}{% if llm.detail %} · {{ llm.detail }}{% endif %}
+        </span>
     </div>
 </section>
 
-<form method="post" class="form-card">
-    <h3>Proveedor activo</h3>
-    <p class="muted small">El proveedor que se usará cuando pulses "Generar prompt" en cualquier etapa.</p>
-    <div class="radio-group">
+<form method="post" class="panel">
+    <div class="panel-head">
+        <h2>Proveedor</h2>
+    </div>
+    <div class="options">
         {% for key, desc in config.llm.options.items() %}
-        <label class="radio">
-            <input type="radio" name="provider" value="{{ key }}" {% if config.llm.provider == key %}checked{% endif %}>
-            <div>
-                <strong>{{ key }}</strong>
-                <div class="muted small">{{ desc }}</div>
-            </div>
+        <label class="option">
+            <input type="radio" name="provider" value="{{ key }}"
+                   {% if config.llm.provider == key %}checked{% endif %}>
+            <span>
+                <span class="option-name">{{ provider_names.get(key, key) }}</span>
+                <span class="hint">{{ desc }}</span>
+            </span>
         </label>
         {% endfor %}
     </div>
 
-    <h3 class="mt-3">OpenAI / OpenAI-compatible (legacy)</h3>
-    <p class="muted small">Configuración por defecto. Si usas un preset, este campo se ignora en favor del preset activo.</p>
-    <label>API key
-        <input type="password" name="openai_key" value="{{ config.llm.openai.api_key }}" placeholder="sk-...">
-    </label>
-    <div class="form-row inline">
-        <label>Modelo
-            <input type="text" name="openai_model" value="{{ config.llm.openai.model }}">
+    <details class="fold mt-3">
+        <summary>Credenciales OpenAI-compatible</summary>
+        <label class="field">
+            <span class="label">Clave de API</span>
+            <input type="password" name="openai_key" value="{{ config.llm.openai.api_key }}" placeholder="sk-…">
         </label>
-        <label>Base URL
-            <input type="text" name="openai_base" value="{{ config.llm.openai.base_url }}">
+        <div class="field-row">
+            <label class="field">
+                <span class="label">Modelo</span>
+                <input type="text" name="openai_model" value="{{ config.llm.openai.model }}">
+            </label>
+            <label class="field">
+                <span class="label">URL base</span>
+                <input type="text" name="openai_base" value="{{ config.llm.openai.base_url }}">
+            </label>
+        </div>
+        <p class="hint">Si tienes un preset activo, estos valores se ignoran.</p>
+    </details>
+
+    <details class="fold">
+        <summary>Credenciales Anthropic Claude</summary>
+        <label class="field">
+            <span class="label">Clave de API</span>
+            <input type="password" name="anthropic_key" value="{{ config.llm.anthropic.api_key }}" placeholder="sk-ant-…">
         </label>
-    </div>
+        <label class="field">
+            <span class="label">Modelo</span>
+            <input type="text" name="anthropic_model" value="{{ config.llm.anthropic.model }}">
+        </label>
+    </details>
 
-    <h3 class="mt-3">Anthropic Claude</h3>
-    <label>API key
-        <input type="password" name="anthropic_key" value="{{ config.llm.anthropic.api_key }}" placeholder="sk-ant-...">
-    </label>
-    <label>Modelo
-        <input type="text" name="anthropic_model" value="{{ config.llm.anthropic.model }}">
-    </label>
-
-    <div class="form-actions">
+    <div class="actions">
         <button type="submit" class="btn btn-primary">Guardar configuración</button>
     </div>
 </form>
 
-<div class="card mt-3">
-    <h3>📡 Presets de conexión</h3>
-    <p class="muted small">Configuraciones reutilizables. Activa una para que el provider la use. Útil para cambiar entre MiniMax, OpenAI, Ollama, etc.</p>
+<section class="panel">
+    <div class="panel-head">
+        <h2>Presets de conexión</h2>
+        <span class="chip">{{ presets|length }} guardados</span>
+    </div>
+    <p class="hint">Configuraciones completas listas para activar: MiniMax, Azure, Ollama, LM Studio o tu propio servidor.</p>
 
     {% if presets %}
-    <table class="presets-table">
-        <thead>
-            <tr>
-                <th>Preset</th>
-                <th>Tipo</th>
-                <th>Modelo</th>
-                <th>Base URL</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for key, p in presets.items() %}
-            <tr class="{% if config.llm.active_preset == key %}active-preset{% endif %}">
-                <td>
-                    <strong>{{ p.label or key }}</strong>
-                    <div class="muted small">{{ key }}</div>
-                    {% if config.llm.active_preset == key %}<span class="status-pill status-ready">activo</span>{% endif %}
-                </td>
-                <td>{{ p.type }}</td>
-                <td><code>{{ p.model }}</code></td>
-                <td><code class="small">{{ p.base_url[:50] }}{% if p.base_url|length > 50 %}…{% endif %}</code></td>
-                <td>
-                    <form method="post" style="display:inline">
-                        <input type="hidden" name="action" value="activate_preset">
-                        <input type="hidden" name="preset_key" value="{{ key }}">
-                        <button class="btn btn-ghost btn-sm">Activar</button>
-                    </form>
-                    <form method="post" style="display:inline" onsubmit="return confirm('¿Eliminar preset?')">
-                        <input type="hidden" name="action" value="delete_preset">
-                        <input type="hidden" name="preset_key" value="{{ key }}">
-                        <button class="btn btn-ghost btn-sm btn-danger">×</button>
-                    </form>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-scroll mt-2">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Preset</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Modelo</th>
+                    <th scope="col">URL base</th>
+                    <th scope="col"><span class="sr-only">Acciones</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, p in presets.items() %}
+                <tr class="{% if config.llm.active_preset == key %}is-active{% endif %}">
+                    <td>
+                        <strong>{{ p.label or key }}</strong>
+                        <div class="hint"><code>{{ key }}</code></div>
+                        {% if config.llm.active_preset == key %}<span class="chip chip-done">Activo</span>{% endif %}
+                    </td>
+                    <td>{{ p.type }}</td>
+                    <td><code>{{ p.model }}</code></td>
+                    <td><code>{{ p.base_url[:44] }}{% if p.base_url|length > 44 %}…{% endif %}</code></td>
+                    <td>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="activate_preset">
+                            <input type="hidden" name="preset_key" value="{{ key }}">
+                            <button class="btn btn-ghost btn-sm">Activar</button>
+                        </form>
+                        <form method="post" class="inline-form"
+                              onsubmit="return confirm('Se elimina el preset «{{ key }}».')">
+                            <input type="hidden" name="action" value="delete_preset">
+                            <input type="hidden" name="preset_key" value="{{ key }}">
+                            <button class="btn btn-danger btn-sm" aria-label="Eliminar preset {{ key }}">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% endif %}
 
-    <h4 class="mt-3">+ Crear / editar preset</h4>
-    <form method="post">
-        <input type="hidden" name="action" value="save_preset">
-        <div class="form-row inline">
-            <label>Identificador (sin espacios)
-                <input type="text" name="preset_key" required placeholder="minimax-text, openai-pro, mi-servidor...">
+    <details class="fold mt-3">
+        <summary>Crear o editar un preset</summary>
+        <form method="post">
+            <input type="hidden" name="action" value="save_preset">
+            <div class="field-row">
+                <label class="field">
+                    <span class="label">Identificador</span>
+                    <input type="text" name="preset_key" required placeholder="minimax-text">
+                </label>
+                <label class="field">
+                    <span class="label">Nombre visible</span>
+                    <input type="text" name="label" placeholder="MiniMax text API">
+                </label>
+            </div>
+            <div class="field-row">
+                <label class="field">
+                    <span class="label">Tipo</span>
+                    <select name="type">
+                        <option value="openai">OpenAI-compatible</option>
+                        <option value="anthropic">Anthropic Claude</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span class="label">Modelo</span>
+                    <input type="text" name="model" placeholder="gpt-4o, claude-3-5-sonnet, MiniMax-Text-01">
+                </label>
+            </div>
+            <label class="field">
+                <span class="label">Clave de API</span>
+                <input type="password" name="api_key" placeholder="Déjalo vacío para conservar la actual">
             </label>
-            <label>Etiqueta visible
-                <input type="text" name="label" placeholder="MiniMax text API">
+            <label class="field">
+                <span class="label">URL base</span>
+                <input type="text" name="base_url" placeholder="https://api.openai.com/v1">
             </label>
-        </div>
-        <div class="form-row inline">
-            <label>Tipo
-                <select name="type">
-                    <option value="openai">OpenAI-compatible</option>
-                    <option value="anthropic">Anthropic Claude</option>
-                </select>
+            <label class="field">
+                <span class="label">Notas</span>
+                <textarea name="notes" rows="2" placeholder="Para qué sirve y dónde conseguir la clave."></textarea>
             </label>
-            <label>Modelo
-                <input type="text" name="model" placeholder="ej: gpt-4o, claude-3-5-sonnet, MiniMax-Text-01">
-            </label>
-        </div>
-        <label>API key
-            <input type="password" name="api_key" placeholder="(déjalo vacío para conservar el actual al editar)">
-        </label>
-        <label>Base URL (solo OpenAI-compatible)
-            <input type="text" name="base_url" placeholder="https://api.openai.com/v1">
-        </label>
-        <label>Notas
-            <textarea name="notes" rows="2" placeholder="Para qué es este preset, dónde conseguir la key, etc."></textarea>
-        </label>
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Guardar preset</button>
-        </div>
-    </form>
-</div>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Guardar preset</button>
+            </div>
+        </form>
+    </details>
 
-<div class="card mt-3">
-    <h3>❓ ¿Cómo uso MiniMax Token Plan?</h3>
-    <p><strong>Importante:</strong> el Token Plan de MiniMax está pensado para generación de <strong>video</strong> (H3.0 / Hailuo-2.3), no para texto. Tu herramienta trabaja con texto, así que el Token Plan no aplica directamente.</p>
-    <p>Si MiniMax expone una API de texto con formato OpenAI-compatible (lo más común en proveedores modernos), puedes:</p>
-    <ol>
-        <li>Crear un preset con <code>type=openai</code></li>
-        <li>Poner el <code>base_url</code> que te dé MiniMax</li>
-        <li>Pegar tu API key</li>
-        <li>Indicar el nombre exacto del modelo</li>
-        <li>Activar el preset</li>
-    </ol>
-    <p class="muted small">Si no estás seguro de los valores exactos, consulta la documentación de MiniMax para text LLM o usa el modo manual (puedes copiar los prompts a su interfaz web).</p>
-</div>
-
-<div class="card mt-3">
-    <h3>📂 Archivos del proyecto</h3>
-    <ul class="meta-list">
-        <li><strong>app.py</strong> — lógica principal</li>
-        <li><strong>config.json</strong> — configuración (este formulario la edita)</li>
-        <li><strong>workflow.db</strong> — base de datos SQLite</li>
-        <li><strong>projects/</strong> — exportaciones</li>
-        <li><strong>templates/</strong> — plantillas HTML</li>
-    </ul>
-</div>
+    <details class="fold">
+        <summary>MiniMax: qué plan sirve para esta herramienta</summary>
+        <p class="small">
+            El Token Plan de MiniMax está pensado para generación de vídeo (H3.0 / Hailuo-2.3).
+            Esta herramienta sólo trabaja con texto, así que ese plan no aplica.
+        </p>
+        <p class="small">
+            Si tienes acceso a su API de texto con formato OpenAI-compatible: crea un preset de
+            tipo <code>openai</code>, pon la URL base y el modelo exactos que te indiquen, pega la
+            clave y activa el preset. Si no, usa el modo manual y copia los prompts a su interfaz web.
+        </p>
+    </details>
+</section>
 {% endblock %}

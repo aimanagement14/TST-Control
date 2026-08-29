@@ -2,44 +2,64 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0A0D13">
     <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <header class="topbar">
-        <div class="topbar-inner">
-            <a href="{{ url_for('dashboard') }}" class="brand">
-                <span class="brand-mark">⬢</span>
-                <div>
-                    <div class="brand-name">{{ app_name }}</div>
-                    <div class="brand-tag">{{ app_tagline }}</div>
-                </div>
-            </a>
-            <nav class="topnav">
-                <a href="{{ url_for('dashboard') }}">Proyectos</a>
-                <a href="{{ url_for('profiles') }}">Perfiles</a>
-                <a href="{{ url_for('settings') }}">Configuración</a>
-            </nav>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+<header class="console">
+    <div class="console-inner">
+        <a href="{{ url_for('dashboard') }}" class="brand">
+            <span class="brand-name">{{ app_name }}</span>
+            <span class="brand-tag">{{ app_tagline }}</span>
+        </a>
+        <nav class="console-nav" aria-label="Secciones">
+            <a href="{{ url_for('dashboard') }}"
+               {% if request.endpoint not in ('profiles', 'settings') %}aria-current="page"{% endif %}>Proyectos</a>
+            <a href="{{ url_for('profiles') }}"
+               {% if request.endpoint == 'profiles' %}aria-current="page"{% endif %}>Perfiles</a>
+            <a href="{{ url_for('settings') }}"
+               {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}>Configuración</a>
+        </nav>
+        <a class="mode-chip {% if llm.key == 'api' %}is-api{% endif %}" href="{{ url_for('settings') }}">
+            {{ llm.label }}{% if llm.detail %} · {{ llm.detail }}{% endif %}
+        </a>
+    </div>
+</header>
+
+{% set rail = pipeline(project, current_stage|default(none)) if project is defined and project else none %}
+{% if rail %}{% include "_rail.html" %}{% endif %}
+
+<main class="main" id="contenido">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes" role="status" aria-live="polite">
+            {% for category, msg in messages %}
+            <div class="flash flash-{{ category }}">
+                <span>{{ msg }}</span>
+                <button type="button" class="flash-close" aria-label="Cerrar aviso">&times;</button>
+            </div>
+            {% endfor %}
         </div>
-    </header>
+        {% endif %}
+    {% endwith %}
 
-    <main class="main">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flashes">
-                    {% for category, msg in messages %}
-                        <div class="flash flash-{{ category }}">{{ msg }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </main>
+    {% block content %}{% endblock %}
 
-    <footer class="footer">
+    {% if rail and current_stage is defined and current_stage %}{% include "_stepper.html" %}{% endif %}
+</main>
+
+<footer class="footer">
+    <div class="footer-inner">
         <span>{{ app_name }} · v{{ app_version }}</span>
-        <span>Hecho para producir, no para entretenerse</span>
-    </footer>
+        <span>Todo se planifica antes de rodar</span>
+    </div>
+</footer>
+
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </body>
 </html>

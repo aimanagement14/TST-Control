@@ -1,110 +1,170 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'metadata' %}
 {% block title %}Metadata · {{ project.name }}{% endblock %}
 
-{% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Metadata</h1>
-        <p class="muted">Títulos, descripciones, tags, hashtags y CTAs optimizados por plataforma.</p>
+{% macro meta_panel(platform, label, lede, saved) %}
+{% set m = meta_by_platform.get(platform) %}
+{% set is_active = gen_platform == platform and generated %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>{{ label }}</h2>
+        {% if m %}
+        <span class="chip chip-done">Guardada</span>
+        {% else %}
+        <span class="chip chip-next">Pendiente</span>
+        {% endif %}
     </div>
-</section>
+    <p class="hint">{{ lede }}</p>
 
-{% if not scripts %}
-<div class="empty-card">
-    <p class="muted">Necesitas un guion para generar metadata.</p>
-</div>
-{% else %}
-
-{% macro meta_card(platform, label, saved, gen_flag) %}
-<div class="card">
-    <h2>{{ label }}</h2>
-    {% set m = meta_by_platform.get(platform) %}
-    <form method="post">
-        <input type="hidden" name="action" value="generate_prompt">
+    <form method="post" class="field-row mt-2">
         <input type="hidden" name="platform" value="{{ platform }}">
-        <div class="form-row inline">
-            <label>Guion:
-                <select name="script_id">
-                    {% for s in scripts %}
-                    <option value="{{ s.id }}">{{ s.type }} — {{ s.title or 'sin título' }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button class="btn btn-primary btn-sm">⚡ Generar prompt</button>
-        </div>
+        <label class="field">
+            <span class="label">Guion base</span>
+            <select name="script_id">
+                {% for s in scripts %}
+                <option value="{{ s.id }}"
+                        {% if (platform == 'shorts' and s.type == 'short') or (platform == 'youtube' and s.type == 'long') %}selected{% endif %}>
+                    {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
+                    — {{ s.title or 'sin título' }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button name="action" value="generate_prompt" class="btn">
+            {% if saved %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+        </button>
     </form>
-    {% if saved %}<p class="muted small">✓ prompt guardado en el proyecto</p>{% endif %}
 
-    {% if generated and gen_flag == platform %}
-    <div class="card mt-2">
-        <h4>📝 Prompt generado</h4>
+    {% if is_active or saved %}
+    <details class="fold" data-prompt {% if is_active %}open{% endif %}>
+        <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
         <form method="post">
             <input type="hidden" name="action" value="save_prompt">
             <input type="hidden" name="platform" value="{{ platform }}">
-            <label>Prompt del sistema
-                <textarea name="sys_prompt" rows="5">{{ sys_prompt }}</textarea>
+            <label class="field">
+                <span class="label">Instrucciones del sistema</span>
+                <textarea name="sys_prompt" rows="4">{{ sys_prompt if is_active else (saved.sys_prompt if saved else '') }}</textarea>
             </label>
-            <label>Prompt del usuario
-                <textarea name="user_prompt" rows="8">{{ user_prompt }}</textarea>
+            <label class="field">
+                <span class="label">Petición</span>
+                <textarea name="user_prompt" rows="8">{{ user_prompt if is_active else (saved.user_prompt if saved else '') }}</textarea>
             </label>
-            <div class="form-actions">
-                <button class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+            <div class="actions">
+                <button type="button" class="btn btn-sm" data-copy-button>Copiar prompt</button>
+                <button type="submit" class="btn btn-ghost btn-sm">Guardar cambios</button>
             </div>
         </form>
-    </div>
-    <form method="post" class="mt-2">
-        <input type="hidden" name="action" value="save">
-        <input type="hidden" name="platform" value="{{ platform }}">
-        <h4>Pegar respuesta del LLM</h4>
-        <textarea name="text" rows="12">{{ generated }}</textarea>
-        <button class="btn btn-primary btn-sm">Guardar {{ platform }}</button>
-    </form>
-    {% elif saved %}
-    <div class="card mt-2">
-        <h4>📝 Prompt guardado</h4>
-        <form method="post">
-            <input type="hidden" name="action" value="save_prompt">
-            <input type="hidden" name="platform" value="{{ platform }}">
-            <label>Prompt del sistema
-                <textarea name="sys_prompt" rows="5">{{ saved.sys_prompt }}</textarea>
-            </label>
-            <label>Prompt del usuario
-                <textarea name="user_prompt" rows="8">{{ saved.user_prompt }}</textarea>
-            </label>
-            <div class="form-actions">
-                <button class="btn btn-ghost btn-sm">💾 Guardar cambios del prompt</button>
-            </div>
-        </form>
-    </div>
+    </details>
     {% endif %}
 
     {% if m %}
-    <div class="mt-2">
+    <div class="panel-inset mt-2">
         {% if m.titles_list %}
-        <h5>Títulos</h5>
-        <ol>{% for t in m.titles_list %}<li>{{ t }}</li>{% endfor %}</ol>
+        <p class="label">Títulos propuestos <span class="muted">— caracteres</span></p>
+        <ol class="bullets">
+            {% for t in m.titles_list %}<li>{{ t }} <span class="mono muted small">{{ t|length }}</span></li>{% endfor %}
+        </ol>
+        {% endif %}
+        {% if m.caption %}
+        <p class="label">Caption</p>
+        <pre class="code" id="caption-{{ platform }}">{{ m.caption }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#caption-{{ platform }}">
+                Copiar caption
+            </button>
+        </div>
+        {% endif %}
+        {% if m.hook %}
+        <p class="label mt-2">Hook</p>
+        <p class="small">{{ m.hook }}</p>
+        {% endif %}
+        {% if m.on_screen_list %}
+        <p class="label mt-2">Texto en pantalla</p>
+        <ol class="bullets">
+            {% for t in m.on_screen_list %}<li>{{ t }}</li>{% endfor %}
+        </ol>
+        {% endif %}
+        {% if m.chapters_list %}
+        <details class="fold">
+            <summary>Capítulos ({{ m.chapters_list|length }})</summary>
+            <ul class="bullets">
+                {% for c in m.chapters_list %}<li class="mono small">{{ c }}</li>{% endfor %}
+            </ul>
+        </details>
         {% endif %}
         {% if m.description %}
-        <h5>Descripción</h5>
-        <p class="muted small">{{ m.description[:200] }}{% if m.description|length > 200 %}…{% endif %}</p>
+        <p class="label mt-2">Descripción</p>
+        <pre class="code" id="desc-{{ platform }}">{{ m.description }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#desc-{{ platform }}">
+                Copiar descripción
+            </button>
+        </div>
         {% endif %}
         {% if m.tags_list %}
-        <h5>Tags</h5>
-        <p class="muted small">{{ m.tags_list|join(', ') }}</p>
+        <p class="label mt-2">Tags ({{ m.tags_list|length }})</p>
+        <pre class="code" id="tags-{{ platform }}">{{ m.tags_list|join(', ') }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#tags-{{ platform }}">
+                Copiar tags
+            </button>
+        </div>
         {% endif %}
         {% if m.hashtags_list %}
-        <h5>Hashtags</h5>
-        <p class="muted small">{{ m.hashtags_list|join(' ') }}</p>
+        <p class="label mt-2">Hashtags</p>
+        <pre class="code" id="hash-{{ platform }}">{{ m.hashtags_list|join(' ') }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#hash-{{ platform }}">
+                Copiar hashtags
+            </button>
+        </div>
+        {% endif %}
+        {% if m.cta %}
+        <p class="label mt-2">CTA</p>
+        <p class="small">{{ m.cta }}</p>
         {% endif %}
     </div>
     {% endif %}
-</div>
+
+    <details class="fold" {% if is_active or not m %}open{% endif %}>
+        <summary>{% if m %}Actualizar con una respuesta nueva{% else %}Respuesta del LLM{% endif %}</summary>
+        <form method="post">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="platform" value="{{ platform }}">
+            <label class="field">
+                <span class="sr-only">Respuesta del LLM para {{ label }}</span>
+                <textarea name="text" rows="10"
+                          placeholder="Pega aquí la respuesta con títulos, descripción, tags y CTA.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
+            </label>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">
+                    {% if m %}Reemplazar metadata{% else %}Guardar metadata{% endif %}
+                </button>
+            </div>
+        </form>
+    </details>
+</section>
 {% endmacro %}
 
-<div class="two-col-equal">
-    {{ meta_card('youtube', '▶️ YouTube', saved_yt, gen_platform) }}
-    {{ meta_card('shorts', '📱 Shorts / Reels / TikTok', saved_sh, gen_platform) }}
+{% block content %}
+{{ ui.stage_head(project, '07', 'Metadata',
+    'Títulos, descripción, tags y CTA por plataforma. Es lo que decide si el vídeo se encuentra y se clica.') }}
+
+{% if not scripts %}
+<div class="empty">
+    <h2>Primero hace falta un guion</h2>
+    <p>La metadata se escribe a partir del contenido del guion.</p>
+    <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-primary">Ir a guiones</a>
+</div>
+{% else %}
+<div class="pair">
+    {{ meta_panel('youtube', 'YouTube',
+        'Formato horizontal: cinco títulos, descripción larga con fuentes, capítulos y quince tags.',
+        saved_yt) }}
+    {{ meta_panel('shorts', 'Shorts · Reels · TikTok',
+        'Formato vertical: caption con gancho textual, hashtags y tres textos en pantalla.',
+        saved_sh) }}
 </div>
 {% endif %}
 {% endblock %}

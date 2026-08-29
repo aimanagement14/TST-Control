@@ -1,84 +1,118 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'prompts' %}
 {% block title %}Prompts visuales · {{ project.name }}{% endblock %}
 
 {% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Prompts visuales</h1>
-        <p class="muted">Para cada escena, un prompt cinematográfico estructurado. El estilo del perfil se aplica a todos.</p>
-    </div>
-    {% if scenes %}
-    <div class="page-head-actions">
-        <form method="post">
-            <input type="hidden" name="action" value="generate_all">
-            <button class="btn btn-primary">⚡ Generar todos los prompts</button>
-        </form>
-    </div>
-    {% endif %}
-</section>
+{% call ui.stage_head(project, '06', 'Prompts visuales',
+        'Un prompt cinematográfico por escena. El estilo del perfil se aplica a todos.') %}
+{% if scenes %}
+<form method="post">
+    <input type="hidden" name="action" value="generate_all">
+    <button class="btn {% if batch %}btn-ghost{% else %}btn-primary{% endif %}">
+        {% if llm.key == 'manual' %}Preparar los {{ scenes|length }} prompts{% else %}Generar con {{ llm.target }}{% endif %}
+    </button>
+</form>
+{% endif %}
+{% endcall %}
 
 {% if not scenes %}
-<div class="empty-card">
-    <p class="muted">Primero necesitas escenas. Ve a la etapa anterior.</p>
-    <a href="{{ url_for('scenes', project_id=project.id) }}" class="btn btn-ghost">Ir a escenas</a>
+<div class="empty">
+    <h2>Primero hacen falta escenas</h2>
+    <p>Cada prompt visual describe una escena concreta. Genera la secuencia y vuelve aquí.</p>
+    <a href="{{ url_for('scenes', project_id=project.id) }}" class="btn btn-primary">Ir a escenas</a>
 </div>
 {% else %}
 
-{% if batch %}
-<div class="card">
-    <h3>📋 Lote generado ({{ batch|length }} prompts)</h3>
-    <p class="muted small">Procesa estos prompts en tu LLM por lotes y pega cada respuesta en el campo correspondiente de la escena.</p>
-    <details class="prompt-details">
-        <summary>Ver todos los prompts del lote</summary>
-        {% for item in batch %}
-        <h4>Escena {{ item.scene.scene_number }}</h4>
-        <pre class="code-block">{{ item.sys }}
+{% set saved_count = scenes|selectattr('id', 'in', prompts_by_scene)|list|length %}
 
-{{ item.user }}</pre>
-        <hr>
-        {% endfor %}
-    </details>
-</div>
-{% endif %}
+<p class="spec">
+    <span><b>{{ saved_count }}</b> de {{ scenes|length }} escenas con prompt</span>
+    {% if batch %}<span>{{ batch|length }} prompts recién preparados</span>{% endif %}
+</p>
 
-<form method="post" class="mt-3">
+<form method="post" class="mt-2">
     <input type="hidden" name="action" value="save_all">
-    <p class="muted small">Para cada escena, pega la respuesta JSON del LLM. El parser extraerá los campos.</p>
+
     {% for sc in scenes %}
     {% set existing = prompts_by_scene.get(sc.id) %}
-    <div class="card scene-prompt">
-        <div class="card-head">
-            <h3>Escena {{ sc.scene_number }}</h3>
+    {% set item = batch[loop.index0] if batch and batch|length > loop.index0 else none %}
+    <section class="panel">
+        <div class="panel-head">
+            <h3>Escena {{ '%02d'|format(sc.scene_number) }}</h3>
+            <span class="spec">
+                <span><b>{{ sc.duration_seconds }}s</b></span>
+                <span>{{ sc.camera_movement or 'cámara sin definir' }}</span>
+            </span>
             {% if existing %}
-            <span class="status-pill status-ready">Guardado</span>
+            <span class="chip chip-done">Con prompt</span>
             {% else %}
-            <span class="status-pill status-created">Pendiente</span>
+            <span class="chip chip-next">Pendiente</span>
             {% endif %}
         </div>
-        <details class="prompt-details">
-            <summary>Ver prompt para esta escena</summary>
-            {% set sys_p, user_p = ('', '') %}
-            <pre class="code-block">SISTEMA: Eres un director de arte especializado en prompts para generación de imagen y video con IA...
 
-USUARIO:
-Escena {{ loop.index }}/{{ scenes|length }} del video '{{ project.topic }}'
-Narración: {{ sc.narration }}
-Descripción visual: {{ sc.visual_description }}
-Movimiento cámara: {{ sc.camera_movement }}
-Estilo general del proyecto: {{ profile.style if profile else 'cinematográfico, oscuro, contrastado' }}</pre>
-        </details>
-        <textarea name="text_{{ sc.id }}" rows="8" placeholder='{"subject":"...", "environment":"...", ...}'>{% if existing %}{"subject":"{{ existing.subject }}", "environment":"{{ existing.environment }}", "era":"{{ existing.era }}", "lighting":"{{ existing.lighting }}", "camera":"{{ existing.camera }}", "composition":"{{ existing.composition }}", "atmosphere":"{{ existing.atmosphere }}", "style":"{{ existing.style }}", "full_prompt_en":"{{ existing.full_prompt_en }}", "full_prompt_es":"{{ existing.full_prompt_es }}"}{% endif %}</textarea>
-        {% if existing and existing.full_prompt_en %}
-        <details class="mt-1">
-            <summary>Prompt actual (EN)</summary>
-            <p class="code-block">{{ existing.full_prompt_en }}</p>
+        <p class="small muted">{{ sc.visual_description }}</p>
+
+        {% if item %}
+        <details class="fold" open>
+            <summary>Prompt para esta escena</summary>
+            <pre class="code" id="batch-{{ sc.id }}">SYSTEM:
+{{ item.sys }}
+
+USER:
+{{ item.user }}</pre>
+            <div class="actions">
+                <button type="button" class="btn btn-sm" data-copy-button data-copy="#batch-{{ sc.id }}">
+                    Copiar prompt
+                </button>
+            </div>
         </details>
         {% endif %}
-    </div>
+
+        {% if existing and existing.full_prompt_en %}
+        <div class="panel-inset mt-2">
+            <p class="label">Prompt en inglés</p>
+            <pre class="code" id="en-{{ sc.id }}">{{ existing.full_prompt_en }}</pre>
+            <div class="actions">
+                <button type="button" class="btn btn-sm" data-copy-button data-copy="#en-{{ sc.id }}">
+                    Copiar en inglés
+                </button>
+                {% if existing.full_prompt_es %}
+                <button type="button" class="btn btn-ghost btn-sm" data-copy-button data-copy="#es-{{ sc.id }}">
+                    Copiar en español
+                </button>
+                {% endif %}
+            </div>
+            {% if existing.full_prompt_es %}
+            <details class="fold">
+                <summary>Versión en español y desglose</summary>
+                <pre class="code" id="es-{{ sc.id }}">{{ existing.full_prompt_es }}</pre>
+                <ul class="data-list mt-2">
+                    <li><span>Sujeto</span><b>{{ existing.subject or '—' }}</b></li>
+                    <li><span>Entorno</span><b>{{ existing.environment or '—' }}</b></li>
+                    <li><span>Luz</span><b>{{ existing.lighting or '—' }}</b></li>
+                    <li><span>Cámara</span><b>{{ existing.camera or '—' }}</b></li>
+                    <li><span>Atmósfera</span><b>{{ existing.atmosphere or '—' }}</b></li>
+                </ul>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <details class="fold" {% if item or not existing %}open{% endif %}>
+            <summary>{% if existing %}Actualizar con una respuesta nueva{% else %}Respuesta JSON del LLM{% endif %}</summary>
+            <label class="field">
+                <span class="sr-only">Respuesta JSON de la escena {{ sc.scene_number }}</span>
+                <textarea name="text_{{ sc.id }}" rows="6"
+                          placeholder='{"subject": "…", "lighting": "…", "full_prompt_en": "…", "full_prompt_es": "…"}'>{% if item and not is_manual_output(item.generated) %}{{ item.generated }}{% endif %}</textarea>
+            </label>
+        </details>
+    </section>
     {% endfor %}
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Guardar todos los prompts</button>
+
+    <div class="actions-sticky">
+        <span class="hint">Los campos vacíos se ignoran: guarda las escenas que hayas rellenado.</span>
+        <button type="submit" class="btn btn-primary">Guardar prompts</button>
     </div>
 </form>
 {% endif %}

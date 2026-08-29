@@ -1,104 +1,79 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'concept' %}
 {% block title %}Concepto · {{ project.name }}{% endblock %}
 
-{% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Concepto</h1>
-        <p class="muted">El ángulo, la tesis y el gancho emocional que vertebrarán el guion.</p>
-    </div>
-</section>
-
-<div class="two-col">
-    <div>
-        {% if not generated %}
-        <form method="post">
-            <input type="hidden" name="action" value="generate_prompt">
-            <button type="submit" class="btn btn-primary">⚡ Generar prompt de concepto</button>
-            <p class="muted small">Usa la investigación ya guardada como base.</p>
-        </form>
-        {% endif %}
-
-        {% if generated or saved_prompt %}
-        <div class="card mt-3">
-            <h3>📝 Prompt
-                {% if saved_prompt %}<span class="status-pill status-ready">guardado</span>{% endif %}
-            </h3>
-            <form method="post">
-                <input type="hidden" name="action" value="save_prompt">
-                <label>Prompt del sistema
-                    <textarea name="sys_prompt" rows="6">{{ sys_prompt or (saved_prompt.sys_prompt if saved_prompt else '') }}</textarea>
-                </label>
-                <label>Prompt del usuario
-                    <textarea name="user_prompt" rows="10">{{ user_prompt or (saved_prompt.user_prompt if saved_prompt else '') }}</textarea>
-                </label>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="copyToClipboard()">📋 Copiar al portapapeles</button>
-                </div>
-            </form>
-            <script>
-            function copyToClipboard() {
-                const form = document.querySelector('form');
-                const sys = form.querySelector('[name=sys_prompt]').value;
-                const usr = form.querySelector('[name=user_prompt]').value;
-                navigator.clipboard.writeText('SYSTEM:\n' + sys + '\n\nUSER:\n' + usr);
-            }
-            </script>
-        </div>
-        {% endif %}
-
-        {% if generated %}
-        <form method="post" class="mt-3">
-            <input type="hidden" name="action" value="save">
-            <h3>Pegar respuesta del LLM</h3>
-            <textarea name="text" rows="20">{{ generated }}</textarea>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Guardar concepto</button>
-            </div>
-        </form>
-        {% elif concept.angle %}
-        <form method="post" class="mt-3">
-            <input type="hidden" name="action" value="save">
-            <h3>Editar concepto</h3>
-            <textarea name="text" rows="20">## ÁNGULO
+{% set concept_md %}## ÁNGULO
 {{ concept.angle }}
 
 ## TESIS
 {{ concept.thesis }}
 
 ## PUNTOS CLAVE
-{% for p in key_points %}{{ loop.index }}. {{ p }}
+{% for p in (key_points or []) %}{{ loop.index }}. {{ p }}
 {% endfor %}
 
 ## GANCHO EMOCIONAL
 {{ concept.emotional_hook }}
-</textarea>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Guardar cambios</button>
-                <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-ghost">Volver</a>
-            </div>
-        </form>
+{% endset %}
+
+{% block content %}
+{% call ui.stage_head(project, '02', 'Concepto',
+        'El ángulo, la tesis y el gancho emocional que vertebran el guion.') %}
+<form method="post">
+    <input type="hidden" name="action" value="generate_prompt">
+    <button class="btn {% if saved_prompt or generated %}btn-ghost{% else %}btn-primary{% endif %}">
+        {% if saved_prompt or generated %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+    </button>
+</form>
+{% endcall %}
+
+<div class="work">
+    <div>
+        {% if generated or saved_prompt %}
+        {{ ui.prompt_editor(
+            sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
+            user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
+            saved_prompt) }}
+        {% else %}
+        <div class="empty-inline">
+            <p>El prompt de concepto parte de la investigación guardada. Genéralo y llévalo a tu LLM.</p>
+        </div>
         {% endif %}
+
+        {{ ui.paste_form('text',
+            (generated if generated and not is_manual_output(generated) else '') or (concept_md if concept.angle else ''),
+            title='Concepto',
+            button='Guardar concepto',
+            rows=16,
+            placeholder='Pega aquí la respuesta de tu LLM: ángulo, tesis, puntos clave y gancho.') }}
     </div>
 
-    <aside>
+    <aside class="work-aside">
         {% if concept.angle %}
-        <div class="card">
-            <h4>📐 Concepto actual</h4>
-            <h5>Ángulo</h5>
-            <p>{{ concept.angle }}</p>
+        <div class="panel">
+            <h4>Concepto actual</h4>
+            <p class="mt-1"><span class="label">Ángulo</span>{{ concept.angle }}</p>
             {% if concept.thesis %}
-            <h5>Tesis</h5>
-            <p>{{ concept.thesis }}</p>
+            <p><span class="label">Tesis</span>{{ concept.thesis }}</p>
             {% endif %}
             {% if key_points %}
-            <h5>Puntos clave</h5>
-            <ol class="compact-list">
+            <p class="label">Puntos clave</p>
+            <ol class="bullets">
                 {% for p in key_points %}<li>{{ p }}</li>{% endfor %}
             </ol>
             {% endif %}
+        </div>
+        {% if concept.emotional_hook %}
+        <details class="fold">
+            <summary>Gancho emocional</summary>
+            <p class="small">{{ concept.emotional_hook }}</p>
+        </details>
+        {% endif %}
+        {% else %}
+        <div class="panel">
+            <h4>Aún sin concepto</h4>
+            <p class="hint mt-1">Cuando guardes la respuesta verás aquí el ángulo, la tesis y los puntos clave ya separados.</p>
         </div>
         {% endif %}
     </aside>

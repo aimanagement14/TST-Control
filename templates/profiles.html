@@ -4,95 +4,128 @@
 {% block content %}
 <section class="page-head">
     <div>
+        <p class="eyebrow">Ajustes reutilizables</p>
         <h1>Perfiles de contenido</h1>
-        <p class="muted">Plantillas reutilizables con tono, estilo, niveles de misterio y plataformas.</p>
+        <p class="lede">Tono, estilo, intensidad y plataformas. Cada proyecto usa un perfil y todos los prompts lo heredan.</p>
     </div>
 </section>
 
-<div class="two-col">
+<div class="work">
     <div>
-        <h3>Perfiles existentes</h3>
         {% for p in profiles %}
-        <div class="card profile-card">
-            <div class="card-head">
-                <h4>
+        <section class="panel">
+            <div class="panel-head">
+                <h2>
                     {{ p.name }}
-                    {% if p.is_default %}<span class="status-pill status-ready">por defecto</span>{% endif %}
-                </h4>
-                <div>
+                    {% if p.is_default %}<span class="chip chip-done">Por defecto</span>{% endif %}
+                </h2>
+                <div class="actions tight">
                     {% if not p.is_default %}
-                    <form method="post" style="display:inline">
+                    <form method="post" class="inline-form">
                         <input type="hidden" name="action" value="set_default">
                         <input type="hidden" name="profile_id" value="{{ p.id }}">
-                        <button class="btn btn-ghost btn-sm">Marcar por defecto</button>
+                        <button class="btn btn-ghost btn-sm">Usar por defecto</button>
                     </form>
                     {% endif %}
-                    <form method="post" style="display:inline" onsubmit="return confirm('¿Eliminar perfil?')">
+                    <form method="post" class="inline-form"
+                          onsubmit="return confirm('Se elimina el perfil «{{ p.name }}». Los proyectos que ya lo usan conservan su contenido.')">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="profile_id" value="{{ p.id }}">
-                        <button class="btn btn-ghost btn-sm btn-danger">×</button>
+                        <button class="btn btn-danger btn-sm" aria-label="Eliminar perfil {{ p.name }}">Eliminar</button>
                     </form>
                 </div>
             </div>
-            <ul class="meta-list">
-                <li><strong>Tipo:</strong> {{ p.content_type or '—' }}</li>
-                <li><strong>Audiencia:</strong> {{ p.audience or '—' }}</li>
-                <li><strong>Tono:</strong> {{ p.tone or '—' }}</li>
-                <li><strong>Estilo:</strong> {{ p.style or '—' }}</li>
-                <li><strong>Misterio:</strong> {{ p.mystery_level }}/10 · <strong>Drama:</strong> {{ p.drama_level }}/10</li>
-                <li><strong>Velocidad:</strong> {{ p.narration_speed }} ppm</li>
-                <li><strong>Plataformas:</strong> {{ p.platforms_list|join(', ') or '—' }}</li>
+            <ul class="data-list">
+                <li><span>Tipo de contenido</span><b>{{ p.content_type or '—' }}</b></li>
+                <li><span>Audiencia</span><b>{{ p.audience or '—' }}</b></li>
+                <li><span>Tono</span><b>{{ p.tone or '—' }}</b></li>
+                <li><span>Estilo visual</span><b>{{ p.style or '—' }}</b></li>
+                <li><span>Misterio</span><b>{{ p.mystery_level }}/10</b></li>
+                <li><span>Drama</span><b>{{ p.drama_level }}/10</b></li>
+                <li><span>Velocidad de narración</span><b>{{ p.narration_speed }} ppm</b></li>
+                <li><span>Plataformas</span><b>{{ p.platforms_list|join(' · ') or '—' }}</b></li>
             </ul>
-            {% if p.notes %}<p class="muted small">{{ p.notes }}</p>{% endif %}
+            {% if p.notes %}<p class="hint mt-2">{{ p.notes }}</p>{% endif %}
+        </section>
+        {% else %}
+        <div class="empty">
+            <h2>Sin perfiles</h2>
+            <p>Crea el primero con el formulario de al lado: define cómo suena y cómo se ve tu canal.</p>
         </div>
         {% endfor %}
     </div>
 
-    <aside>
-        <div class="card">
-            <h3>+ Nuevo perfil</h3>
-            <form method="post">
-                <input type="hidden" name="action" value="create">
-                <label>Nombre
-                    <input type="text" name="name" required placeholder="Ej: Todo Sobre Todo / Misterio">
-                </label>
-                <label>Tipo de contenido
-                    <input type="text" name="content_type" placeholder="Documental, video corto, etc.">
-                </label>
-                <label>Audiencia
-                    <input type="text" name="audience" placeholder="A quién va dirigido">
-                </label>
-                <label>Tono
-                    <input type="text" name="tone" placeholder="Serio, intrigante, didáctico...">
-                </label>
-                <label>Estilo visual
-                    <input type="text" name="style" placeholder="Cinematográfico, contrastado, oscuro...">
-                </label>
-                <div class="form-row inline">
-                    <label>Misterio
-                        <input type="number" name="mystery_level" min="1" max="10" value="5">
-                    </label>
-                    <label>Drama
-                        <input type="number" name="drama_level" min="1" max="10" value="5">
-                    </label>
-                    <label>PPM
-                        <input type="number" name="narration_speed" min="100" max="200" value="150">
-                    </label>
+    <aside class="work-aside after">
+        <form method="post" class="panel">
+            <div class="panel-head">
+                <h3>Nuevo perfil</h3>
+            </div>
+            <input type="hidden" name="action" value="create">
+            <label class="field">
+                <span class="label">Nombre</span>
+                <input type="text" name="name" required placeholder="Todo Sobre Todo / Misterio">
+            </label>
+            <label class="field">
+                <span class="label">Tipo de contenido</span>
+                <input type="text" name="content_type" placeholder="Documental de misterio">
+            </label>
+            <label class="field">
+                <span class="label">Audiencia</span>
+                <input type="text" name="audience" placeholder="Curiosos de 25 a 45 años">
+            </label>
+            <label class="field">
+                <span class="label">Tono</span>
+                <input type="text" name="tone" placeholder="Serio, intrigante, sin sensacionalismo">
+            </label>
+            <label class="field">
+                <span class="label">Estilo visual</span>
+                <input type="text" name="style" placeholder="Cinematográfico, contrastado, penumbra">
+            </label>
+
+            <label class="field">
+                <span class="label">Nivel de misterio</span>
+                <span class="slider">
+                    <input type="range" name="mystery_level" min="1" max="10" value="5">
+                    <output>5</output>
+                </span>
+            </label>
+            <label class="field">
+                <span class="label">Nivel de drama</span>
+                <span class="slider">
+                    <input type="range" name="drama_level" min="1" max="10" value="5">
+                    <output>5</output>
+                </span>
+            </label>
+            <label class="field">
+                <span class="label">Velocidad de narración (ppm)</span>
+                <span class="slider">
+                    <input type="range" name="narration_speed" min="100" max="200" step="5" value="150">
+                    <output>150</output>
+                </span>
+            </label>
+
+            <div class="field">
+                <span class="label">Plataformas</span>
+                <div class="checks">
+                    {% for plat in ['youtube', 'shorts', 'tiktok', 'instagram', 'facebook', 'twitter'] %}
+                    <label><input type="checkbox" name="platforms" value="{{ plat }}"> {{ plat }}</label>
+                    {% endfor %}
                 </div>
-                <label>Plataformas
-                    <div class="checkbox-group">
-                        {% for plat in ['youtube','shorts','tiktok','instagram','facebook','twitter'] %}
-                        <label class="checkbox"><input type="checkbox" name="platforms" value="{{ plat }}"> {{ plat }}</label>
-                        {% endfor %}
-                    </div>
-                </label>
-                <label>Notas
-                    <textarea name="notes" rows="3"></textarea>
-                </label>
-                <label class="checkbox"><input type="checkbox" name="is_default"> Marcar como perfil por defecto</label>
+            </div>
+
+            <label class="field">
+                <span class="label">Notas</span>
+                <textarea name="notes" rows="3" placeholder="Para qué sirve este perfil y cuándo usarlo."></textarea>
+            </label>
+
+            <div class="checks">
+                <label><input type="checkbox" name="is_default"> Usar por defecto en proyectos nuevos</label>
+            </div>
+
+            <div class="actions">
                 <button type="submit" class="btn btn-primary">Crear perfil</button>
-            </form>
-        </div>
+            </div>
+        </form>
     </aside>
 </div>
 {% endblock %}

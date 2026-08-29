@@ -1,0 +1,22 @@
+{# Paso anterior y siguiente del pipeline, al final de cada etapa. #}
+{% set nav = rail if rail is defined and rail else pipeline(project, current_stage|default(none)) %}
+<nav class="stepper" aria-label="Navegación entre etapas">
+    {% if nav.prev_step %}
+    <a href="{{ nav.prev_step.url }}">
+        <span class="step-label">Etapa anterior</span>
+        <span class="step-name">&larr; {{ nav.prev_step.label }}</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('view_project', project_id=project.id) }}">
+        <span class="step-label">Volver</span>
+        <span class="step-name">&larr; {{ project.name }}</span>
+    </a>
+    {% endif %}
+
+    {% if nav.next_step %}
+    <a href="{{ nav.next_step.url }}" class="step-next">
+        <span class="step-label">Etapa siguiente</span>
+        <span class="step-name">{{ nav.next_step.label }} &rarr;</span>
+    </a>
+    {% endif %}
+</nav>

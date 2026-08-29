@@ -301,6 +301,137 @@ def project_stage_status(project):
     return stages
 
 
+# ---------------------------------------------------------------------------
+# Pipeline: orden de etapas, estado legible y siguiente acción
+# ---------------------------------------------------------------------------
+
+PIPELINE_STAGES = (
+    {"key": "research", "num": "01", "label": "Investigación", "short": "Investigación",
+     "endpoint": "research", "hint": "Hechos, fuentes y teorías"},
+    {"key": "concept", "num": "02", "label": "Concepto", "short": "Concepto",
+     "endpoint": "concept", "hint": "Ángulo, tesis y gancho"},
+    {"key": "scripts_long", "num": "03", "label": "Guion 5 min", "short": "Guion 5 min",
+     "endpoint": "scripts", "hint": "Documental completo"},
+    {"key": "scripts_short", "num": "04", "label": "Guion 1 min", "short": "Guion 1 min",
+     "endpoint": "scripts", "hint": "Versión vertical"},
+    {"key": "scenes", "num": "05", "label": "Escenas", "short": "Escenas",
+     "endpoint": "scenes", "hint": "Secuencia visual"},
+    {"key": "prompts", "num": "06", "label": "Prompts", "short": "Prompts",
+     "endpoint": "prompts", "hint": "Imagen y vídeo por escena"},
+    {"key": "metadata", "num": "07", "label": "Metadata", "short": "Metadata",
+     "endpoint": "metadata", "hint": "Títulos, tags y CTA"},
+    {"key": "qc", "num": "08", "label": "Control de calidad", "short": "Calidad",
+     "endpoint": "qc", "hint": "Revisión antes de exportar"},
+)
+
+PAGE_ORDER = ("research", "concept", "scripts", "scenes",
+              "prompts", "metadata", "qc", "export")
+
+PAGE_LABELS = {
+    "research": "Investigación",
+    "concept": "Concepto",
+    "scripts": "Guiones",
+    "scenes": "Escenas",
+    "prompts": "Prompts visuales",
+    "metadata": "Metadata",
+    "qc": "Control de calidad",
+    "export": "Exportar",
+}
+
+STATUS_LABELS = {
+    "created": "Sin empezar",
+    "research": "En investigación",
+    "concept": "En concepto",
+    "scripts": "En guion",
+    "scenes": "En escenas",
+    "prompts": "En prompts",
+    "metadata": "En metadata",
+    "ready": "Listo para exportar",
+}
+
+
+def status_label(status):
+    """Traduce el estado interno del proyecto a lenguaje de usuario."""
+    return STATUS_LABELS.get(status, status or "—")
+
+
+def format_timecode(seconds):
+    """Segundos a MM:SS, el formato con el que se mide un vídeo."""
+    total = max(0, int(seconds or 0))
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def project_runtime(project, profile=None):
+    """Duración estimada del guion largo frente al objetivo del formato."""
+    checks = CONFIG["qc"]["checks"]
+    wpm = (profile or {}).get("narration_speed") or checks["default_wpm"]
+    target = checks["target_duration_long_seconds"]
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT word_count FROM scripts WHERE project_id=? AND type='long'",
+            (project["id"],),
+        ).fetchone()
+    words = (row["word_count"] if row else 0) or 0
+    seconds = int(round(words / wpm * 60)) if words else 0
+    return {
+        "words": words,
+        "seconds": seconds,
+        "target": target,
+        "timecode": format_timecode(seconds),
+        "target_timecode": format_timecode(target),
+        "percent": min(100, round(seconds * 100 / target)) if target else 0,
+        "over": bool(target and seconds > target * 1.1),
+        "has_script": words > 0,
+    }
+
+
+def pipeline_view(project, current=None):
+    """Estado del pipeline para la barra de etapas y el paso siguiente.
+
+    `current` es el nombre de la página activa (endpoint), no la etapa:
+    la página de guiones cubre dos etapas del pipeline.
+    """
+    stages = dict(project.get("stages") or project_stage_status(project))
+    stages["qc"] = project.get("status") == "ready"
+
+    cells, pending = [], None
+    for stage in PIPELINE_STAGES:
+        cell = dict(
+            stage,
+            done=bool(stages.get(stage["key"])),
+            current=stage["endpoint"] == current,
+            url=url_for(stage["endpoint"], project_id=project["id"]),
+        )
+        if not cell["done"] and pending is None:
+            pending = cell
+        cells.append(cell)
+
+    done = sum(1 for c in cells if c["done"])
+    index = PAGE_ORDER.index(current) if current in PAGE_ORDER else None
+
+    def step(offset):
+        if index is None:
+            return None
+        pos = index + offset
+        if not 0 <= pos < len(PAGE_ORDER):
+            return None
+        page = PAGE_ORDER[pos]
+        return {"label": PAGE_LABELS[page],
+                "url": url_for(page, project_id=project["id"])}
+
+    return {
+        "cells": cells,
+        "done": done,
+        "total": len(cells),
+        "percent": round(done * 100 / len(cells)),
+        "next": pending,
+        "prev_step": step(-1),
+        "next_step": step(1),
+        "complete": done == len(cells),
+        "runtime": project_runtime(project, get_profile(project.get("profile_id"))),
+    }
+
+
 def get_or_create_research(project_id):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM research WHERE project_id=?", (project_id,)).fetchone()
@@ -766,6 +897,11 @@ def _manual_fallback(sys_prompt, user_msg, reason=""):
     )
 
 
+def llm_output_is_manual(text):
+    """True si la respuesta es el prompt para copiar y no contenido generado."""
+    return bool(text) and text.lstrip().startswith("## [MODO MANUAL")
+
+
 # ---------------------------------------------------------------------------
 # Parsers
 # ---------------------------------------------------------------------------
@@ -1095,12 +1231,13 @@ def run_qc(project_id):
             issues.append(("scripts", "info", f"Falta el guion {ttype}", ttype))
             continue
         wc = s["word_count"]
+        tlabel = f"{ttype} (5 min)" if ttype == "long" else f"{ttype} (1 min)"
         if wc < min_w:
             issues.append(("scripts", "warning",
-                f"Guion {ttype} tiene {wc} palabras (mínimo {min_w})", ttype))
+                f"Guion {tlabel} tiene {wc} palabras (mínimo {min_w})", ttype))
         elif wc > max_w:
             issues.append(("scripts", "warning",
-                f"Guion {ttype} tiene {wc} palabras (máximo {max_w})", ttype))
+                f"Guion {tlabel} tiene {wc} palabras (máximo {max_w})", ttype))
         # Duración estimada
         if wc > 0:
             wpm = project.get("narration_speed") or 150
@@ -1108,10 +1245,11 @@ def run_qc(project_id):
             target = cfg[f"target_duration_{ttype}_seconds"]
             if abs(est - target) > 30:
                 issues.append(("scripts", "info",
-                    f"Duración estimada guion {ttype}: {est}s (objetivo: {target}s)", ttype))
+                    f"Duración estimada del guion {tlabel}: {format_timecode(est)} "
+                    f"(objetivo {format_timecode(target)})", ttype))
         # Hook presente
         if not s["hook"]:
-            issues.append(("scripts", "error", f"Guion {ttype} sin hook definido", "hook"))
+            issues.append(("scripts", "error", f"Guion {tlabel} sin hook definido", "hook"))
         # Repeticiones
         full = s["body_full"] or ""
         words = re.findall(r"\b\w{6,}\b", full.lower())
@@ -1120,11 +1258,11 @@ def run_qc(project_id):
         for word, n in c.most_common(10):
             if n >= cfg["repetition_threshold"]:
                 issues.append(("scripts", "warning",
-                    f"Palabra repetida {n}× en guion {ttype}: «{word}»", ttype))
+                    f"Palabra repetida {n}× en el guion {tlabel}: «{word}»", ttype))
                 break
         # CTA
         if not s["cta"]:
-            issues.append(("scripts", "warning", f"Guion {ttype} sin CTA", "cta"))
+            issues.append(("scripts", "warning", f"Guion {tlabel} sin CTA", "cta"))
 
     # Escenas
     if not scenes:
@@ -1751,13 +1889,22 @@ def qc(project_id):
                 conn.execute("UPDATE projects SET status='ready', updated_at=? WHERE id=?",
                              (now_iso(), project_id))
         flash(f"Análisis completado: {len(issues)} avisos", "ok")
+        if not issues:
+            return redirect(url_for("qc", project_id=project_id, clean=1))
         return redirect(url_for("qc", project_id=project_id))
     with get_db() as conn:
         issues = [dict(r) for r in conn.execute(
-            "SELECT * FROM qc_issues WHERE project_id=? ORDER BY severity, stage",
+            """SELECT * FROM qc_issues WHERE project_id=?
+               ORDER BY CASE severity
+                            WHEN 'error' THEN 0
+                            WHEN 'warning' THEN 1
+                            ELSE 2
+                        END, stage""",
             (project_id,)
         ).fetchall()]
-    return render_template("qc.html", project=project, issues=issues)
+    last_run = max((i["created_at"] for i in issues if i["created_at"]), default=None)
+    return render_template("qc.html", project=project, issues=issues,
+                           last_run=last_run)
 
 
 # --- Export ------------------------------------------------------------------
@@ -2015,13 +2162,20 @@ def export(project_id):
         return send_file(zip_path, as_attachment=True,
                          download_name=zip_path.name)
 
+    with get_db() as conn:
+        qc_errors = conn.execute(
+            "SELECT COUNT(*) AS n FROM qc_issues WHERE project_id=? AND severity='error'",
+            (project_id,),
+        ).fetchone()["n"]
+
     return render_template("export.html", project=project, profile=profile,
                            has_research=bool(research_obj.get("content")),
                            has_concept=bool(concept_obj.get("angle")),
                            scripts=scripts_rows,
                            scenes=scenes_rows,
                            prompts=prompts_rows,
-                           metadata=meta_rows)
+                           metadata=meta_rows,
+                           qc_errors=qc_errors)
 
 
 # --- Perfiles ----------------------------------------------------------------
@@ -2144,12 +2298,44 @@ def settings():
 # Contexto de plantilla
 # ---------------------------------------------------------------------------
 
+PROVIDER_NAMES = {
+    "manual": "Modo manual",
+    "openai": "OpenAI-compatible",
+    "anthropic": "Anthropic Claude",
+    "custom": "Preset personalizado",
+}
+
+
+def llm_mode():
+    """Cómo se generará el contenido: a mano o contra una API."""
+    provider = CONFIG["llm"].get("provider", "manual")
+    if provider == "manual":
+        return {"key": "manual", "label": PROVIDER_NAMES["manual"],
+                "detail": "copias los prompts a tu LLM", "target": "tu LLM"}
+    if provider == "custom":
+        preset_key = CONFIG["llm"].get("active_preset") or ""
+        preset = CONFIG["llm"].get("presets", {}).get(preset_key, {})
+        model = preset.get("model", "")
+        return {"key": "api", "label": preset.get("label") or preset_key or "Preset",
+                "detail": model, "target": model or preset.get("label") or "la API"}
+    model = CONFIG["llm"].get(provider, {}).get("model", "")
+    return {"key": "api", "label": PROVIDER_NAMES.get(provider, provider),
+            "detail": model, "target": model or PROVIDER_NAMES.get(provider, provider)}
+
+
 @app.context_processor
 def inject_globals():
     return {
         "app_name": CONFIG["app"]["name"],
         "app_tagline": CONFIG["app"]["tagline"],
         "app_version": CONFIG["app"]["version"],
+        "pipeline": pipeline_view,
+        "status_label": status_label,
+        "timecode": format_timecode,
+        "llm": llm_mode(),
+        "provider_names": PROVIDER_NAMES,
+        "is_manual_output": llm_output_is_manual,
+        "qc_checks": CONFIG["qc"]["checks"],
     }
 
 

@@ -13,7 +13,7 @@ TodoSobreTodo/
 ├── config.json       # configuración, perfiles, plantillas de prompts
 ├── workflow.db       # base de datos SQLite (se crea al arrancar)
 ├── templates/        # HTML Jinja2
-├── static/           # CSS
+├── static/           # CSS y JS de interfaz
 ├── projects/         # exportaciones
 └── requirements.txt
 ```

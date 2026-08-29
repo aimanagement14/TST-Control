@@ -1,65 +1,126 @@
 {% extends "base.html" %}
-{% block title %}QC · {{ project.name }}{% endblock %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'qc' %}
+{% block title %}Control de calidad · {{ project.name }}{% endblock %}
+
+{% set stage_names = {
+    'research': 'Investigación',
+    'concept': 'Concepto',
+    'script_long': 'Guion 5 min',
+    'script_short': 'Guion 1 min',
+    'scripts': 'Guiones',
+    'scenes': 'Escenas',
+    'prompts': 'Prompts visuales',
+    'metadata': 'Metadata',
+    'metadata_youtube': 'Metadata YouTube',
+    'metadata_shorts': 'Metadata Shorts',
+} %}
+{% set severity_names = {'error': 'Error', 'warning': 'Aviso', 'info': 'Nota'} %}
+{% set field_names = {
+    'long': 'guion 5 min',
+    'short': 'guion 1 min',
+    'unverified': 'sin verificar',
+    'content': 'contenido',
+    'angle': 'ángulo',
+    'hook': 'hook',
+    'cta': 'CTA',
+    'sources': 'fuentes',
+    'scenes': 'escenas',
+    'prompts': 'prompts',
+    'metadata': 'metadata',
+} %}
 
 {% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Control de calidad</h1>
-        <p class="muted">Verifica duración, estructura, fuentes, repeticiones y coherencia antes de exportar.</p>
-    </div>
-    <div class="page-head-actions">
-        <form method="post">
-            <button class="btn btn-primary">🔍 Ejecutar análisis</button>
-        </form>
-    </div>
-</section>
+{% call ui.stage_head(project, '08', 'Control de calidad',
+        'Duración, estructura, fuentes, repeticiones y coherencia. Se revisa antes de exportar.') %}
+<form method="post">
+    <button class="btn {% if issues %}btn-ghost{% else %}btn-primary{% endif %}">
+        {% if issues or last_run %}Volver a analizar{% else %}Ejecutar análisis{% endif %}
+    </button>
+</form>
+{% endcall %}
 
-{% if not issues %}
-<div class="empty-card">
-    <h3>Sin análisis previo</h3>
-    <p class="muted">Ejecuta el análisis para ver los avisos y problemas detectados.</p>
-</div>
-{% else %}
-<div class="qc-summary">
-    {% set ns = namespace(errors=0, warnings=0, infos=0) %}
-    {% for i in issues %}
-        {% if i.severity == 'error' %}{% set ns.errors = ns.errors + 1 %}
-        {% elif i.severity == 'warning' %}{% set ns.warnings = ns.warnings + 1 %}
-        {% else %}{% set ns.infos = ns.infos + 1 %}{% endif %}
-    {% endfor %}
-    <div class="qc-counter error"><strong>{{ ns.errors }}</strong><span>errores</span></div>
-    <div class="qc-counter warning"><strong>{{ ns.warnings }}</strong><span>avisos</span></div>
-    <div class="qc-counter info"><strong>{{ ns.infos }}</strong><span>info</span></div>
+{% if issues %}
+{% set ns = namespace(errors=0, warnings=0, infos=0) %}
+{% for i in issues %}
+    {% if i.severity == 'error' %}{% set ns.errors = ns.errors + 1 %}
+    {% elif i.severity == 'warning' %}{% set ns.warnings = ns.warnings + 1 %}
+    {% else %}{% set ns.infos = ns.infos + 1 %}{% endif %}
+{% endfor %}
+
+<div class="gauges">
+    <div class="gauge error">
+        <strong>{{ ns.errors }}</strong>
+        <span>Errores</span>
+        <p class="hint">Bloquean la exportación</p>
+    </div>
+    <div class="gauge warning">
+        <strong>{{ ns.warnings }}</strong>
+        <span>Avisos</span>
+        <p class="hint">Conviene corregirlos</p>
+    </div>
+    <div class="gauge info">
+        <strong>{{ ns.infos }}</strong>
+        <span>Notas</span>
+        <p class="hint">Sólo para tenerlo en cuenta</p>
+    </div>
 </div>
 
-<div class="qc-list">
+{% if last_run %}
+<p class="spec"><span>Último análisis <b>{{ last_run[:16]|replace('T', ' ') }}</b></span></p>
+{% endif %}
+
+<div class="mt-2">
     {% for i in issues %}
-    <div class="qc-item qc-{{ i.severity }}">
-        <div class="qc-head">
-            <span class="qc-severity">{{ i.severity }}</span>
-            <span class="qc-stage">{{ i.stage }}</span>
-            {% if i.field %}<span class="qc-field muted small">{{ i.field }}</span>{% endif %}
+    <div class="issue {{ i.severity }}">
+        <div>
+            <p class="issue-tag">{{ severity_names.get(i.severity, i.severity) }}</p>
+            {% if i.field %}<p class="issue-tag">{{ field_names.get(i.field, i.field) }}</p>{% endif %}
         </div>
-        <p>{{ i.message }}</p>
+        <div class="issue-body">
+            <p class="issue-where">{{ stage_names.get(i.stage, i.stage) }}</p>
+            <p>{{ i.message }}</p>
+        </div>
     </div>
     {% endfor %}
+</div>
+
+{% if ns.errors == 0 %}
+<div class="empty-inline mt-3">
+    <p>Sin errores bloqueantes: el proyecto se puede exportar.</p>
+    <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary">Exportar paquete</a>
 </div>
 {% endif %}
 
-<div class="mt-3">
-    <h3>Qué verificamos</h3>
-    <ul class="check-list">
-        <li>✓ Existencia y completitud de cada etapa</li>
-        <li>✓ Número de palabras del guion (rangos por tipo)</li>
-        <li>✓ Duración estimada según velocidad de narración</li>
-        <li>✓ Presencia de hook, CTA y estructura</li>
-        <li>✓ Repeticiones de palabras (umbral: 3+)</li>
-        <li>✓ Mínimo de escenas según duración</li>
-        <li>✓ Coherencia prompts/escenas</li>
-        <li>✓ Fuentes mínimas en investigación</li>
-        <li>✓ Metadata para plataformas objetivo</li>
-        <li>✓ Afirmaciones sin verificar marcadas en investigación</li>
-    </ul>
+{% elif request.args.get('clean') %}
+<div class="empty">
+    <h2>Ni un aviso</h2>
+    <p>El proyecto pasa todas las comprobaciones. Está listo para exportar.</p>
+    <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary btn-lg">Exportar paquete</a>
 </div>
+{% else %}
+<div class="empty">
+    <h2>Todavía sin analizar</h2>
+    <p>El análisis recorre las ocho etapas y devuelve lo que falta o no cuadra.</p>
+    <form method="post">
+        <button class="btn btn-primary btn-lg">Ejecutar análisis</button>
+    </form>
+</div>
+{% endif %}
+
+<details class="fold mt-3">
+    <summary>Qué se comprueba</summary>
+    <ul class="bullets">
+        <li>Que cada etapa exista y esté completa</li>
+        <li>Palabras del guion: {{ qc_checks.min_words_long }}–{{ qc_checks.max_words_long }} en 5 min, {{ qc_checks.min_words_short }}–{{ qc_checks.max_words_short }} en 1 min</li>
+        <li>Duración estimada según la velocidad de narración del perfil</li>
+        <li>Presencia de hook, CTA y estructura</li>
+        <li>Palabras repetidas por encima de {{ qc_checks.repetition_threshold }} veces</li>
+        <li>Escenas mínimas: {{ qc_checks.min_scenes_long }} en 5 min, {{ qc_checks.min_scenes_short }} en 1 min</li>
+        <li>Coherencia entre escenas y prompts visuales</li>
+        <li>Al menos {{ qc_checks.min_sources }} fuentes en la investigación</li>
+        <li>Metadata de las plataformas del perfil</li>
+        <li>Afirmaciones marcadas como no verificadas</li>
+    </ul>
+</details>
 {% endblock %}

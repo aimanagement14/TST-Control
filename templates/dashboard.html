@@ -1,47 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block title %}Proyectos · {{ app_name }}{% endblock %}
 
 {% block content %}
 <section class="page-head">
     <div>
+        <p class="eyebrow">Centro de producción</p>
         <h1>Proyectos</h1>
-        <p class="muted">Desde un tema hasta un paquete listo para producción.</p>
+        <p class="lede">De un tema a un paquete listo para rodar, en ocho etapas.</p>
     </div>
     <div class="page-head-actions">
-        <a href="{{ url_for('new_project') }}" class="btn btn-primary">+ Nuevo proyecto</a>
+        <a href="{{ url_for('new_project') }}" class="btn btn-primary">Nuevo proyecto</a>
     </div>
 </section>
 
 {% if projects %}
-<div class="grid-projects">
+<div class="projects">
     {% for p in projects %}
-    <a class="card-project" href="{{ url_for('view_project', project_id=p.id) }}">
-        <div class="card-project-head">
-            <h3>{{ p.name }}</h3>
-            <span class="status-pill status-{{ p.status }}">{{ p.status }}</span>
+    {% set nav = pipeline(p) %}
+    <a class="project-card" href="{{ url_for('view_project', project_id=p.id) }}">
+        <div class="project-card-head">
+            <div>
+                <h2>{{ p.name }}</h2>
+                <p class="project-topic">{{ p.topic }}</p>
+            </div>
+            <span class="chip {% if p.status == 'ready' %}chip-done{% endif %}">{{ status_label(p.status) }}</span>
         </div>
-        <p class="card-project-topic">{{ p.topic }}</p>
-        <div class="stage-list">
-            <div class="stage {% if p.stages.research %}done{% endif %}">Investigación</div>
-            <div class="stage {% if p.stages.concept %}done{% endif %}">Concepto</div>
-            <div class="stage {% if p.stages.scripts_long %}done{% endif %}">Guion 5 min</div>
-            <div class="stage {% if p.stages.scripts_short %}done{% endif %}">Guion 1 min</div>
-            <div class="stage {% if p.stages.scenes %}done{% endif %}">Escenas</div>
-            <div class="stage {% if p.stages.prompts %}done{% endif %}">Prompts</div>
-            <div class="stage {% if p.stages.metadata %}done{% endif %}">Metadata</div>
+
+        <div>
+            <p class="spec">
+                <span><b>{{ nav.done }}/{{ nav.total }}</b> etapas</span>
+                {% if nav.runtime.has_script %}
+                <span><b>{{ nav.runtime.timecode }}</b> de narración</span>
+                {% endif %}
+            </p>
+            <div class="segments mt-1" role="img"
+                 aria-label="{{ nav.done }} de {{ nav.total }} etapas completadas">
+                {% for cell in nav.cells %}<i class="{% if cell.done %}on{% endif %}"></i>{% endfor %}
+            </div>
         </div>
-        <div class="card-project-foot">
-            <span class="muted small">Actualizado {{ p.updated_at[:10] }}</span>
-            <span class="arrow">→</span>
+
+        <div class="project-card-foot">
+            {% if nav.next %}
+            <span class="next-action">Sigue: {{ nav.next.label }} &rarr;</span>
+            {% else %}
+            <span class="next-action">Exportar paquete &rarr;</span>
+            {% endif %}
+            <span>{{ p.updated_at[:10] }}</span>
         </div>
     </a>
     {% endfor %}
 </div>
 {% else %}
 <div class="empty">
-    <h2>Aún no hay proyectos</h2>
-    <p class="muted">Crea el primero y empieza a producir.</p>
-    <a href="{{ url_for('new_project') }}" class="btn btn-primary">+ Crear primer proyecto</a>
+    <h2>Todavía no hay proyectos</h2>
+    <p>Empieza por un tema. La herramienta te lleva desde la investigación hasta el paquete de producción.</p>
+    <a href="{{ url_for('new_project') }}" class="btn btn-primary btn-lg">Crear el primer proyecto</a>
 </div>
 {% endif %}
 {% endblock %}

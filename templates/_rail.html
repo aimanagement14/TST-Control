@@ -1,0 +1,31 @@
+{# Tira de película: posición dentro del pipeline y estado de cada etapa. #}
+{% set nav = rail if rail is defined and rail else pipeline(project, current_stage|default(none)) %}
+<nav class="rail" aria-label="Etapas del proyecto">
+    <div class="rail-inner">
+        <ol class="rail-strip">
+            {% for cell in nav.cells %}
+            <li class="rail-cell{% if cell.done %} is-done{% endif %}{% if cell.current %} is-current{% endif %}"
+                style="--i: {{ loop.index0 }}">
+                <a href="{{ cell.url }}" {% if cell.current %}aria-current="step"{% endif %}>
+                    <span class="rail-num">{{ cell.num }}</span>
+                    <span class="rail-label">{{ cell.short or cell.label }}</span>
+                    <span class="rail-state">{{ 'listo' if cell.done else 'pendiente' }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ol>
+        <div class="rail-meter">
+            <p class="rail-meter-row">
+                <span>Etapas</span>
+                <b>{{ nav.done }}/{{ nav.total }}</b>
+            </p>
+            <div class="bar{% if not nav.complete %} is-amber{% endif %}">
+                <i style="width: {{ nav.percent }}%"></i>
+            </div>
+            <p class="rail-meter-row{% if nav.runtime.over %} is-over{% endif %}">
+                <span>Duración</span>
+                <b>{% if nav.runtime.has_script %}{{ nav.runtime.timecode }}{% else %}--:--{% endif %} / {{ nav.runtime.target_timecode }}</b>
+            </p>
+        </div>
+    </div>
+</nav>

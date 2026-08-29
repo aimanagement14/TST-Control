@@ -1,0 +1,82 @@
+{# Piezas compartidas por las etapas del pipeline. #}
+
+{% macro stage_head(project, num, title, lede) %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">
+            <a href="{{ url_for('view_project', project_id=project.id) }}">{{ project.name }}</a>
+            &middot; Etapa <span class="num">{{ num }}</span> de 08
+        </p>
+        <h1>{{ title }}</h1>
+        <p class="lede">{{ lede }}</p>
+    </div>
+    {% if caller %}<div class="page-head-actions">{{ caller() }}</div>{% endif %}
+</section>
+{% endmacro %}
+
+
+{% macro prompt_editor(sys_value, user_value, saved, hidden={}, title='Prompt') %}
+<div class="panel" data-prompt>
+    <div class="panel-head">
+        <h3>{{ title }}</h3>
+        {% if saved %}
+        <span class="chip chip-done">Guardado{% if saved is mapping and saved.updated_at %} &middot; {{ saved.updated_at[11:16] }}{% endif %}</span>
+        {% else %}
+        <span class="chip">Sin guardar</span>
+        {% endif %}
+    </div>
+    <form method="post">
+        <input type="hidden" name="action" value="save_prompt">
+        {% for key, value in hidden.items() %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <label class="field">
+            <span class="label">Instrucciones del sistema</span>
+            <textarea name="sys_prompt" rows="5">{{ sys_value }}</textarea>
+        </label>
+        <label class="field">
+            <span class="label">Petición</span>
+            <textarea name="user_prompt" rows="9">{{ user_value }}</textarea>
+        </label>
+        <div class="actions">
+            <button type="button" class="btn" data-copy-button>Copiar prompt</button>
+            <button type="submit" class="btn btn-ghost">Guardar cambios</button>
+        </div>
+    </form>
+</div>
+{% endmacro %}
+
+
+{% macro paste_form(field, value='', hidden={}, title='Respuesta del LLM',
+                    button='Guardar', rows=16, spec=none,
+                    placeholder='Pega aquí la respuesta de tu LLM.') %}
+<div class="panel">
+    <div class="panel-head">
+        <h3>{{ title }}</h3>
+        {% if caller %}{{ caller() }}{% endif %}
+    </div>
+    <form method="post">
+        <input type="hidden" name="action" value="save">
+        {% for key, val in hidden.items() %}
+        <input type="hidden" name="{{ key }}" value="{{ val }}">
+        {% endfor %}
+        <label class="field">
+            <span class="sr-only">{{ title }}</span>
+            <textarea name="{{ field }}" rows="{{ rows }}" placeholder="{{ placeholder }}">{{ value }}</textarea>
+        </label>
+        {% if spec %}
+        <p class="spec" data-spec data-for="{{ field }}" data-wpm="{{ spec.wpm }}"
+           data-min="{{ spec.min }}" data-max="{{ spec.max }}">
+            <span><b data-words>0</b> palabras</span>
+            {% if spec.wpm %}
+            <span><b data-runtime>00:00</b> de narración a {{ spec.wpm }} ppm</span>
+            {% endif %}
+            {% if spec.max %}<span>objetivo {{ spec.min }}–{{ spec.max }}</span>{% endif %}
+        </p>
+        {% endif %}
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">{{ button }}</button>
+        </div>
+    </form>
+</div>
+{% endmacro %}

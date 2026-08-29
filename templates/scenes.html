@@ -1,94 +1,126 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'scenes' %}
 {% block title %}Escenas · {{ project.name }}{% endblock %}
 
 {% block content %}
-<section class="page-head">
-    <div>
-        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
-        <h1>Escenas</h1>
-        <p class="muted">Convierte el guion en una secuencia visual. Cada escena debe poder existir visualmente sin depender de la anterior.</p>
-    </div>
-</section>
+{{ ui.stage_head(project, '05', 'Escenas',
+    'El guion convertido en secuencia visual. Cada escena tiene que sostenerse por sí sola.') }}
 
-<div class="two-col">
+{% if not scripts %}
+<div class="empty">
+    <h2>Primero hace falta un guion</h2>
+    <p>Las escenas se derivan del texto narrado. Escribe o pega un guion y vuelve aquí.</p>
+    <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-primary">Ir a guiones</a>
+</div>
+{% else %}
+
+{% set ns = namespace(target=none) %}
+{% for s in scripts %}
+    {% if s.type == 'long' and not ns.target %}{% set ns.target = s %}{% endif %}
+{% endfor %}
+{% if not ns.target %}{% set ns.target = scripts|first %}{% endif %}
+{% for s in scripts %}
+    {% if gen_script_id and s.id|string == gen_script_id|string %}{% set ns.target = s %}{% endif %}
+{% endfor %}
+{% set total_seconds = scenes|sum(attribute='duration_seconds') %}
+
+<div class="work">
     <div>
-        {% if scripts %}
-        <form method="post">
-            <input type="hidden" name="action" value="generate_prompt">
-            <div class="form-row inline">
-                <label>Basado en:
+        <form method="post" class="panel">
+            <div class="panel-head">
+                <h3>Origen</h3>
+                {% if saved_prompt %}<span class="chip chip-done">Prompt guardado</span>{% endif %}
+            </div>
+            <div class="field-row">
+                <label class="field">
+                    <span class="label">Guion de referencia</span>
                     <select name="script_id">
                         {% for s in scripts %}
-                        <option value="{{ s.id }}">{{ s.type }} — {{ s.title or 'sin título' }} ({{ s.word_count }} palabras)</option>
+                        <option value="{{ s.id }}" {% if ns.target and s.id == ns.target.id %}selected{% endif %}>
+                            {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
+                            — {{ s.title or 'sin título' }} ({{ s.word_count }} palabras)
+                        </option>
                         {% endfor %}
                     </select>
                 </label>
-                <button type="submit" class="btn btn-primary">⚡ Generar prompt de escenas</button>
+                <button name="action" value="generate_prompt" class="btn">
+                    {% if saved_prompt %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+                </button>
             </div>
         </form>
 
         {% if generated or saved_prompt %}
-        <div class="card mt-2">
-            <h3>📝 Prompt
-                {% if saved_prompt %}<span class="status-pill status-ready">guardado</span>{% endif %}
-            </h3>
+        {{ ui.prompt_editor(
+            sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
+            user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
+            saved_prompt) }}
+        {% endif %}
+
+        <div class="panel">
+            <div class="panel-head">
+                <h3>Respuesta del LLM</h3>
+                {% if ns.target %}
+                <span class="chip chip-info">Basado en {% if ns.target.type == 'long' %}guion 5 min{% else %}guion 1 min{% endif %}</span>
+                {% endif %}
+            </div>
             <form method="post">
-                <input type="hidden" name="action" value="save_prompt">
-                <label>Prompt del sistema
-                    <textarea name="sys_prompt" rows="5">{{ sys_prompt or (saved_prompt.sys_prompt if saved_prompt else '') }}</textarea>
+                <input type="hidden" name="action" value="save">
+                <input type="hidden" name="script_id" value="{{ ns.target.id if ns.target }}">
+                <label class="field">
+                    <span class="sr-only">Escenas en JSON</span>
+                    <textarea name="text" rows="18"
+                              placeholder='[{"scene_number": 1, "narration_segment": "…", "visual_description": "…", "camera_movement": "paneo lento", "duration_seconds": 8, "transition": "corte seco"}]'>{% if not is_manual_output(generated) %}{{ generated or '' }}{% endif %}</textarea>
                 </label>
-                <label>Prompt del usuario
-                    <textarea name="user_prompt" rows="8">{{ user_prompt or (saved_prompt.user_prompt if saved_prompt else '') }}</textarea>
-                </label>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+                <p class="hint">
+                    Se espera un array JSON; el parser lo extrae aunque venga con texto alrededor.
+                    Al guardar se reemplazan las {{ scenes|length }} escenas actuales.
+                </p>
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary">Guardar escenas</button>
                 </div>
             </form>
         </div>
-        {% endif %}
-
-        {% if generated %}
-        <form method="post" class="mt-2">
-            <input type="hidden" name="action" value="save">
-            <input type="hidden" name="script_id" value="{{ gen_script_id }}">
-            <h3>Pegar respuesta JSON del LLM</h3>
-            <p class="muted small">La respuesta debe ser un array JSON. El parser intentará extraerlo aunque venga con texto alrededor.</p>
-            <textarea name="text" rows="20">{{ generated }}</textarea>
-            <button type="submit" class="btn btn-primary">Guardar escenas</button>
-        </form>
-        {% endif %}
-        {% else %}
-        <div class="empty-card">
-            <p class="muted">Primero necesitas un guion. Ve a la etapa anterior.</p>
-            <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-ghost">Ir a guiones</a>
-        </div>
-        {% endif %}
     </div>
 
-    <aside>
-        <div class="card">
-            <h4>📊 Estado</h4>
-            <p><strong>{{ scenes|length }}</strong> escenas guardadas</p>
-            {% if saved_prompt %}<p>✓ prompt guardado</p>{% endif %}
+    <aside class="work-aside">
+        <div class="panel">
+            <h4>Secuencia</h4>
+            <ul class="data-list mt-1">
+                <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
+                <li><span>Duración sumada</span><b>{{ timecode(total_seconds) }}</b></li>
+                <li><span>Mínimo recomendado</span><b>{{ qc_checks.min_scenes_long }}</b></li>
+            </ul>
+            {% if scenes and scenes|length < qc_checks.min_scenes_long %}
+            <p class="hint mt-2">
+                <span class="chip chip-next">Pocas escenas</span>
+                Un guion de 5 minutos suele necesitar {{ qc_checks.min_scenes_long }} o más.
+            </p>
+            {% endif %}
         </div>
+
         {% if scenes %}
-        <div class="card">
-            <h4>Escenas</h4>
-            <ol class="scenes-list">
+        <div class="panel">
+            <h4>Escenas guardadas</h4>
+            <ul class="scene-list mt-1">
                 {% for s in scenes %}
                 <li>
-                    <strong>Escena {{ s.scene_number }}</strong> · {{ s.duration_seconds }}s
-                    <p class="muted small">{{ s.visual_description[:80] }}{% if s.visual_description|length > 80 %}…{% endif %}</p>
-                    <form method="post" style="display:inline" onsubmit="return confirm('¿Eliminar escena?')">
+                    <span class="num">{{ '%02d'|format(s.scene_number) }}</span>
+                    <span>
+                        <span class="mono small">{{ s.duration_seconds }}s · {{ s.camera_movement or 'sin cámara' }}</span>
+                        <p>{{ s.visual_description[:90] }}{% if s.visual_description|length > 90 %}…{% endif %}</p>
+                    </span>
+                    <form method="post" onsubmit="return confirm('Se elimina la escena {{ s.scene_number }}.')">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="scene_id" value="{{ s.id }}">
-                        <button class="btn btn-ghost btn-sm btn-danger">×</button>
+                        <button class="btn btn-danger btn-sm" aria-label="Eliminar escena {{ s.scene_number }}">&times;</button>
                     </form>
                 </li>
                 {% endfor %}
-            </ol>
+            </ul>
         </div>
         {% endif %}
     </aside>
 </div>
+{% endif %}
 {% endblock %}
