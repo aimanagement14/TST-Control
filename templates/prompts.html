@@ -4,6 +4,29 @@
 {% block title %}Prompts visuales · {{ project.name }}{% endblock %}
 
 {% block content %}
+{% set active_script = none %}
+{% for s in scripts %}
+    {% if active_script_id and s.id == active_script_id %}{% set active_script = s %}{% endif %}
+{% endfor %}
+{% if not active_script %}
+    {% for s in scripts %}
+        {% if not active_script and s.type == 'long' %}{% set active_script = s %}{% endif %}
+    {% endfor %}
+{% endif %}
+{% if not active_script and scripts %}{% set active_script = scripts|first %}{% endif %}
+
+{% if scripts %}
+<nav class="tabs" aria-label="Cambiar de guion">
+    {% for s in scripts %}
+    <a class="tab {% if active_script and s.id == active_script.id %}active{% endif %}"
+       href="{{ url_for('prompts', project_id=project.id, script_id=s.id) }}">
+        {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
+        <span class="tab-meta">{{ s.word_count }} palabras</span>
+    </a>
+    {% endfor %}
+</nav>
+{% endif %}
+
 {% call ui.stage_head(project, '06', 'Prompts visuales',
         'Un prompt cinematográfico por escena. El estilo del perfil se aplica a todos.') %}
 {% if scenes %}
@@ -16,7 +39,7 @@
 {% endif %}
 {% endcall %}
 
-{% if not scenes %}
+{% if not scenes and scripts %}
 <div class="empty">
     <h2>Primero hacen falta escenas</h2>
     <p>Cada prompt visual describe una escena concreta. Genera la secuencia y vuelve aquí.</p>

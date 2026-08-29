@@ -1102,6 +1102,60 @@ def parse_scenes_json(text):
     return None
 
 
+def parse_scenes_tst(text):
+    """Parsea la salida TST Scene Director en bloques ESCENA N / TEXTO AUDIO / IMAGEN.
+
+    Acepta líneas adicionales entre los bloques, líneas en blanco, y valores
+    multilínea hasta el siguiente marcador. Devuelve lista de dicts con
+    scene_number, narration_segment, image_prompt.
+    """
+    if not text:
+        return []
+    scenes = []
+    current = None
+    field = None
+    scene_re = re.compile(r"^\s*ESCENA\s+(\d+)\s*[:.]?\s*$", re.IGNORECASE)
+    field_re = re.compile(r"^\s*(TEXTO\s+AUDIO|IMAGEN)\s*:\s*(.*)$", re.IGNORECASE)
+
+    def flush():
+        if current and current.get("narration_segment") and current.get("image_prompt"):
+            scenes.append(current)
+
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        stripped = line.strip()
+        m_scene = scene_re.match(line)
+        if m_scene:
+            flush()
+            current = {"scene_number": int(m_scene.group(1))}
+            field = None
+            continue
+        if current is None:
+            continue
+        m_field = field_re.match(line)
+        if m_field:
+            label = m_field.group(1).upper().replace(" ", "")
+            key = "narration_segment" if label == "TEXTOAUDIO" else "image_prompt"
+            current[key] = m_field.group(2).strip()
+            field = key
+            continue
+        if field and stripped:
+            current[field] = (current.get(field, "") + " " + stripped).strip()
+    flush()
+    return scenes
+
+
+def parse_scenes(text):
+    """Parsea una respuesta de escenas: intenta primero TST, luego JSON."""
+    tst = parse_scenes_tst(text)
+    if tst:
+        return tst
+    j = parse_scenes_json(text)
+    if j:
+        return j
+    return None
+
+
 def parse_prompt_json(text):
     """Intenta extraer el JSON de un prompt."""
     m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.DOTALL)
@@ -1201,6 +1255,11 @@ def run_qc(project_id):
         prompts = [dict(r) for r in conn.execute("SELECT * FROM prompts WHERE project_id=?", (project_id,)).fetchall()]
         metadata = [dict(r) for r in conn.execute("SELECT * FROM metadata_records WHERE project_id=?", (project_id,)).fetchall()]
 
+    scenes_by_script = {}
+    for sc in scenes:
+        scenes_by_script.setdefault(sc["script_id"], []).append(sc)
+    prompts_by_scene = {p["scene_id"]: p for p in prompts}
+
     cfg = CONFIG["qc"]["checks"]
 
     # Investigación
@@ -1264,21 +1323,35 @@ def run_qc(project_id):
         if not s["cta"]:
             issues.append(("scripts", "warning", f"Guion {tlabel} sin CTA", "cta"))
 
-    # Escenas
-    if not scenes:
+    # Escenas (chequeo por guion, ya que cada video tiene las suyas)
+    if scripts and not scenes:
         issues.append(("scenes", "error", "No hay escenas", "scenes"))
-    else:
-        if long_s and len(scenes) < cfg["min_scenes_long"]:
+    for s in scripts:
+        scs = scenes_by_script.get(s["id"], [])
+        min_n = cfg[f"min_scenes_{'long' if s['type'] == 'long' else 'short'}"]
+        label = "guion 5 min" if s["type"] == "long" else "guion 1 min"
+        if not scs:
             issues.append(("scenes", "warning",
-                f"Solo {len(scenes)} escenas (mínimo recomendado: {cfg['min_scenes_long']})", "scenes"))
+                f"Faltan escenas para el {label}", s["type"]))
+        elif len(scs) < min_n:
+            issues.append(("scenes", "warning",
+                f"Solo {len(scs)} escenas en el {label} (mínimo recomendado: {min_n})",
+                s["type"]))
 
-    # Prompts
+    # Prompts (también por guion, enlazados a sus escenas)
     if scenes and not prompts:
         issues.append(("prompts", "error", "Hay escenas pero no hay prompts visuales", "prompts"))
     elif scenes and prompts:
-        if len(prompts) < len(scenes):
-            issues.append(("prompts", "warning",
-                f"Solo {len(prompts)} prompts para {len(scenes)} escenas", "prompts"))
+        for s in scripts:
+            scs = scenes_by_script.get(s["id"], [])
+            if not scs:
+                continue
+            linked = sum(1 for sc in scs if sc["id"] in prompts_by_scene)
+            if linked < len(scs):
+                label = "guion 5 min" if s["type"] == "long" else "guion 1 min"
+                issues.append(("prompts", "warning",
+                    f"Solo {linked} prompts para {len(scs)} escenas del {label}",
+                    s["type"]))
 
     # Metadata
     if scripts and not metadata:
@@ -1592,14 +1665,31 @@ def scenes(project_id):
         scripts_rows = [dict(r) for r in conn.execute(
             "SELECT * FROM scripts WHERE project_id=?", (project_id,)
         ).fetchall()]
-        scenes_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
-        ).fetchall()]
+
+    def default_script_id():
+        long_s = next((s for s in scripts_rows if s["type"] == "long"), None)
+        return long_s["id"] if long_s else (scripts_rows[0]["id"] if scripts_rows else None)
+
+    def fetch_scenes_for(sid):
+        if sid is None:
+            return []
+        with get_db() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
+                (project_id, sid),
+            ).fetchall()]
+
+    raw_script_id = request.values.get("script_id")
+    if raw_script_id and any(str(s["id"]) == str(raw_script_id) for s in scripts_rows):
+        active_script_id = int(raw_script_id)
+    else:
+        active_script_id = default_script_id()
+    scenes_rows = fetch_scenes_for(active_script_id)
 
     if request.method == "POST":
         action = request.form.get("action")
         if action == "generate_prompt":
-            script_id = request.form.get("script_id")
+            script_id = request.form.get("script_id") or active_script_id
             script = next((s for s in scripts_rows if str(s["id"]) == str(script_id)), None)
             if not script:
                 flash("Selecciona un guion", "error")
@@ -1611,24 +1701,33 @@ def scenes(project_id):
                                    scripts=scripts_rows, scenes=scenes_rows,
                                    generated=generated, gen_script_id=script_id,
                                    sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_prompt=True)
+                                   saved_prompt=True,
+                                   active_script_id=script_id)
         elif action == "save_prompt":
             sys_p = request.form.get("sys_prompt", "").strip()
             user_p = request.form.get("user_prompt", "").strip()
             if sys_p and user_p:
                 save_stage_prompt(project_id, "scenes", sys_p, user_p)
                 flash("Prompt de escenas guardado en el proyecto", "ok")
-            return redirect(url_for("scenes", project_id=project_id))
+            return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
         elif action == "save":
             text = request.form.get("text", "").strip()
-            script_id = request.form.get("script_id")
+            script_id = request.form.get("script_id") or active_script_id
             if text and script_id:
-                parsed = parse_scenes_json(text)
+                parsed = parse_scenes(text)
                 if not parsed:
-                    flash("No se pudo extraer JSON de escenas de la respuesta", "error")
-                    return redirect(url_for("scenes", project_id=project_id))
+                    flash("No se pudo extraer escenas de la respuesta (¿formato TST correcto?)", "error")
+                    return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
+                # Estimar duración por escena si el LLM no la incluyó.
+                wpm = (profile.get("narration_speed") if profile else None) or 150
+                total_words = sum(count_words(sc.get("narration_segment", "")) for sc in parsed)
+                for sc in parsed:
+                    if not sc.get("duration_seconds") and total_words > 0:
+                        w = count_words(sc.get("narration_segment", ""))
+                        sc["duration_seconds"] = max(1, round(w / wpm * 60))
                 with get_db() as conn:
-                    conn.execute("DELETE FROM scenes WHERE project_id=?", (project_id,))
+                    conn.execute("DELETE FROM scenes WHERE project_id=? AND script_id=?",
+                                 (project_id, script_id))
                     for sc in parsed:
                         try:
                             scene_num = int(sc.get("scene_number", 0))
@@ -1638,6 +1737,11 @@ def scenes(project_id):
                             dur = int(sc.get("duration_seconds", 0))
                         except Exception:
                             dur = 0
+                        image_prompt = (
+                            sc.get("image_prompt")
+                            or sc.get("visual_description")
+                            or ""
+                        )
                         conn.execute("""
                             INSERT INTO scenes (project_id, script_id, scene_number,
                                 narration, visual_description, camera_movement,
@@ -1646,13 +1750,13 @@ def scenes(project_id):
                         """, (
                             project_id, script_id, scene_num,
                             sc.get("narration_segment", ""),
-                            sc.get("visual_description", ""),
-                            sc.get("camera_movement", ""),
-                            sc.get("transition", ""),
+                            image_prompt,
+                            sc.get("camera_movement", "") or "",
+                            sc.get("transition", "") or "",
                             dur, now_iso(),
                         ))
                     conn.execute("UPDATE projects SET status='scenes', updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                                  (now_iso(), project_id))
                 # Auto-guardar prompt de escenas usando el guion largo como referencia
                 long_script = get_script(project_id, "long") or get_script(project_id, "short")
                 if long_script:
@@ -1660,18 +1764,19 @@ def scenes(project_id):
                         project_id, "scenes", project, profile,
                         {"script": long_script},
                     )
-                flash(f"Guardadas {len(parsed)} escenas", "ok")
-            return redirect(url_for("scenes", project_id=project_id))
+                flash(f"Guardadas {len(parsed)} escenas del guion seleccionado", "ok")
+            return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
         elif action == "delete":
             scene_id = request.form.get("scene_id")
             with get_db() as conn:
                 conn.execute("DELETE FROM scenes WHERE id=?", (scene_id,))
-            return redirect(url_for("scenes", project_id=project_id))
+            return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
 
     saved_prompt = get_saved_prompt(project_id, "scenes")
     return render_template("scenes.html", project=project, profile=profile,
                            scripts=scripts_rows, scenes=scenes_rows,
-                           saved_prompt=saved_prompt)
+                           saved_prompt=saved_prompt,
+                           active_script_id=active_script_id)
 
 
 # --- Prompts -----------------------------------------------------------------
@@ -1681,8 +1786,24 @@ def prompts(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
+        scripts_rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        ).fetchall()]
+
+    def default_script_id():
+        long_s = next((s for s in scripts_rows if s["type"] == "long"), None)
+        return long_s["id"] if long_s else (scripts_rows[0]["id"] if scripts_rows else None)
+
+    raw_script_id = request.values.get("script_id")
+    if raw_script_id and any(str(s["id"]) == str(raw_script_id) for s in scripts_rows):
+        active_script_id = int(raw_script_id)
+    else:
+        active_script_id = default_script_id()
+
+    with get_db() as conn:
         scenes_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
+            "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
+            (project_id, active_script_id),
         ).fetchall()]
         prompts_rows = [dict(r) for r in conn.execute(
             "SELECT * FROM prompts WHERE project_id=?", (project_id,)
@@ -1704,7 +1825,9 @@ def prompts(project_id):
                     "user": user_p,
                 })
             return render_template("prompts.html", project=project, profile=profile,
-                                   scenes=scenes_rows, prompts_by_scene=prompts_by_scene,
+                                   scripts=scripts_rows, scenes=scenes_rows,
+                                   prompts_by_scene=prompts_by_scene,
+                                   active_script_id=active_script_id,
                                    batch=generated_all)
         elif action == "save_all":
             count = 0
@@ -1754,17 +1877,19 @@ def prompts(project_id):
                     count += 1
                 if count:
                     conn.execute("UPDATE projects SET status='prompts', updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                                  (now_iso(), project_id))
             flash(f"Guardados {count} prompts", "ok")
-            return redirect(url_for("prompts", project_id=project_id))
+            return redirect(url_for("prompts", project_id=project_id, script_id=active_script_id))
         elif action == "delete":
             prompt_id = request.form.get("prompt_id")
             with get_db() as conn:
                 conn.execute("DELETE FROM prompts WHERE id=?", (prompt_id,))
-            return redirect(url_for("prompts", project_id=project_id))
+            return redirect(url_for("prompts", project_id=project_id, script_id=active_script_id))
 
     return render_template("prompts.html", project=project, profile=profile,
-                           scenes=scenes_rows, prompts_by_scene=prompts_by_scene)
+                           scripts=scripts_rows, scenes=scenes_rows,
+                           prompts_by_scene=prompts_by_scene,
+                           active_script_id=active_script_id)
 
 
 # --- Metadata ----------------------------------------------------------------

@@ -302,6 +302,42 @@ code, .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular
 .btn[data-copied] { background: var(--lock); border-color: var(--lock); color: var(--void); }
 .inline-form { display: inline-block; }
 
+/* ===== Tabs (selector de guion) ===== */
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 18px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0;
+}
+.tab {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 16px;
+    color: var(--mute);
+    text-decoration: none;
+    border-radius: var(--r) var(--r) 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    font-size: .85rem;
+    letter-spacing: .02em;
+    transition: color .15s, background .15s, border-color .15s;
+}
+.tab:hover { color: var(--paper); background: rgba(255, 255, 255, .03); }
+.tab.active {
+    color: var(--amber);
+    background: var(--slate);
+    border-color: var(--line);
+    border-bottom-color: var(--slate);
+    margin-bottom: -1px;
+}
+.tab-meta {
+    font-size: .72rem;
+    color: var(--mute);
+    font-weight: normal;
+}
+
 /* ===== Paneles ===== */
 .panel {
     background: var(--slate);
