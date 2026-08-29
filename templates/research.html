@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Investigación · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
+        <h1>Investigación</h1>
+        <p class="muted">Recopila hechos verificados, fuentes y teorías. Esta información alimenta todas las etapas siguientes.</p>
+    </div>
+</section>
+
+<div class="two-col">
+    <div>
+        {% if not generated %}
+        <form method="post">
+            <input type="hidden" name="action" value="generate_prompt">
+            <button type="submit" class="btn btn-primary">⚡ Generar prompt de investigación</button>
+            <p class="muted small">Genera un prompt estructurado y lo guarda en el proyecto.</p>
+        </form>
+        {% endif %}
+
+        {% if generated or saved_prompt %}
+        <div class="card mt-3">
+            <h3>📝 Prompt
+                {% if saved_prompt %}<span class="status-pill status-ready">guardado</span>{% endif %}
+            </h3>
+            <p class="muted small">Edita el prompt si quieres ajustar el enfoque. Se guarda al pulsar el botón.</p>
+
+            <form method="post" id="prompt-form">
+                <input type="hidden" name="action" value="save_prompt">
+                <label>Prompt del sistema
+                    <textarea name="sys_prompt" rows="6">{{ sys_prompt or (saved_prompt.sys_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <label>Prompt del usuario
+                    <textarea name="user_prompt" rows="10">{{ user_prompt or (saved_prompt.user_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="copyPrompts()">📋 Copiar al portapapeles</button>
+                </div>
+            </form>
+            <script>
+            function copyPrompts() {
+                const form = document.getElementById('prompt-form');
+                const sys = form.querySelector('[name=sys_prompt]').value;
+                const usr = form.querySelector('[name=user_prompt]').value;
+                navigator.clipboard.writeText('SYSTEM:\n' + sys + '\n\nUSER:\n' + usr);
+            }
+            </script>
+        </div>
+        {% endif %}
+
+        {% if generated %}
+        <form method="post" class="mt-3">
+            <input type="hidden" name="action" value="save">
+            <h3>Pegar respuesta del LLM</h3>
+            <textarea name="content" rows="20" placeholder="Pega aquí la respuesta de tu LLM...">{{ generated }}</textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar investigación</button>
+            </div>
+        </form>
+        {% else %}
+        <form method="post" class="mt-3">
+            <input type="hidden" name="action" value="save">
+            <h3>Investigación actual</h3>
+            <textarea name="content" rows="20" placeholder="Pega aquí la investigación, o genera el prompt arriba.">{{ research.content or '' }}</textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+
+    <aside>
+        <div class="card">
+            <h4>📊 Estado</h4>
+            <ul class="meta-list">
+                <li><strong>{{ facts|length }}</strong> hechos identificados</li>
+                <li><strong>{{ sources|length }}</strong> fuentes</li>
+                {% if saved_prompt %}
+                <li><strong>✓</strong> prompt guardado</li>
+                {% endif %}
+            </ul>
+            <p class="muted small">El parser intentará extraer fuentes y hechos automáticamente.</p>
+        </div>
+        {% if facts %}
+        <div class="card">
+            <h4>Hechos clave</h4>
+            <ul class="compact-list">
+                {% for f in facts[:10] %}<li>{{ f }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if sources %}
+        <div class="card">
+            <h4>Fuentes</h4>
+            <ul class="compact-list">
+                {% for s in sources[:10] %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+{% endblock %}

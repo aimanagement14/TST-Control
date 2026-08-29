@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Perfiles · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <h1>Perfiles de contenido</h1>
+        <p class="muted">Plantillas reutilizables con tono, estilo, niveles de misterio y plataformas.</p>
+    </div>
+</section>
+
+<div class="two-col">
+    <div>
+        <h3>Perfiles existentes</h3>
+        {% for p in profiles %}
+        <div class="card profile-card">
+            <div class="card-head">
+                <h4>
+                    {{ p.name }}
+                    {% if p.is_default %}<span class="status-pill status-ready">por defecto</span>{% endif %}
+                </h4>
+                <div>
+                    {% if not p.is_default %}
+                    <form method="post" style="display:inline">
+                        <input type="hidden" name="action" value="set_default">
+                        <input type="hidden" name="profile_id" value="{{ p.id }}">
+                        <button class="btn btn-ghost btn-sm">Marcar por defecto</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" style="display:inline" onsubmit="return confirm('¿Eliminar perfil?')">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="profile_id" value="{{ p.id }}">
+                        <button class="btn btn-ghost btn-sm btn-danger">×</button>
+                    </form>
+                </div>
+            </div>
+            <ul class="meta-list">
+                <li><strong>Tipo:</strong> {{ p.content_type or '—' }}</li>
+                <li><strong>Audiencia:</strong> {{ p.audience or '—' }}</li>
+                <li><strong>Tono:</strong> {{ p.tone or '—' }}</li>
+                <li><strong>Estilo:</strong> {{ p.style or '—' }}</li>
+                <li><strong>Misterio:</strong> {{ p.mystery_level }}/10 · <strong>Drama:</strong> {{ p.drama_level }}/10</li>
+                <li><strong>Velocidad:</strong> {{ p.narration_speed }} ppm</li>
+                <li><strong>Plataformas:</strong> {{ p.platforms_list|join(', ') or '—' }}</li>
+            </ul>
+            {% if p.notes %}<p class="muted small">{{ p.notes }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <aside>
+        <div class="card">
+            <h3>+ Nuevo perfil</h3>
+            <form method="post">
+                <input type="hidden" name="action" value="create">
+                <label>Nombre
+                    <input type="text" name="name" required placeholder="Ej: Todo Sobre Todo / Misterio">
+                </label>
+                <label>Tipo de contenido
+                    <input type="text" name="content_type" placeholder="Documental, video corto, etc.">
+                </label>
+                <label>Audiencia
+                    <input type="text" name="audience" placeholder="A quién va dirigido">
+                </label>
+                <label>Tono
+                    <input type="text" name="tone" placeholder="Serio, intrigante, didáctico...">
+                </label>
+                <label>Estilo visual
+                    <input type="text" name="style" placeholder="Cinematográfico, contrastado, oscuro...">
+                </label>
+                <div class="form-row inline">
+                    <label>Misterio
+                        <input type="number" name="mystery_level" min="1" max="10" value="5">
+                    </label>
+                    <label>Drama
+                        <input type="number" name="drama_level" min="1" max="10" value="5">
+                    </label>
+                    <label>PPM
+                        <input type="number" name="narration_speed" min="100" max="200" value="150">
+                    </label>
+                </div>
+                <label>Plataformas
+                    <div class="checkbox-group">
+                        {% for plat in ['youtube','shorts','tiktok','instagram','facebook','twitter'] %}
+                        <label class="checkbox"><input type="checkbox" name="platforms" value="{{ plat }}"> {{ plat }}</label>
+                        {% endfor %}
+                    </div>
+                </label>
+                <label>Notas
+                    <textarea name="notes" rows="3"></textarea>
+                </label>
+                <label class="checkbox"><input type="checkbox" name="is_default"> Marcar como perfil por defecto</label>
+                <button type="submit" class="btn btn-primary">Crear perfil</button>
+            </form>
+        </div>
+    </aside>
+</div>
+{% endblock %}

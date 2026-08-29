@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Escenas · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
+        <h1>Escenas</h1>
+        <p class="muted">Convierte el guion en una secuencia visual. Cada escena debe poder existir visualmente sin depender de la anterior.</p>
+    </div>
+</section>
+
+<div class="two-col">
+    <div>
+        {% if scripts %}
+        <form method="post">
+            <input type="hidden" name="action" value="generate_prompt">
+            <div class="form-row inline">
+                <label>Basado en:
+                    <select name="script_id">
+                        {% for s in scripts %}
+                        <option value="{{ s.id }}">{{ s.type }} — {{ s.title or 'sin título' }} ({{ s.word_count }} palabras)</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-primary">⚡ Generar prompt de escenas</button>
+            </div>
+        </form>
+
+        {% if generated or saved_prompt %}
+        <div class="card mt-2">
+            <h3>📝 Prompt
+                {% if saved_prompt %}<span class="status-pill status-ready">guardado</span>{% endif %}
+            </h3>
+            <form method="post">
+                <input type="hidden" name="action" value="save_prompt">
+                <label>Prompt del sistema
+                    <textarea name="sys_prompt" rows="5">{{ sys_prompt or (saved_prompt.sys_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <label>Prompt del usuario
+                    <textarea name="user_prompt" rows="8">{{ user_prompt or (saved_prompt.user_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if generated %}
+        <form method="post" class="mt-2">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="script_id" value="{{ gen_script_id }}">
+            <h3>Pegar respuesta JSON del LLM</h3>
+            <p class="muted small">La respuesta debe ser un array JSON. El parser intentará extraerlo aunque venga con texto alrededor.</p>
+            <textarea name="text" rows="20">{{ generated }}</textarea>
+            <button type="submit" class="btn btn-primary">Guardar escenas</button>
+        </form>
+        {% endif %}
+        {% else %}
+        <div class="empty-card">
+            <p class="muted">Primero necesitas un guion. Ve a la etapa anterior.</p>
+            <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-ghost">Ir a guiones</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <aside>
+        <div class="card">
+            <h4>📊 Estado</h4>
+            <p><strong>{{ scenes|length }}</strong> escenas guardadas</p>
+            {% if saved_prompt %}<p>✓ prompt guardado</p>{% endif %}
+        </div>
+        {% if scenes %}
+        <div class="card">
+            <h4>Escenas</h4>
+            <ol class="scenes-list">
+                {% for s in scenes %}
+                <li>
+                    <strong>Escena {{ s.scene_number }}</strong> · {{ s.duration_seconds }}s
+                    <p class="muted small">{{ s.visual_description[:80] }}{% if s.visual_description|length > 80 %}…{% endif %}</p>
+                    <form method="post" style="display:inline" onsubmit="return confirm('¿Eliminar escena?')">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="scene_id" value="{{ s.id }}">
+                        <button class="btn btn-ghost btn-sm btn-danger">×</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+{% endblock %}

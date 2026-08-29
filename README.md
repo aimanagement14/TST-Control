@@ -1,0 +1,122 @@
+# Todo Sobre Todo — Centro de producción de contenido
+
+Herramienta local para **planear, investigar y preparar todo el contenido**
+antes de pasar a producción audiovisual.
+
+No genera imágenes, videos ni audio. Solo planifica y prepara.
+
+## Arquitectura (deliberadamente simple)
+
+```
+TodoSobreTodo/
+├── app.py            # toda la lógica
+├── config.json       # configuración, perfiles, plantillas de prompts
+├── workflow.db       # base de datos SQLite (se crea al arrancar)
+├── templates/        # HTML Jinja2
+├── static/           # CSS
+├── projects/         # exportaciones
+└── requirements.txt
+```
+
+Sin ORM, sin microservicios, sin 47 capas de abstracción.
+
+## Instalación
+
+```bash
+# 1. Dependencias (solo Flask)
+python3 -m pip install -r requirements.txt
+
+# 2. Arrancar
+python3 app.py
+
+# 3. Abrir
+# http://localhost:5000
+```
+
+## Flujo
+
+```
+TEMA
+ ↓
+INVESTIGACIÓN
+ ↓
+CONCEPTO
+ ↓
+GUION 5 min ── GUION 1 min
+ ↓
+ESCENAS
+ ↓
+PROMPTS
+ ↓
+METADATA (YouTube + Shorts)
+ ↓
+CONTROL DE CALIDAD
+ ↓
+EXPORTAR
+```
+
+## Modos de uso
+
+### Modo manual (por defecto)
+La herramienta genera **prompts estructurados** que copias en tu LLM
+favorito (ChatGPT, Claude, Gemini). Pegas la respuesta de vuelta y
+se parsea automáticamente.
+
+Cero costos. Cero dependencias externas. Tú controlas qué LLM usas.
+
+### Modo API
+Configura una clave de OpenAI en `Configuración` y la herramienta
+llamará al LLM directamente. Compatible con cualquier endpoint
+OpenAI-compatible (LM Studio, Ollama con shim, etc.).
+
+## Perfiles
+
+Guarda configuraciones reutilizables:
+tipo de contenido, audiencia, tono, estilo, niveles de misterio/drama,
+velocidad de narración y plataformas objetivo.
+
+Ejemplo incluido: **Todo Sobre Todo / Misterio**.
+
+## Control de calidad automático
+
+Verifica:
+- Existencia de cada etapa
+- Número de palabras (rangos por tipo de guion)
+- Duración estimada según velocidad
+- Presencia de hook, CTA y estructura
+- Repeticiones
+- Coherencia escenas/prompts
+- Mínimo de fuentes
+- Afirmaciones sin verificar
+
+## Exportación
+
+Cada proyecto se exporta como un ZIP con:
+
+```
+PROYECTO.zip
+├── 00_RESUMEN.md
+├── 01_investigacion.md
+├── 02_concepto.md
+├── 03_guiones/
+│   ├── guion_long.md
+│   └── guion_short.md
+├── 04_escenas/
+│   └── escenas.md         # un único archivo: TEXTO AUDIO + IMAGEN por escena
+├── 05_prompts/
+│   └── prompts.md         # un único archivo con todos los prompts EN + ES
+├── 06_metadata/
+│   ├── metadata_youtube.md
+│   └── metadata_shorts.md
+└── 07_paquete_completo.json
+```
+
+Listo para conectar con tu pipeline de producción.
+
+## Principios
+
+1. **Simple** — pocos botones, pocas decisiones.
+2. **Modular** — cada etapa funciona por separado.
+3. **Reutilizable** — perfiles, estilos y configuraciones guardados.
+4. **Editable** — la IA propone, tú apruebas.
+5. **Sin duplicación** — la información se introduce una sola vez.

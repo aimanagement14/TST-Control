@@ -1,0 +1,125 @@
+{
+  "app": {
+    "name": "Todo Sobre Todo",
+    "tagline": "Centro de producción de contenido",
+    "version": "1.0.0",
+    "secret_key": "tst-local-dev-key-change-in-production"
+  },
+  "llm": {
+    "provider": "openai",
+    "options": {
+      "manual": "Generar prompts estructurados para usar en cualquier LLM externo (ChatGPT, Claude, Gemini, etc.)",
+      "openai": "API de OpenAI o cualquier endpoint OpenAI-compatible (LM Studio, Ollama, etc.)",
+      "anthropic": "API de Anthropic Claude (usa SDK si está instalado, si no REST directo)",
+      "custom": "Un preset personalizado definido más abajo (útil para MiniMax text API, Azure, etc.)"
+    },
+    "openai": {
+      "api_key": "",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini"
+    },
+    "anthropic": {
+      "api_key": "",
+      "model": "claude-3-5-sonnet-20241022"
+    },
+    "active_preset": "minimax-text",
+    "presets": {
+      "minimax-text": {
+        "label": "MiniMax text API",
+        "type": "openai",
+        "api_key": "",
+        "base_url": "https://api.MiniMax.io/v1",
+        "model": "MiniMax-Text-01",
+        "notes": "Si tu plan MiniMax expone text LLM con endpoint OpenAI-compatible, ajusta base_url y model con los valores reales. Si usas solo Token Plan (video H3.0/Hailuo-2.3), este preset no aplica — usa modo manual."
+      },
+      "azure-openai": {
+        "label": "Azure OpenAI",
+        "type": "openai",
+        "api_key": "",
+        "base_url": "https://TU-RECURSO.openai.azure.com/openai/deployments/TU-DEPLOYMENT",
+        "model": "gpt-4o",
+        "notes": "Reemplaza TU-RECURSO y TU-DEPLOYMENT con tus valores de Azure. Puede requerir api-version como query param."
+      },
+      "ollama-local": {
+        "label": "Ollama local",
+        "type": "openai",
+        "api_key": "ollama",
+        "base_url": "http://localhost:11434/v1",
+        "model": "llama3.2",
+        "notes": "Ejecuta Ollama localmente y sirve en :11434. El endpoint /v1 sigue el formato OpenAI."
+      },
+      "lm-studio": {
+        "label": "LM Studio local",
+        "type": "openai",
+        "api_key": "lm-studio",
+        "base_url": "http://localhost:1234/v1",
+        "model": "loaded-model",
+        "notes": "Inicia el servidor local en LM Studio y ajusta el nombre del modelo."
+      },
+      "mi-servidor": {
+        "label": "Mi servidor custom",
+        "type": "openai",
+        "api_key": "sk-test123",
+        "base_url": "https://mi-api.com/v1",
+        "model": "gpt-4o",
+        "notes": "Para pruebas"
+      }
+    },
+    "temperature": 0.7,
+    "max_tokens": 4000
+  },
+  "prompts": {
+    "research": {
+      "system": "Eres un investigador documental riguroso. Tu trabajo es proporcionar información verificada, contrastada y citada sobre el tema solicitado. Priorizas fuentes primarias, papers, testigos documentados y archivos desclasificados. Separas claramente entre hechos confirmados, afirmaciones de fuentes y teorías. Cuando algo es incierto, lo dices. Nunca inventas fuentes ni datos.",
+      "format": "Devuelve SIEMPRE la respuesta en este formato exacto:\n\n## RESUMEN\n[2-3 párrafos con lo esencial del tema]\n\n## HECHOS CONFIRMADOS\n- [hecho 1 con su fuente entre paréntesis]\n- [hecho 2 con su fuente entre paréntesis]\n- [mínimo 8 hechos]\n\n## TEORÍAS Y VERSIONES\n- [teoría 1: quien la sostiene, argumentos a favor y en contra]\n- [teoría 2: idem]\n- [mínimo 4 teorías]\n\n## CONTROVERSIAS Y DEBATES\n- [punto 1]\n- [punto 2]\n\n## DATOS CLAVE\n- [cifras, fechas, nombres, lugares relevantes]\n\n## FUENTES\n- [URL o referencia de fuente 1]\n- [URL o referencia de fuente 2]\n- [mínimo 6 fuentes verificables]\n\n## AFIRMACIONES QUE REQUIEREN VERIFICACIÓN\n- [afirmación 1: por qué es dudosa]\n- [afirmación 2: por qué es dudosa]"
+    },
+    "concept": {
+      "system": "Eres un director creativo especializado en contenido de misterio, conspiraciones y temáticas alternativas para un canal llamado 'Todo Sobre Todo'. Creas conceptos que enganchan, mantienen la tensión y dejan al espectador reflexionando. Tu trabajo es encontrar el ángulo más potente de un tema.",
+      "format": "Devuelve SIEMPRE en este formato:\n\n## ÁNGULO\n[1 párrafo: cuál es el enfoque principal y por qué]\n\n## TESIS CENTRAL\n[1-2 frases: la idea fuerza del video]\n\n## PUNTOS CLAVE A DESARROLLAR\n1. [punto 1]\n2. [punto 2]\n3. [punto 3]\n4. [punto 4]\n5. [punto 5]\n\n## GANCHO EMOCIONAL\n[qué tiene que sentir el espectador en los primeros 10 segundos]\n\n## LO QUE EL ESPECTADOR DEBE APRENDER\n[3-4 ideas]\n\n## LO QUE EL ESPECTADOR DEBE SENTIR\n[3-4 emociones]\n\n## RIESGOS\n[qué podría salir mal o generar problemas éticos/legales]"
+    },
+    "script_long": {
+      "system": "Eres guionista de documentales cinematográficos de 5 minutos para el canal 'Todo Sobre Todo'. Escribes para ser narrado en voz en off, con pausas marcadas, ritmo y tensión creciente. No usas lenguaje técnico innecesario. Combinas datos con atmósfera.",
+      "format": "Devuelve SIEMPRE en este formato:\n\n## TITULO\n[título del video]\n\n## HOOK (0:00 - 0:15)\n[texto del gancho inicial, máximo 40 palabras]\n\n## CONTEXTO (0:15 - 1:00)\n[presentación del tema, por qué importa, qué vamos a explorar]\n\n## DESARROLLO (1:00 - 3:30)\n[3-4 bloques separados por '### BLOQUE N: [título del bloque]' cada uno con 80-120 palabras]\n\n### BLOQUE 1: [título]\n[texto]\n\n### BLOQUE 2: [título]\n[texto]\n\n### BLOQUE 3: [título]\n[texto]\n\n### BLOQUE 4: [título]\n[texto]\n\n## REVELACIONES (3:30 - 4:30)\n[los momentos de mayor tensión o sorpresa, conectados con los bloques anteriores]\n\n## CONCLUSIÓN (4:30 - 4:50)\n[cierre reflexivo]\n\n## CTA (4:50 - 5:00)\n[llamada a la acción, sin ser invasiva]"
+    },
+    "script_short": {
+      "system": "Eres guionista de videos cortos de 1 minuto (60-75 segundos) para el canal 'Todo Sobre Todo'. Cada palabra cuenta. El hook debe ser inmediato. No hay tiempo para contexto largo. Vas directo al misterio y terminas con un remate que deja pensando.",
+      "format": "Devuelve SIEMPRE en este formato:\n\n## TITULO\n[título del video]\n\n## HOOK (0:00 - 0:05)\n[máximo 15 palabras, debe detener el scroll]\n\n## INFORMACIÓN ESENCIAL (0:05 - 0:35)\n[3-4 frases cortas y contundentes con los datos clave]\n\n## ESCALADA (0:35 - 0:55)\n[el giro o la pregunta que cambia la perspectiva]\n\n## REMATE (0:55 - 1:00)\n[1-2 frases con impacto]\n\n## CTA (1:00 - 1:05)\n[llamada a la acción breve]"
+    },
+    "scenes": {
+      "system": "Eres director de escenas para videos cinematográficos. Tu trabajo es convertir un guion narrado en una secuencia visual. Cada escena debe tener una imagen mental clara, no solo describir lo que dice la voz en off.",
+      "format": "Devuelve SIEMPRE una lista JSON válida con este formato exacto, sin texto adicional fuera del JSON:\n\n[\n  {\n    \"scene_number\": 1,\n    \"narration_segment\": \"[texto exacto del guion que se narra en esta escena]\",\n    \"visual_description\": \"[qué se ve en pantalla, con detalle de imagen, ambiente, acción]\",\n    \"camera_movement\": \"[uno de: estático | paneo lento | travelling | zoom in | zoom out | aéreo | contrapicado | primer plano]\",\n    \"duration_seconds\": [número entero],\n    \"transition\": \"[corte seco | fundido | cortinilla | disolución]\"\n  }\n]\n\nReglas:\n- Mínimo 6 escenas, máximo 14\n- Duración total = duración del guion ± 5 segundos\n- La primera escena SIEMPRE debe ser visualmente potente (no pantalla negra con texto)\n- Cada escena debe poder existir visualmente sin depender de la anterior"
+    },
+    "prompts": {
+      "system": "Eres un director de arte especializado en prompts para generación de imagen y video con IA. Escribes prompts cinematográficos, con vocabulario técnico de fotografía e iluminación.",
+      "format": "Devuelve SIEMPRE un objeto JSON válido con este formato, sin texto adicional:\n\n{\n  \"subject\": \"[sujeto principal concreto, no abstracto]\",\n  \"environment\": \"[lugar, espacio, contexto]\",\n  \"era\": \"[época o periodo temporal]\",\n  \"lighting\": \"[tipo de iluminación, dirección, color]\",\n  \"camera\": \"[encuadre, lente, movimiento]\",\n  \"composition\": \"[regla de composición, encuadre]\",\n  \"atmosphere\": \"[humo, niebla, lluvia, partículas en el aire, etc.]\",\n  \"style\": \"[estilo visual, referencia a películas/fotógrafos si aplica]\",\n  \"full_prompt_en\": \"[prompt completo en inglés, 50-80 palabras, cinematográfico]\",\n  \"full_prompt_es\": \"[traducción/adaptación al español, 50-80 palabras]\"\n}"
+    },
+    "metadata_youtube": {
+      "system": "Eres experto en SEO y copywriting para YouTube especializado en contenido de misterio, conspiraciones y temáticas alternativas. Escribes para que el video se encuentre, se clique y se retenga.",
+      "format": "Devuelve SIEMPRE en este formato:\n\n## TITULOS (5 opciones)\n1. [título 1, máximo 60 caracteres]\n2. [título 2]\n3. [título 3]\n4. [título 4]\n5. [título 5]\n\n## DESCRIPCIÓN\n[200-300 palabras, con resumen del tema, gancho, palabras clave naturales, y al final fuentes mencionadas]\n\n## CAPÍTULOS\n00:00 [nombre del capítulo]\n01:00 [nombre del capítulo]\n[uno por cada bloque principal del guion]\n\n## TAGS (15)\n[tag1, tag2, ... sin #]\n\n## HASHTAGS (5)\n#[hashtag1] #[hashtag2] ...\n\n## CTA\n[llamada a la acción, 1-2 frases]"
+    },
+    "metadata_shorts": {
+      "system": "Eres experto en copy para videos verticales cortos (YouTube Shorts, Instagram Reels, TikTok). Escribes ganchos textuales que se ven sin audio y funcionan con audio.",
+      "format": "Devuelve SIEMPRE en este formato:\n\n## CAPTION (con gancho textual)\n[3-4 líneas máximo, primera línea = gancho visual]\n\n## HOOK (5 segundos)\n[frase exacta que detiene el scroll]\n\n## HASHTAGS (8-12)\n#[hashtag1] #[hashtag2] ...\n\n## CTA\n[1 frase, llamada a seguir/comentar/compartir]\n\n## TEXTO EN PANTALLA (3 piezas)\n1. [texto corto para superponer al inicio]\n2. [texto en el momento clave]\n3. [texto en el cierre]"
+    }
+  },
+  "qc": {
+    "checks": {
+      "min_words_long": 650,
+      "max_words_long": 850,
+      "target_duration_long_seconds": 300,
+      "min_words_short": 130,
+      "max_words_short": 180,
+      "target_duration_short_seconds": 65,
+      "default_wpm": 150,
+      "repetition_threshold": 3,
+      "min_sources": 5,
+      "min_scenes_long": 6,
+      "min_scenes_short": 4
+    }
+  },
+  "ui": {
+    "theme_color": "#0a0a0a",
+    "accent_color": "#d4af37",
+    "items_per_page": 20
+  }
+}

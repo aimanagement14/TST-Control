@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Prompts visuales · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
+        <h1>Prompts visuales</h1>
+        <p class="muted">Para cada escena, un prompt cinematográfico estructurado. El estilo del perfil se aplica a todos.</p>
+    </div>
+    {% if scenes %}
+    <div class="page-head-actions">
+        <form method="post">
+            <input type="hidden" name="action" value="generate_all">
+            <button class="btn btn-primary">⚡ Generar todos los prompts</button>
+        </form>
+    </div>
+    {% endif %}
+</section>
+
+{% if not scenes %}
+<div class="empty-card">
+    <p class="muted">Primero necesitas escenas. Ve a la etapa anterior.</p>
+    <a href="{{ url_for('scenes', project_id=project.id) }}" class="btn btn-ghost">Ir a escenas</a>
+</div>
+{% else %}
+
+{% if batch %}
+<div class="card">
+    <h3>📋 Lote generado ({{ batch|length }} prompts)</h3>
+    <p class="muted small">Procesa estos prompts en tu LLM por lotes y pega cada respuesta en el campo correspondiente de la escena.</p>
+    <details class="prompt-details">
+        <summary>Ver todos los prompts del lote</summary>
+        {% for item in batch %}
+        <h4>Escena {{ item.scene.scene_number }}</h4>
+        <pre class="code-block">{{ item.sys }}
+
+{{ item.user }}</pre>
+        <hr>
+        {% endfor %}
+    </details>
+</div>
+{% endif %}
+
+<form method="post" class="mt-3">
+    <input type="hidden" name="action" value="save_all">
+    <p class="muted small">Para cada escena, pega la respuesta JSON del LLM. El parser extraerá los campos.</p>
+    {% for sc in scenes %}
+    {% set existing = prompts_by_scene.get(sc.id) %}
+    <div class="card scene-prompt">
+        <div class="card-head">
+            <h3>Escena {{ sc.scene_number }}</h3>
+            {% if existing %}
+            <span class="status-pill status-ready">Guardado</span>
+            {% else %}
+            <span class="status-pill status-created">Pendiente</span>
+            {% endif %}
+        </div>
+        <details class="prompt-details">
+            <summary>Ver prompt para esta escena</summary>
+            {% set sys_p, user_p = ('', '') %}
+            <pre class="code-block">SISTEMA: Eres un director de arte especializado en prompts para generación de imagen y video con IA...
+
+USUARIO:
+Escena {{ loop.index }}/{{ scenes|length }} del video '{{ project.topic }}'
+Narración: {{ sc.narration }}
+Descripción visual: {{ sc.visual_description }}
+Movimiento cámara: {{ sc.camera_movement }}
+Estilo general del proyecto: {{ profile.style if profile else 'cinematográfico, oscuro, contrastado' }}</pre>
+        </details>
+        <textarea name="text_{{ sc.id }}" rows="8" placeholder='{"subject":"...", "environment":"...", ...}'>{% if existing %}{"subject":"{{ existing.subject }}", "environment":"{{ existing.environment }}", "era":"{{ existing.era }}", "lighting":"{{ existing.lighting }}", "camera":"{{ existing.camera }}", "composition":"{{ existing.composition }}", "atmosphere":"{{ existing.atmosphere }}", "style":"{{ existing.style }}", "full_prompt_en":"{{ existing.full_prompt_en }}", "full_prompt_es":"{{ existing.full_prompt_es }}"}{% endif %}</textarea>
+        {% if existing and existing.full_prompt_en %}
+        <details class="mt-1">
+            <summary>Prompt actual (EN)</summary>
+            <p class="code-block">{{ existing.full_prompt_en }}</p>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Guardar todos los prompts</button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}

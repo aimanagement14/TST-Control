@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Concepto · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
+        <h1>Concepto</h1>
+        <p class="muted">El ángulo, la tesis y el gancho emocional que vertebrarán el guion.</p>
+    </div>
+</section>
+
+<div class="two-col">
+    <div>
+        {% if not generated %}
+        <form method="post">
+            <input type="hidden" name="action" value="generate_prompt">
+            <button type="submit" class="btn btn-primary">⚡ Generar prompt de concepto</button>
+            <p class="muted small">Usa la investigación ya guardada como base.</p>
+        </form>
+        {% endif %}
+
+        {% if generated or saved_prompt %}
+        <div class="card mt-3">
+            <h3>📝 Prompt
+                {% if saved_prompt %}<span class="status-pill status-ready">guardado</span>{% endif %}
+            </h3>
+            <form method="post">
+                <input type="hidden" name="action" value="save_prompt">
+                <label>Prompt del sistema
+                    <textarea name="sys_prompt" rows="6">{{ sys_prompt or (saved_prompt.sys_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <label>Prompt del usuario
+                    <textarea name="user_prompt" rows="10">{{ user_prompt or (saved_prompt.user_prompt if saved_prompt else '') }}</textarea>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="copyToClipboard()">📋 Copiar al portapapeles</button>
+                </div>
+            </form>
+            <script>
+            function copyToClipboard() {
+                const form = document.querySelector('form');
+                const sys = form.querySelector('[name=sys_prompt]').value;
+                const usr = form.querySelector('[name=user_prompt]').value;
+                navigator.clipboard.writeText('SYSTEM:\n' + sys + '\n\nUSER:\n' + usr);
+            }
+            </script>
+        </div>
+        {% endif %}
+
+        {% if generated %}
+        <form method="post" class="mt-3">
+            <input type="hidden" name="action" value="save">
+            <h3>Pegar respuesta del LLM</h3>
+            <textarea name="text" rows="20">{{ generated }}</textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar concepto</button>
+            </div>
+        </form>
+        {% elif concept.angle %}
+        <form method="post" class="mt-3">
+            <input type="hidden" name="action" value="save">
+            <h3>Editar concepto</h3>
+            <textarea name="text" rows="20">## ÁNGULO
+{{ concept.angle }}
+
+## TESIS
+{{ concept.thesis }}
+
+## PUNTOS CLAVE
+{% for p in key_points %}{{ loop.index }}. {{ p }}
+{% endfor %}
+
+## GANCHO EMOCIONAL
+{{ concept.emotional_hook }}
+</textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-ghost">Volver</a>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+
+    <aside>
+        {% if concept.angle %}
+        <div class="card">
+            <h4>📐 Concepto actual</h4>
+            <h5>Ángulo</h5>
+            <p>{{ concept.angle }}</p>
+            {% if concept.thesis %}
+            <h5>Tesis</h5>
+            <p>{{ concept.thesis }}</p>
+            {% endif %}
+            {% if key_points %}
+            <h5>Puntos clave</h5>
+            <ol class="compact-list">
+                {% for p in key_points %}<li>{{ p }}</li>{% endfor %}
+            </ol>
+            {% endif %}
+        </div>
+        {% endif %}
+    </aside>
+</div>
+{% endblock %}

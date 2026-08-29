@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <h1>Proyectos</h1>
+        <p class="muted">Desde un tema hasta un paquete listo para producción.</p>
+    </div>
+    <div class="page-head-actions">
+        <a href="{{ url_for('new_project') }}" class="btn btn-primary">+ Nuevo proyecto</a>
+    </div>
+</section>
+
+{% if projects %}
+<div class="grid-projects">
+    {% for p in projects %}
+    <a class="card-project" href="{{ url_for('view_project', project_id=p.id) }}">
+        <div class="card-project-head">
+            <h3>{{ p.name }}</h3>
+            <span class="status-pill status-{{ p.status }}">{{ p.status }}</span>
+        </div>
+        <p class="card-project-topic">{{ p.topic }}</p>
+        <div class="stage-list">
+            <div class="stage {% if p.stages.research %}done{% endif %}">Investigación</div>
+            <div class="stage {% if p.stages.concept %}done{% endif %}">Concepto</div>
+            <div class="stage {% if p.stages.scripts_long %}done{% endif %}">Guion 5 min</div>
+            <div class="stage {% if p.stages.scripts_short %}done{% endif %}">Guion 1 min</div>
+            <div class="stage {% if p.stages.scenes %}done{% endif %}">Escenas</div>
+            <div class="stage {% if p.stages.prompts %}done{% endif %}">Prompts</div>
+            <div class="stage {% if p.stages.metadata %}done{% endif %}">Metadata</div>
+        </div>
+        <div class="card-project-foot">
+            <span class="muted small">Actualizado {{ p.updated_at[:10] }}</span>
+            <span class="arrow">→</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+    <h2>Aún no hay proyectos</h2>
+    <p class="muted">Crea el primero y empieza a producir.</p>
+    <a href="{{ url_for('new_project') }}" class="btn btn-primary">+ Crear primer proyecto</a>
+</div>
+{% endif %}
+{% endblock %}

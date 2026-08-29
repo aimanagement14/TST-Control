@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a href="{{ url_for('dashboard') }}" class="brand">
+                <span class="brand-mark">⬢</span>
+                <div>
+                    <div class="brand-name">{{ app_name }}</div>
+                    <div class="brand-tag">{{ app_tagline }}</div>
+                </div>
+            </a>
+            <nav class="topnav">
+                <a href="{{ url_for('dashboard') }}">Proyectos</a>
+                <a href="{{ url_for('profiles') }}">Perfiles</a>
+                <a href="{{ url_for('settings') }}">Configuración</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashes">
+                    {% for category, msg in messages %}
+                        <div class="flash flash-{{ category }}">{{ msg }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <span>{{ app_name }} · v{{ app_version }}</span>
+        <span>Hecho para producir, no para entretenerse</span>
+    </footer>
+</body>
+</html>

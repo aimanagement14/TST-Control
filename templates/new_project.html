@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Nuevo proyecto · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('dashboard') }}" class="back-link">← Volver</a>
+        <h1>Nuevo proyecto</h1>
+        <p class="muted">Define el tema y el perfil. El resto se va construyendo etapa a etapa.</p>
+    </div>
+</section>
+
+<form method="post" class="form-card">
+    <div class="form-row">
+        <label>Nombre del proyecto
+            <input type="text" name="name" required placeholder="Ej: Todo sobre los OVNIs">
+        </label>
+    </div>
+    <div class="form-row">
+        <label>Tema
+            <textarea name="topic" rows="3" required placeholder="¿De qué va el video? Una frase o dos basta para empezar."></textarea>
+        </label>
+    </div>
+    <div class="form-row">
+        <label>Perfil
+            <select name="profile_id">
+                {% for pr in profiles %}
+                <option value="{{ pr.id }}" {% if default_profile and pr.id == default_profile.id %}selected{% endif %}>
+                    {{ pr.name }}{% if pr.is_default %} (por defecto){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <p class="muted small">Los perfiles guardan tono, estilo, niveles y plataformas. <a href="{{ url_for('profiles') }}">Gestionar perfiles</a></p>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Crear proyecto</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

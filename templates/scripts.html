@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Guiones · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="back-link">← Proyecto</a>
+        <h1>Guiones</h1>
+        <p class="muted">Versión documental de 5 minutos y versión corta de 1 minuto, ambas desde la misma base.</p>
+    </div>
+</section>
+
+{% macro prompt_block(stype, saved, sys_prompt_val, user_prompt_val, just_generated) %}
+<div class="card">
+    <div class="card-head">
+        <h2>{% if stype == 'long' %}📽️ Guion 5 min{% else %}📱 Guion 1 min{% endif %}</h2>
+        <span class="muted small">
+            {% if stype == 'long' %}{{ long_s.word_count if long_s else 0 }}{% else %}{{ short_s.word_count if short_s else 0 }}{% endif %} palabras
+            {% if saved %}<span class="status-pill status-ready">prompt guardado</span>{% endif %}
+        </span>
+    </div>
+
+    {% if not just_generated or just_generated != stype %}
+    <form method="post">
+        <input type="hidden" name="action" value="generate_prompt">
+        <input type="hidden" name="script_type" value="{{ stype }}">
+        <button type="submit" class="btn btn-primary btn-sm">⚡ Generar prompt ({{ stype }})</button>
+    </form>
+    {% endif %}
+
+    {% if (just_generated == stype) or saved %}
+    <div class="card mt-2">
+        <h4>📝 Prompt</h4>
+        <form method="post">
+            <input type="hidden" name="action" value="save_prompt">
+            <input type="hidden" name="script_type" value="{{ stype }}">
+            <label>Prompt del sistema
+                <textarea name="sys_prompt" rows="5">{{ sys_prompt_val or (saved.sys_prompt if saved else '') }}</textarea>
+            </label>
+            <label>Prompt del usuario
+                <textarea name="user_prompt" rows="8">{{ user_prompt_val or (saved.user_prompt if saved else '') }}</textarea>
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-ghost btn-sm">💾 Guardar prompt en el proyecto</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if just_generated == stype %}
+    <form method="post" class="mt-2">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="script_type" value="{{ stype }}">
+        <h4>Pegar respuesta del LLM</h4>
+        <textarea name="text" rows="12">{{ generated }}</textarea>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Guardar guion {{ stype }}</button>
+        </div>
+    </form>
+    {% elif stype == 'long' and long_s %}
+    <div class="script-preview mt-2">
+        <h4>{{ long_s.title }}</h4>
+        {% if long_s.hook %}<p><strong>Hook:</strong> {{ long_s.hook }}</p>{% endif %}
+        {% if long_s.body_full %}
+        <details><summary>Ver guion completo</summary>
+        <pre class="code-block">{{ long_s.body_full }}</pre>
+        </details>
+        {% endif %}
+    </div>
+    {% elif stype == 'short' and short_s %}
+    <div class="script-preview mt-2">
+        <h4>{{ short_s.title }}</h4>
+        {% if short_s.hook %}<p><strong>Hook:</strong> {{ short_s.hook }}</p>{% endif %}
+        {% if short_s.body_full %}
+        <details><summary>Ver guion completo</summary>
+        <pre class="code-block">{{ short_s.body_full }}</pre>
+        </details>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+<div class="two-col-equal">
+    {{ prompt_block('long', saved_long, sys_prompt if gen_type == 'long' else None, user_prompt if gen_type == 'long' else None, gen_type) }}
+    {{ prompt_block('short', saved_short, sys_prompt if gen_type == 'short' else None, user_prompt if gen_type == 'short' else None, gen_type) }}
+</div>
+{% endblock %}
