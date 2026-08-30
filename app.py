@@ -302,16 +302,18 @@ def project_stage_status(project):
         scripts = [dict(r) for r in conn.execute(
             "SELECT id, type FROM scripts WHERE project_id=?", (project["id"],),
         ).fetchall()]
-        scenes_done = True
-        for s in scripts:
-            min_n = min_scenes_long if s["type"] == "long" else min_scenes_short
-            count = conn.execute(
-                "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
-                (project["id"], s["id"]),
-            ).fetchone()["n"]
-            if count < min_n:
-                scenes_done = False
-                break
+        scenes_done = False
+        if scripts:
+            scenes_done = True
+            for s in scripts:
+                min_n = min_scenes_long if s["type"] == "long" else min_scenes_short
+                count = conn.execute(
+                    "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
+                    (project["id"], s["id"]),
+                ).fetchone()["n"]
+                if count < min_n:
+                    scenes_done = False
+                    break
         stages["scenes"] = scenes_done
         stages["metadata"] = conn.execute(
             "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?",
