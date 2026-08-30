@@ -9,6 +9,15 @@
                         is_open, min_words, max_words) %}
 {% set words = (script.word_count if script else 0) or 0 %}
 {% set state = '' if not words else ('is-over' if words > max_words else ('is-warn' if words < min_words else 'is-ok')) %}
+{% set is_short = (stype == 'short') %}
+{% set section_order = [
+    ('hook', 'Hook'),
+    ('context', 'Contexto'),
+    ('development', 'Desarrollo'),
+    ('revelations', 'Revelaciones'),
+    ('conclusion', 'Conclusión'),
+    ('cta', 'CTA'),
+] %}
 <section class="panel">
     <div class="panel-head">
         <div>
@@ -58,13 +67,31 @@
         <div class="panel-head">
             <h4 class="title-plain">{{ script.title or 'Guion guardado' }}</h4>
             <span class="chip chip-done">Guardado {{ script.updated_at[11:16] }}</span>
-        </div>
-        {% if script.body_full %}
-        <pre class="code" id="script-{{ stype }}">{{ script.body_full }}</pre>
-        <div class="actions">
-            <button type="button" class="btn btn-sm" data-copy-button data-copy="#script-{{ stype }}">
+            <button type="button" class="btn btn-sm" data-copy-script
+                    data-script-type="{{ stype }}">
                 Copiar guion
             </button>
+        </div>
+        {% set has_any_section = script.hook or script.context or script.development
+            or script.revelations or script.conclusion or script.cta
+            or script.body_full %}
+        {% if has_any_section %}
+        <div class="script-preview" id="script-{{ stype }}">
+            {% if script.title %}<h5 class="script-title">{{ script.title }}</h5>{% endif %}
+            {% for key, label in section_order %}
+                {% set value = script[key] %}
+                {% if value %}
+                <section class="script-block">
+                    <p class="script-tag">{{ label }}</p>
+                    <div class="script-body">{{ value }}</div>
+                </section>
+                {% endif %}
+            {% endfor %}
+            {% if not (script.hook or script.context or script.development
+                or script.revelations or script.conclusion or script.cta)
+                and script.body_full %}
+            <pre class="code">{{ script.body_full }}</pre>
+            {% endif %}
         </div>
         {% endif %}
     </div>

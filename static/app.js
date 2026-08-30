@@ -27,6 +27,10 @@
             if (!node) return "";
             return "value" in node ? node.value : node.textContent;
         }
+        var scriptNode = button.closest(".panel-inset");
+        if (scriptNode) {
+            return scriptTextToCopy(scriptNode);
+        }
         var scope = button.closest("[data-prompt]") || button.closest("form");
         if (!scope) return "";
         var sys = scope.querySelector('[name="sys_prompt"]');
@@ -35,6 +39,27 @@
         if (sys && sys.value.trim()) parts.push("SYSTEM:\n" + sys.value.trim());
         if (user && user.value.trim()) parts.push("USER:\n" + user.value.trim());
         return parts.join("\n\n");
+    }
+
+    function scriptTextToCopy(scope) {
+        var out = [];
+        var title = scope.querySelector(".script-title");
+        if (title) out.push("# " + title.textContent.trim());
+        var blocks = scope.querySelectorAll(".script-block");
+        blocks.forEach(function (block) {
+            var tag = block.querySelector(".script-tag");
+            var body = block.querySelector(".script-body");
+            if (tag && body) {
+                out.push("## " + tag.textContent.trim());
+                out.push(body.textContent.replace(/\s+/g, " ").trim());
+                out.push("");
+            }
+        });
+        if (!out.length) {
+            var fallback = scope.querySelector("pre.code");
+            if (fallback) return fallback.textContent;
+        }
+        return out.join("\n").trim();
     }
 
     function feedback(button, message) {

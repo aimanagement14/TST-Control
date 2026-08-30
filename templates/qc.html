@@ -31,11 +31,19 @@
 {% block content %}
 {% call ui.stage_head(project, '07', 'Control de calidad',
         'Duración, estructura, fuentes, repeticiones y coherencia. Se revisa antes de exportar.') %}
-<form method="post">
-    <button class="btn {% if issues %}btn-ghost{% else %}btn-primary{% endif %}">
-        {% if issues or last_run %}Volver a analizar{% else %}Ejecutar análisis{% endif %}
-    </button>
-</form>
+<div class="qc-actions">
+    <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="analyze">
+        <button class="btn {% if issues %}btn-ghost{% else %}btn-primary{% endif %}">
+            {% if issues or last_run %}Volver a analizar{% else %}Ejecutar análisis{% endif %}
+        </button>
+    </form>
+    <form method="post" class="inline-form"
+          onsubmit="return confirm('Vas a saltar el análisis y marcar el proyecto como listo para exportar. ¿Continuar?')">
+        <input type="hidden" name="action" value="skip">
+        <button class="btn btn-ghost">Saltar análisis y marcar como listo</button>
+    </form>
+</div>
 {% endcall %}
 
 {% if issues %}
@@ -88,6 +96,15 @@
     <p>Sin errores bloqueantes: el proyecto se puede exportar.</p>
     <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary">Exportar paquete</a>
 </div>
+{% else %}
+<div class="empty-inline mt-3">
+    <p>Hay {{ ns.errors }} error(es) bloqueante(s). Puedes volver a las etapas a corregirlos, o forzar el paso para exportar igualmente.</p>
+    <form method="post" class="inline-form"
+          onsubmit="return confirm('Vas a ignorar los errores y marcar el proyecto como listo para exportar igualmente. ¿Continuar?')">
+        <input type="hidden" name="action" value="skip">
+        <button class="btn btn-ghost">Ignorar errores y marcar como listo</button>
+    </form>
+</div>
 {% endif %}
 
 {% elif request.args.get('clean') %}
@@ -96,13 +113,33 @@
     <p>El proyecto pasa todas las comprobaciones. Está listo para exportar.</p>
     <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary btn-lg">Exportar paquete</a>
 </div>
+{% elif request.args.get('skipped') %}
+<div class="empty">
+    <h2>Análisis omitido</h2>
+    <p>El proyecto se ha marcado como listo sin pasar el control de calidad. Vuelve a Exportar cuando quieras.</p>
+    <div class="actions">
+        <a href="{{ url_for('export', project_id=project.id) }}" class="btn btn-primary btn-lg">Exportar paquete</a>
+        <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="analyze">
+            <button class="btn btn-ghost btn-lg">Ejecutar análisis igualmente</button>
+        </form>
+    </div>
+</div>
 {% else %}
 <div class="empty">
     <h2>Todavía sin analizar</h2>
     <p>El análisis recorre las siete etapas y devuelve lo que falta o no cuadra.</p>
-    <form method="post">
-        <button class="btn btn-primary btn-lg">Ejecutar análisis</button>
-    </form>
+    <div class="actions">
+        <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="analyze">
+            <button class="btn btn-primary btn-lg">Ejecutar análisis</button>
+        </form>
+        <form method="post" class="inline-form"
+              onsubmit="return confirm('Vas a saltar el análisis y marcar el proyecto como listo para exportar. ¿Continuar?')">
+            <input type="hidden" name="action" value="skip">
+            <button class="btn btn-ghost btn-lg">Saltar análisis y marcar como listo</button>
+        </form>
+    </div>
 </div>
 {% endif %}
 
