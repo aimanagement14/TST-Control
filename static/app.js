@@ -92,7 +92,7 @@
     }
 
     document.addEventListener("click", function (event) {
-        var button = event.target.closest("[data-copy-button]");
+        var button = event.target.closest("[data-copy-button], [data-copy-script]");
         if (!button) return;
         event.preventDefault();
         var text = textToCopy(button);
