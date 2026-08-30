@@ -397,7 +397,15 @@ def pipeline_view(project, current=None):
     la página de guiones cubre dos etapas del pipeline.
     """
     stages = dict(project.get("stages") or project_stage_status(project))
-    stages["qc"] = project.get("status") == "ready"
+    qc_done = project.get("status") == "ready"
+    if not qc_done:
+        with get_db() as conn:
+            n_qc = conn.execute(
+                "SELECT COUNT(*) AS n FROM qc_issues WHERE project_id=?",
+                (project["id"],),
+            ).fetchone()["n"]
+            qc_done = n_qc > 0
+    stages["qc"] = qc_done
 
     cells, pending = [], None
     for stage in PIPELINE_STAGES:
@@ -1867,6 +1875,14 @@ def qc(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
     if request.method == "POST":
+        action = request.form.get("action", "analyze")
+        if action == "skip":
+            with get_db() as conn:
+                conn.execute("DELETE FROM qc_issues WHERE project_id=?", (project_id,))
+                conn.execute("UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+                             (now_iso(), project_id))
+            flash("Análisis omitido: el proyecto se ha marcado como listo para exportar", "ok")
+            return redirect(url_for("qc", project_id=project_id, skipped=1))
         issues = run_qc(project_id)
         save_qc_issues(project_id, issues)
         errors = [i for i in issues if i[1] == "error"]
@@ -1891,7 +1907,11 @@ def qc(project_id):
                         END, stage""",
             (project_id,)
         ).fetchall()]
-    last_run = max((i["created_at"] for i in issues if i["created_at"]), default=None)
+        last_run_row = conn.execute(
+            "SELECT MAX(created_at) AS last FROM qc_issues WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        last_run = last_run_row["last"] if last_run_row else None
     return render_template("qc.html", project=project, issues=issues,
                            last_run=last_run)
 
