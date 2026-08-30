@@ -74,11 +74,13 @@
     'scenes': ('Escenas', 'scenes'),
     'metadata_youtube': ('Metadata YouTube', 'metadata'),
     'metadata_shorts': ('Metadata Shorts', 'metadata'),
+    'thumbnail_long': ('Miniatura 5 min', 'thumbnails'),
+    'thumbnail_short': ('Miniatura 1 min', 'thumbnails'),
 } %}
 <div class="panel mt-3">
     <div class="panel-head">
         <h3>Prompts guardados</h3>
-        <span class="chip">{{ saved_prompts|length }} de 7</span>
+        <span class="chip">{{ saved_prompts|length }} de 9</span>
         <form method="post" action="{{ url_for('backfill_stage_prompts', project_id=project.id) }}"
               class="inline-form"
               onsubmit="return confirm('Se generan los prompts que falten en etapas que ya tienen contenido. Los prompts que editaste a mano se conservan.')">

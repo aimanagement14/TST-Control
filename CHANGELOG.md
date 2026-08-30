@@ -9,6 +9,23 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- Nueva etapa **Miniaturas** entre `Metadata` y `Control de calidad`, con dos
+  paneles (5 min en 16:9 y 1 min en 9:16). Cada panel genera un prompt visual
+  cinematográfico fijo listo para Midjourney / Flux / DALL-E, sin texto
+  overlay y coherente con la guía visual del proyecto (Cinematic
+  Hyperrealism, Orange & Teal, etc.). La etapa se considera completa
+  cuando ambas miniaturas están guardadas.
+- Nueva tabla `thumbnail_records` (`UNIQUE(project_id, script_type)`) y
+  parser `parse_thumbnail` dedicado al bloque `## MINIATURA`.
+
+### Changed
+
+- Renumeración en el ZIP exportado: aparece `06_thumbnails/`,
+  `07_prompts_usados.md` y `08_paquete_completo.json` (antes 06 y 07).
+- El pipeline pasa de 7 a 8 etapas; QC pasa a `08`.
+- `templates/project.html` ahora muestra hasta 9 prompts guardados y dos
+  entradas más (Miniatura 5 min, Miniatura 1 min).
+
 - Barra de etapas persistente (tira de película) en todas las páginas de
   proyecto: posición actual, etapas completadas, progreso y duración
   estimada del guion frente al objetivo del formato.

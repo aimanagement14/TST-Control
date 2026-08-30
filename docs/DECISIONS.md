@@ -145,3 +145,39 @@ amigable sin docker ni gunicorn.
 - Sin dependencias extra en dev.
 - `waitress` solo se requiere en producción.
 - Host/puerto/threads configurables vía `TST_HOST`/`TST_PORT`/`TST_THREADS`.
+
+## 2026-08-29 — Etapa "Miniaturas" con dos paneles
+
+**Contexto:** El canal publica dos versiones por tema (5 min en YouTube,
+1 min en Shorts/Reels/TikTok). Cada una necesita una miniatura con su
+aspect ratio y composición propias. Hasta ahora no había ningún prompt
+para miniaturas: o se improvisaba, o se delegaba en el editor.
+
+**Decisión:** Crear una etapa nueva `thumbnails` entre `metadata` (06)
+y `qc` (ahora 08), con dos paneles al estilo de `metadata`. Cada panel
+produce un único prompt visual cinematográfico (sin texto overlay, sin
+instrucciones de cámara animada) listo para Midjourney / Flux / DALL-E.
+Se añade la tabla `thumbnail_records` (`UNIQUE(project_id, script_type)`)
+y el parser `parse_thumbnail` dedicado al bloque `## MINIATURA`.
+
+**Convenciones heredadas:**
+- Las dos plantillas (`thumbnail_long`, `thumbnail_short`) comparten las
+  mismas keywords de estilo que el system prompt de `scenes`
+  (`Cinematic Hyperrealism`, `Orange & Teal`, `Volumetric Lighting`, …)
+  más un sufijo específico del aspect ratio (`16:9 Aspect Ratio`,
+  `Thumbnail Composition`, … o `9:16 Aspect Ratio`, `Centered Subject`).
+- La etapa se considera completa solo cuando hay registros para ambos
+  `script_type` (long + short). Un solo registro deja la etapa
+  pendiente para que el editor recuerde generar la otra miniatura.
+- Renumeración del ZIP: `06_thumbnails/`, `07_prompts_usados.md`,
+  `08_paquete_completo.json`. Es la tercera renumeración del export
+  pero la tabla `prompts` se mantiene vacía por compatibilidad.
+
+**Consecuencias:**
+- Una nueva etapa que mantener, pero el patrón es 1:1 con `metadata`:
+  dos plantillas en config.json, dos builders, una sola ruta, una sola
+  página con dos macros.
+- El bundle JSON incluye ahora la clave `thumbnails` con la lista de
+  registros.
+- `verify_fosiles.py` y `test_core.py` ganan asserts específicos para
+  miniaturas; sin ellos un fallo en la nueva etapa pasaría inadvertido.

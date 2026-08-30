@@ -502,6 +502,46 @@ def main():
     log("Hashtags Shorts", f"{len(sh_hashtags)} (>= 5)", len(sh_hashtags) >= 5)
     log("Texto pantalla Shorts", f"{len(sh_text)} (>= 3)", len(sh_text) >= 3)
 
+    # ---- 7b) Miniaturas ----
+    print("\n=== 7b) Miniaturas ===")
+    THUMB_LONG_TEXT = """## MINIATURA
+A half-buried trilobite fossil in red sandstone, lit by a single volumetric sunbeam through desert dust, hyper-detailed textures, cinematic orange and teal grading, 16:9 composition, off-center focal point, documentary premium quality.
+"""
+    THUMB_SHORT_TEXT = """## MINIATURA
+Close-up of an ancient trilobite fossil eye filling the frame, orange and teal color grading, volumetric rim light, 9:16 vertical composition, centered subject, cinematic hyperrealism.
+"""
+    for stype, sid, body in (
+        ("long", long_s["id"], THUMB_LONG_TEXT),
+        ("short", short_s["id"], THUMB_SHORT_TEXT),
+    ):
+        r = client.post(
+            f"/projects/{PROJECT_ID}/thumbnails",
+            data={
+                "action": "save",
+                "script_type": stype,
+                "script_id": str(sid),
+                "text": body,
+            },
+            follow_redirects=True,
+        )
+        log(f"Thumbnail {stype} POST", f"status {r.status_code}", r.status_code == 200)
+        with app.get_db() as conn:
+            row = conn.execute(
+                "SELECT prompt FROM thumbnail_records "
+                "WHERE project_id=? AND script_type=?",
+                (PROJECT_ID, stype),
+            ).fetchone()
+        log(f"Thumbnail {stype} guardada",
+            bool(row and row["prompt"]),
+            bool(row and row["prompt"]))
+    # Etapa 'thumbnails' debe estar completa (ambas con prompt)
+    stages = app.project_stage_status(
+        {"id": PROJECT_ID, "status": app.get_db().execute(
+            "SELECT status FROM projects WHERE id=?", (PROJECT_ID,)
+        ).fetchone()["status"]}
+    )
+    log("Etapa thumbnails completa", bool(stages.get("thumbnails")), bool(stages.get("thumbnails")))
+
     # ---- 8) QC ----
     print("\n=== 8) Control de calidad ===")
     r = client.post(f"/projects/{PROJECT_ID}/qc", follow_redirects=True)
@@ -540,7 +580,9 @@ def main():
         "04_escenas/",
         "05_metadata/metadata_youtube.md",
         "05_metadata/metadata_shorts.md",
-        "07_paquete_completo.json",
+        "06_thumbnails/thumbnail_long.md",
+        "06_thumbnails/thumbnail_short.md",
+        "08_paquete_completo.json",
     ]
     for s in expected_substrings:
         present = any(s in n for n in names)
@@ -550,10 +592,12 @@ def main():
     resumen = zf.read([n for n in names if n.endswith("00_RESUMEN.md")][0]).decode("utf-8")
     log("Resumen contiene tema", "Fósiles" in resumen or "fosiles" in resumen.lower(),
         "Fósiles" in resumen or "fosiles" in resumen.lower())
-    bundle = json.loads(zf.read([n for n in names if n.endswith("07_paquete_completo.json")][0])
+    bundle = json.loads(zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0])
                         .decode("utf-8"))
     log("Bundle JSON", f"keys: {list(bundle.keys())[:6]}...",
         {"project", "research", "concept", "scripts"}.issubset(bundle.keys()))
+    log("Bundle thumbnails", f"{len(bundle.get('thumbnails', []))} (esperado 2)",
+        len(bundle.get("thumbnails", [])) == 2)
 
     print("\n" + "=" * 60)
     print(f"  ZIP exportado: {len(names)} archivos, {len(r.data)} bytes")

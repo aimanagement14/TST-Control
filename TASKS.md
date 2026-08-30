@@ -9,6 +9,24 @@ publicarse una versión.
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.
 
+### Etapa Miniaturas 2026-08-29
+
+- [x] Añadir plantillas `thumbnail_long` y `thumbnail_short` en
+  `config.json` (heredan keywords de estilo de `scenes`).
+- [x] Tabla `thumbnail_records` con `UNIQUE(project_id, script_type)`.
+- [x] `build_thumbnail_prompt`, `parse_thumbnail`, builder entries y
+  ramas en `_stage_context` / `_ensure_stage_prompt`.
+- [x] Ruta `thumbnails(project_id)` y plantilla `thumbnails.html`
+  con dos paneles estilo `metadata`.
+- [x] Insertar etapa `thumbnails` (07) en `PIPELINE_STAGES`,
+  `PAGE_ORDER`, `PAGE_LABELS`, `STATUS_LABELS`. Renumerar QC a 08.
+- [x] `project_stage_status`: thumbnails done solo con ambos scripts.
+- [x] Export: `06_thumbnails/`, renumerar `06_prompts_usados.md` → `07`
+  y `07_paquete_completo.json` → `08`. Bundle JSON incluye `thumbnails`.
+- [x] Tests: `test_parse_thumbnail` + asserts en `verify_fosiles.py`.
+- [x] Documentación: README, CHANGELOG, ARCHITECTURE, DECISIONS,
+  templates (`project.html`, `qc.html`, `export.html`).
+
 ## Cerradas (vista resumida)
 
 ### Reducción de pipeline 2026-08-29

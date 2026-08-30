@@ -48,6 +48,8 @@ ESCENAS (un set por guion, con prompt de imagen)
  ↓
 METADATA (YouTube + Shorts)
  ↓
+MINIATURAS (prompt visual 16:9 + 9:16)
+ ↓
 CONTROL DE CALIDAD
  ↓
 EXPORTAR
@@ -104,8 +106,11 @@ PROYECTO.zip
 ├── 05_metadata/
 │   ├── metadata_youtube.md
 │   └── metadata_shorts.md
-├── 06_prompts_usados.md   # prompts SYS + USER editados durante el proyecto
-└── 07_paquete_completo.json
+├── 06_thumbnails/
+│   ├── thumbnail_long.md  # prompt visual 16:9 para el guion 5 min
+│   └── thumbnail_short.md # prompt visual 9:16 para el guion 1 min
+├── 07_prompts_usados.md   # prompts SYS + USER editados durante el proyecto
+└── 08_paquete_completo.json
 ```
 
 Listo para conectar con tu pipeline de producción.

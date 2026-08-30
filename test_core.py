@@ -305,6 +305,35 @@ Sígueme.
     print("  ✓ parse_metadata (shorts)")
 
 
+def test_parse_thumbnail():
+    text = """## MINIATURA
+A weathered stone monolith half-buried in jungle fog, lit by a single volumetric sunbeam piercing the canopy, with bioluminescent moss crawling up its carved symbols, hyper-detailed textures, cinematic orange and teal grading, 16:9 composition, dramatic contrast, documentary premium quality, eye-catching focal point off-center.
+"""
+    r = app.parse_thumbnail(text, "long")
+    assert "stone monolith" in r["prompt"]
+    assert "16:9" in r["prompt"]
+    assert r["prompt"].strip() == r["prompt"].strip()
+    print("  ✓ parse_thumbnail")
+
+
+def test_parse_thumbnail_ignores_other_blocks():
+    text = """## OTRA COSA
+bla bla
+
+## MINIATURA
+prompt útil aquí
+con varias líneas
+
+## RUIDO
+más texto"""
+    r = app.parse_thumbnail(text, "short")
+    assert r["prompt"].startswith("prompt útil aquí")
+    assert "varias líneas" in r["prompt"]
+    assert "OTRA COSA" not in r["prompt"]
+    assert "RUIDO" not in r["prompt"]
+    print("  ✓ parse_thumbnail (ignora bloques no-MINIATURA)")
+
+
 # ==========================================================================
 # Tests de utilidades
 # ==========================================================================
@@ -517,7 +546,7 @@ def test_export_creates_zip(tmp_path):
             names = zf.namelist()
             assert any("00_RESUMEN.md" in n for n in names)
             assert any("01_investigacion.md" in n for n in names)
-            assert any("07_paquete_completo.json" in n for n in names)
+            assert any("08_paquete_completo.json" in n for n in names)
         print(f"  ✓ export crea ZIP con {len(names)} archivos")
     finally:
         app.PROJECTS_DIR = original
@@ -544,6 +573,8 @@ def main():
     test_parse_prompt_json()
     test_parse_metadata_youtube()
     test_parse_metadata_shorts()
+    test_parse_thumbnail()
+    test_parse_thumbnail_ignores_other_blocks()
 
     print("\n=== TESTS DE UTILIDADES ===")
     test_count_words()

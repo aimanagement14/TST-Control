@@ -71,7 +71,8 @@ Toda la configuración editable en runtime vive aquí:
   temperatura, max_tokens.
 - `prompts`: `system` + `format` por etapa (`research`, `concept`,
   `script_long`, `script_short`, `scenes`,
-  `metadata_youtube`, `metadata_shorts`).
+  `metadata_youtube`, `metadata_shorts`,
+  `thumbnail_long`, `thumbnail_short`).
 - `qc.checks`: umbrales de palabras, duraciones objetivo, mínimo de
   fuentes, mínimo de escenas, umbral de repetición.
 - `ui`: colores y paginación.
@@ -99,18 +100,20 @@ flash messages. No se usa Tailwind ni preprocesadores.
 
 ## Modelo de datos
 
-10 tablas (la tabla `prompts` queda en el esquema por compatibilidad pero
+11 tablas (la tabla `prompts` queda en el esquema por compatibilidad pero
 ya no se usa: cada escena almacena su `visual_description` que sirve
-directamente como prompt de imagen). Las seis entidades centrales
+directamente como prompt de imagen). Las siete entidades centrales
 (`projects`, `research`, `concept`, `scripts`, `scenes`,
-`metadata_records`) tienen `project_id` con `ON DELETE CASCADE`.
-`stage_prompts` almacena los prompts SYS + USER editados por etapa
-(`UNIQUE(project_id, stage)`).
+`metadata_records`, `thumbnail_records`) tienen `project_id` con
+`ON DELETE CASCADE`. `stage_prompts` almacena los prompts SYS + USER
+editados por etapa (`UNIQUE(project_id, stage)`).
 
 `scripts.type` distingue `long` (5 min) de `short` (1 min).
 `scenes.script_id` vincula cada escena con su guion.
-`metadata_records.platform` distingue `youtube` de `shorts`. Ambas con
-`UNIQUE(project_id, type/platform)` para impedir duplicados.
+`metadata_records.platform` distingue `youtube` de `shorts`.
+`thumbnail_records.script_type` distingue `long` (16:9) de `short` (9:16).
+Las tres con `UNIQUE(project_id, type/platform/script_type)` para impedir
+duplicados.
 
 ## Flujo de datos
 

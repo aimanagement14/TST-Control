@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% set current_stage = 'thumbnails' %}
+{% block title %}Miniaturas · {{ project.name }}{% endblock %}
+
+{% macro thumb_panel(script_type, label, aspect, lede, saved) %}
+{% set t = thumb_by_type.get(script_type) %}
+{% set is_active = gen_type == script_type and generated %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>{{ label }} <span class="muted small">{{ aspect }}</span></h2>
+        {% if t %}
+        <span class="chip chip-done">Guardada</span>
+        {% else %}
+        <span class="chip chip-next">Pendiente</span>
+        {% endif %}
+    </div>
+    <p class="hint">{{ lede }}</p>
+
+    <form method="post" class="field-row mt-2">
+        <input type="hidden" name="script_type" value="{{ script_type }}">
+        <label class="field">
+            <span class="label">Guion base</span>
+            <select name="script_id">
+                {% for s in scripts %}
+                <option value="{{ s.id }}"
+                        {% if (script_type == 'long' and s.type == 'long') or (script_type == 'short' and s.type == 'short') %}selected{% endif %}>
+                    {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
+                    — {{ s.title or 'sin título' }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button name="action" value="generate_prompt" class="btn">
+            {% if saved %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+        </button>
+    </form>
+
+    {% if is_active or saved %}
+    <details class="fold" data-prompt {% if is_active %}open{% endif %}>
+        <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
+        <form method="post">
+            <input type="hidden" name="action" value="save_prompt">
+            <input type="hidden" name="script_type" value="{{ script_type }}">
+            <label class="field">
+                <span class="label">Instrucciones del sistema</span>
+                <textarea name="sys_prompt" rows="4">{{ sys_prompt if is_active else (saved.sys_prompt if saved else '') }}</textarea>
+            </label>
+            <label class="field">
+                <span class="label">Petición</span>
+                <textarea name="user_prompt" rows="8">{{ user_prompt if is_active else (saved.user_prompt if saved else '') }}</textarea>
+            </label>
+            <div class="actions">
+                <button type="button" class="btn btn-sm" data-copy-button>Copiar prompt</button>
+                <button type="submit" class="btn btn-ghost btn-sm">Guardar cambios</button>
+            </div>
+        </form>
+    </details>
+    {% endif %}
+
+    {% if t %}
+    <div class="panel-inset mt-2">
+        <p class="label">Prompt visual cinematográfico <span class="muted">— listo para Midjourney / Flux / DALL-E</span></p>
+        <pre class="code" id="thumb-{{ script_type }}">{{ t.prompt }}</pre>
+        <div class="actions">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#thumb-{{ script_type }}">
+                Copiar prompt visual
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <details class="fold" {% if is_active or not t %}open{% endif %}>
+        <summary>{% if t %}Actualizar con una respuesta nueva{% else %}Respuesta del LLM{% endif %}</summary>
+        <form method="post">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="script_type" value="{{ script_type }}">
+            <label class="field">
+                <span class="sr-only">Respuesta del LLM para {{ label }}</span>
+                <textarea name="text" rows="6"
+                          placeholder="Pega aquí la respuesta con el bloque ## MINIATURA.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
+            </label>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">
+                    {% if t %}Reemplazar miniatura{% else %}Guardar miniatura{% endif %}
+                </button>
+            </div>
+        </form>
+    </details>
+</section>
+{% endmacro %}
+
+{% block content %}
+{{ ui.stage_head(project, '07', 'Miniaturas',
+    'Un prompt visual cinematográfico por video: uno horizontal para el guion 5 min y uno vertical para el guion 1 min. Sin texto overlay, listo para Midjourney / Flux / DALL-E.') }}
+
+{% if not scripts %}
+<div class="empty">
+    <h2>Primero hace falta un guion</h2>
+    <p>La miniatura se genera a partir del contenido del guion.</p>
+    <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-primary">Ir a guiones</a>
+</div>
+{% else %}
+<div class="pair">
+    {{ thumb_panel('long', 'Miniatura 5 min', '16:9 horizontal',
+        'Imagen fija tipo fotograma cinematográfico para YouTube. Sujeto principal con composición regla de los tercios.',
+        saved_long) }}
+    {{ thumb_panel('short', 'Miniatura 1 min', '9:16 vertical',
+        'Imagen fija vertical para Shorts / Reels / TikTok. Sujeto centrado, composición apta para feed.',
+        saved_short) }}
+</div>
+{% endif %}
+{% endblock %}

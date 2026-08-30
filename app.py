@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS metadata_records (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS thumbnail_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER,
+    script_type TEXT,
+    prompt TEXT,
+    updated_at TEXT,
+    UNIQUE(project_id, script_type),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS qc_issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER,
@@ -307,6 +317,18 @@ def project_stage_status(project):
             "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?",
             (project["id"],)
         ).fetchone()["n"] > 0
+        thumb_long = conn.execute(
+            "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type='long'",
+            (project["id"],),
+        ).fetchone()
+        thumb_short = conn.execute(
+            "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type='short'",
+            (project["id"],),
+        ).fetchone()
+        stages["thumbnails"] = bool(
+            thumb_long and thumb_long["prompt"] and
+            thumb_short and thumb_short["prompt"]
+        )
     return stages
 
 
@@ -327,12 +349,14 @@ PIPELINE_STAGES = (
      "endpoint": "scenes", "hint": "Secuencia visual"},
     {"key": "metadata", "num": "06", "label": "Metadata", "short": "Metadata",
      "endpoint": "metadata", "hint": "Títulos, tags y CTA"},
-    {"key": "qc", "num": "07", "label": "Control de calidad", "short": "Calidad",
+    {"key": "thumbnails", "num": "07", "label": "Miniaturas", "short": "Miniaturas",
+     "endpoint": "thumbnails", "hint": "Prompts visuales de portada"},
+    {"key": "qc", "num": "08", "label": "Control de calidad", "short": "Calidad",
      "endpoint": "qc", "hint": "Revisión antes de exportar"},
 )
 
 PAGE_ORDER = ("research", "concept", "scripts", "scenes",
-              "metadata", "qc", "export")
+              "metadata", "thumbnails", "qc", "export")
 
 PAGE_LABELS = {
     "research": "Investigación",
@@ -340,6 +364,7 @@ PAGE_LABELS = {
     "scripts": "Guiones",
     "scenes": "Escenas",
     "metadata": "Metadata",
+    "thumbnails": "Miniaturas",
     "qc": "Control de calidad",
     "export": "Exportar",
 }
@@ -351,6 +376,7 @@ STATUS_LABELS = {
     "scripts": "En guion",
     "scenes": "En escenas",
     "metadata": "En metadata",
+    "thumbnails": "En miniaturas",
     "ready": "Listo para exportar",
 }
 
@@ -576,6 +602,12 @@ _STAGE_BUILDERS = {
     "metadata_shorts": lambda proj, prof, ctx: build_metadata_prompt(
         proj, prof, ctx.get("script") or {}, "shorts",
     ),
+    "thumbnail_long": lambda proj, prof, ctx: build_thumbnail_prompt(
+        proj, prof, ctx.get("script") or {}, "long",
+    ),
+    "thumbnail_short": lambda proj, prof, ctx: build_thumbnail_prompt(
+        proj, prof, ctx.get("script") or {}, "short",
+    ),
 }
 
 
@@ -589,12 +621,13 @@ def _stage_context(project_id, stage):
                 conn, "SELECT * FROM research WHERE project_id=?", (project_id,),
             )
         if stage in ("script_long", "script_short", "scenes",
-                     "metadata_youtube", "metadata_shorts"):
+                     "metadata_youtube", "metadata_shorts",
+                     "thumbnail_long", "thumbnail_short"):
             ctx["concept"] = fetch_optional_dict(
                 conn, "SELECT * FROM concept WHERE project_id=?", (project_id,),
             )
-            script_type = "long" if stage in ("script_long", "metadata_youtube") else (
-                "short" if stage in ("script_short", "metadata_shorts") else "long"
+            script_type = "long" if stage in ("script_long", "metadata_youtube", "thumbnail_long") else (
+                "short" if stage in ("script_short", "metadata_shorts", "thumbnail_short") else "long"
             )
             ctx["script"] = get_script(project_id, script_type) or {}
     return ctx
@@ -636,6 +669,12 @@ def _ensure_stage_prompt(project_id, stage, project, profile, extra_ctx=None):
             has_content = bool(conn.execute(
                 "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
                 (project_id, platform),
+            ).fetchone())
+        elif stage in ("thumbnail_long", "thumbnail_short"):
+            script_type = stage.split("_", 1)[1]
+            has_content = bool(conn.execute(
+                "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
+                (project_id, script_type),
             ).fetchone())
         else:
             has_content = False
@@ -761,6 +800,34 @@ def build_metadata_prompt(project, profile, script, platform):
         f"Plataformas objetivo: {platforms_txt}\n\n"
         f"Guion completo:\n{script.get('body_full','')[:3000]}\n\n"
         f"Devuelve en este formato:\n\n{fmt}"
+    )
+    return sys_prompt, user_msg
+
+
+def build_thumbnail_prompt(project, profile, script, script_type):
+    """Construye el prompt para generar una miniatura cinematográfica fija.
+
+    `script_type` es 'long' (5 min, 16:9) o 'short' (1 min, 9:16).
+    """
+    if script_type == "long":
+        sys_prompt = CONFIG["prompts"]["thumbnail_long"]["system"]
+        fmt = CONFIG["prompts"]["thumbnail_long"]["format"]
+        duration_txt = "5 minutos (formato 16:9 horizontal)"
+    else:
+        sys_prompt = CONFIG["prompts"]["thumbnail_short"]["system"]
+        fmt = CONFIG["prompts"]["thumbnail_short"]["format"]
+        duration_txt = "1 minuto (formato 9:16 vertical)"
+
+    user_msg = (
+        f"Tema: {project['topic']}\n"
+        f"Duración objetivo del guion: {duration_txt}\n"
+        f"Título del guion: {script.get('title','')}\n"
+        f"Hook: {script.get('hook','')}\n"
+        f"Tipo de contenido: {profile['content_type'] if profile else 'documental'}\n"
+        f"Estilo visual: {profile['style'] if profile else 'cinematográfico'}\n"
+        f"Nivel de misterio: {profile['mystery_level'] if profile else 7}/10\n\n"
+        f"Ángulo y tesis del guion:\n{script.get('body_full','')[:2500]}\n\n"
+        f"Devuelve SIEMPRE en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
 
@@ -1234,6 +1301,39 @@ def parse_metadata(text, platform):
     return out
 
 
+def parse_thumbnail(text, script_type):
+    """Extrae el bloque `## MINIATURA` de la respuesta del LLM.
+
+    Devuelve `{"prompt": "..."}` con todo el contenido bajo `## MINIATURA`
+    hasta el siguiente `##` o el fin del texto. `script_type` se ignora,
+    pero se mantiene por simetría con `parse_metadata`.
+    """
+    out = {"prompt": ""}
+    if not text:
+        return out
+    cur = None
+    buf = []
+
+    def flush():
+        nonlocal out, cur, buf
+        if cur == "miniatura" and buf:
+            chunk = "\n".join(buf).strip()
+            out["prompt"] = (out["prompt"] + "\n" + chunk).strip() if out["prompt"] else chunk
+        buf = []
+
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        up = re.sub(r"\s+", " ", line.strip().upper())
+        if up.startswith("## "):
+            flush()
+            cur = "miniatura" if up.startswith("## MINIATURA") else None
+            continue
+        if cur == "miniatura" and line.strip():
+            buf.append(line.strip())
+    flush()
+    return out
+
+
 # ---------------------------------------------------------------------------
 # QC
 # ---------------------------------------------------------------------------
@@ -1428,7 +1528,8 @@ def backfill_stage_prompts(project_id):
 
     generated = 0
     for stage in ("research", "concept", "script_long", "script_short",
-                  "scenes", "metadata_youtube", "metadata_shorts"):
+                  "scenes", "metadata_youtube", "metadata_shorts",
+                  "thumbnail_long", "thumbnail_short"):
         if _ensure_stage_prompt(project_id, stage, project, profile):
             generated += 1
     flash(f"Prompts regenerados: {generated}", "ok")
@@ -1868,6 +1969,102 @@ def metadata(project_id):
                            saved_yt=saved_yt, saved_sh=saved_sh)
 
 
+# --- Miniaturas --------------------------------------------------------------
+
+@app.route("/projects/<int:project_id>/thumbnails", methods=["GET", "POST"])
+def thumbnails(project_id):
+    with get_db() as conn:
+        project = fetch_project_or_404(project_id)
+        profile = get_profile(project["profile_id"])
+        scripts_rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        ).fetchall()]
+        thumb_rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
+        ).fetchall()]
+
+    thumb_by_type = {t["script_type"]: t for t in thumb_rows}
+    saved_long = get_saved_prompt(project_id, "thumbnail_long")
+    saved_short = get_saved_prompt(project_id, "thumbnail_short")
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        script_type = request.form.get("script_type")
+        if script_type not in ("long", "short"):
+            flash("Tipo de miniatura no válido", "error")
+            return redirect(url_for("thumbnails", project_id=project_id))
+
+        if action == "generate_prompt":
+            script_id = request.form.get("script_id")
+            script = next(
+                (s for s in scripts_rows if str(s["id"]) == str(script_id)), None,
+            )
+            if not script:
+                flash("Selecciona un guion", "error")
+                return redirect(url_for("thumbnails", project_id=project_id))
+            sys_p, user_p = build_thumbnail_prompt(project, profile, script, script_type)
+            save_stage_prompt(project_id, f"thumbnail_{script_type}", sys_p, user_p)
+            generated = call_llm(sys_p, user_p)
+            return render_template("thumbnails.html", project=project, profile=profile,
+                                   scripts=scripts_rows,
+                                   thumb_by_type=thumb_by_type,
+                                   generated=generated, gen_type=script_type,
+                                   gen_script_id=script_id,
+                                   sys_prompt=sys_p, user_prompt=user_p,
+                                   saved_long=saved_long, saved_short=saved_short)
+        elif action == "save_prompt":
+            sys_p = request.form.get("sys_prompt", "").strip()
+            user_p = request.form.get("user_prompt", "").strip()
+            if sys_p and user_p:
+                save_stage_prompt(project_id, f"thumbnail_{script_type}", sys_p, user_p)
+                flash(f"Prompt de miniatura {script_type} guardado", "ok")
+            return redirect(url_for("thumbnails", project_id=project_id))
+        elif action == "save":
+            text = request.form.get("text", "").strip()
+            if text:
+                parsed = parse_thumbnail(text, script_type)
+                prompt_text = parsed["prompt"].strip()
+                if not prompt_text:
+                    flash("No se pudo extraer la miniatura (¿formato correcto?)", "error")
+                    return redirect(url_for("thumbnails", project_id=project_id))
+                with get_db() as conn:
+                    existing = conn.execute(
+                        "SELECT id FROM thumbnail_records "
+                        "WHERE project_id=? AND script_type=?",
+                        (project_id, script_type),
+                    ).fetchone()
+                    if existing:
+                        conn.execute("""
+                            UPDATE thumbnail_records SET prompt=?, updated_at=?
+                            WHERE id=?
+                        """, (prompt_text, now_iso(), existing["id"]))
+                    else:
+                        conn.execute("""
+                            INSERT INTO thumbnail_records
+                            (project_id, script_type, prompt, updated_at)
+                            VALUES (?, ?, ?, ?)
+                        """, (project_id, script_type, prompt_text, now_iso()))
+                    conn.execute(
+                        "UPDATE projects SET status='thumbnails', updated_at=? WHERE id=?",
+                        (now_iso(), project_id),
+                    )
+                # Auto-guardar el prompt canónico de la etapa.
+                script = next(
+                    (s for s in scripts_rows if s["type"] == script_type), None,
+                )
+                if script:
+                    _ensure_stage_prompt(
+                        project_id, f"thumbnail_{script_type}", project, profile,
+                        {"script": script},
+                    )
+                flash(f"Miniatura {script_type} guardada", "ok")
+            return redirect(url_for("thumbnails", project_id=project_id))
+
+    return render_template("thumbnails.html", project=project, profile=profile,
+                           scripts=scripts_rows, thumb_by_type=thumb_by_type,
+                           saved_long=saved_long, saved_short=saved_short)
+
+
 # --- QC ----------------------------------------------------------------------
 
 @app.route("/projects/<int:project_id>/qc", methods=["GET", "POST"])
@@ -1928,6 +2125,7 @@ def export(project_id):
         scripts_rows = [dict(r) for r in conn.execute("SELECT * FROM scripts WHERE project_id=?", (project_id,)).fetchall()]
         scenes_rows = [dict(r) for r in conn.execute("SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)).fetchall()]
         meta_rows = [dict(r) for r in conn.execute("SELECT * FROM metadata_records WHERE project_id=?", (project_id,)).fetchall()]
+        thumb_rows = [dict(r) for r in conn.execute("SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)).fetchall()]
 
     if request.method == "POST":
         # Construir paquete
@@ -2082,7 +2280,22 @@ def export(project_id):
                         for i, t in enumerate(ost, 1):
                             f.write(f"{i}. {t}\n")
 
-        # 06_prompts_usados.md
+        # 06_thumbnails/
+        if thumb_rows:
+            tdir = out_dir / "06_thumbnails"
+            tdir.mkdir(exist_ok=True)
+            for t in thumb_rows:
+                stype = t["script_type"]
+                aspect = "16:9 (horizontal)" if stype == "long" else "9:16 (vertical)"
+                fname = f"thumbnail_{stype}.md"
+                with open(tdir / fname, "w", encoding="utf-8") as f:
+                    f.write(f"# Miniatura — guion {stype} ({aspect})\n\n")
+                    f.write(f"_Actualizado: {t['updated_at']}_\n\n")
+                    f.write("```\n")
+                    f.write((t.get("prompt") or "").strip())
+                    f.write("\n```\n")
+
+        # 07_prompts_usados.md
         stage_prompts = list_saved_prompts(project_id)
         if stage_prompts:
             stage_labels = {
@@ -2093,8 +2306,10 @@ def export(project_id):
                 "scenes": "Escenas",
                 "metadata_youtube": "Metadata YouTube",
                 "metadata_shorts": "Metadata Shorts",
+                "thumbnail_long": "Miniatura 5 min",
+                "thumbnail_short": "Miniatura 1 min",
             }
-            with open(out_dir / "06_prompts_usados.md", "w", encoding="utf-8") as f:
+            with open(out_dir / "07_prompts_usados.md", "w", encoding="utf-8") as f:
                 f.write(f"# Prompts usados en {project['name']}\n\n")
                 f.write("Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n\n")
                 for stage, p in stage_prompts.items():
@@ -2107,7 +2322,7 @@ def export(project_id):
                     f.write(p.get("user_prompt", ""))
                     f.write("\n```\n\n---\n\n")
 
-        # 07_paquete_completo.json
+        # 08_paquete_completo.json
         bundle = {
             "project": project,
             "profile": profile,
@@ -2116,10 +2331,11 @@ def export(project_id):
             "scripts": scripts_rows,
             "scenes": scenes_rows,
             "metadata": meta_rows,
+            "thumbnails": thumb_rows,
             "stage_prompts": stage_prompts,
             "exported_at": now_iso(),
         }
-        with open(out_dir / "07_paquete_completo.json", "w", encoding="utf-8") as f:
+        with open(out_dir / "08_paquete_completo.json", "w", encoding="utf-8") as f:
             json.dump(bundle, f, ensure_ascii=False, indent=2)
 
         # Crear ZIP
@@ -2148,6 +2364,7 @@ def export(project_id):
                            scripts=scripts_rows,
                            scenes=scenes_rows,
                            metadata=meta_rows,
+                           thumbnails=thumb_rows,
                            qc_errors=qc_errors)
 
 

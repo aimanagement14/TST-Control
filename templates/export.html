@@ -4,7 +4,7 @@
 {% block title %}Exportar · {{ project.name }}{% endblock %}
 
 {% block content %}
-{% call ui.stage_head(project, '07', 'Exportar',
+{% call ui.stage_head(project, '08', 'Exportar',
         'El proyecto empaquetado en Markdown y JSON, listo para tu pipeline de producción.') %}
 <form method="post">
     <button class="btn btn-primary btn-lg">Generar paquete ZIP</button>
@@ -39,9 +39,11 @@
                 <b>{{ scenes|length }}</b></li>
             <li><span><code>05_metadata/</code> — una ficha por plataforma</span>
                 <b>{{ metadata|length }}</b></li>
-            <li><span><code>06_prompts_usados.md</code> — prompts con los que se generó todo</span>
+            <li><span><code>06_thumbnails/</code> — prompts visuales de miniatura por guion</span>
+                <b>{{ thumbnails|length }}</b></li>
+            <li><span><code>07_prompts_usados.md</code> — prompts con los que se generó todo</span>
                 <b>siempre</b></li>
-            <li><span><code>07_paquete_completo.json</code> — todo en JSON</span><b>siempre</b></li>
+            <li><span><code>08_paquete_completo.json</code> — todo en JSON</span><b>siempre</b></li>
         </ul>
         <p class="hint mt-2">Al generarlo, el ZIP se descarga y queda una copia en <code>projects/</code>.</p>
     </div>
@@ -55,6 +57,7 @@
                 <li><span>Guiones</span><b>{{ scripts|length }}</b></li>
                 <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
                 <li><span>Plataformas</span><b>{{ metadata|length }}</b></li>
+            <li><span>Miniaturas</span><b>{{ thumbnails|length }}</b></li>
             </ul>
         </div>
         <div class="panel">
