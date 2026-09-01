@@ -553,6 +553,106 @@ def test_export_creates_zip(tmp_path):
 
 
 # ==========================================================================
+# Tests de prompts por perfil (graph foundation)
+# ==========================================================================
+
+def test_resolve_stage_prompt_falls_back_to_config(tmp_path):
+    """Sin fila en profile_prompts, devuelve los strings de CONFIG."""
+    _setup_qc_db(tmp_path)
+    profile_id = 1
+    sys_p, user_p = app.resolve_stage_prompt(profile_id, "research")
+    assert sys_p == app.CONFIG["prompts"]["research"]["system"]
+    assert user_p == app.CONFIG["prompts"]["research"]["format"]
+    sys_p, user_p = app.resolve_stage_prompt(profile_id, "no_existe")
+    assert sys_p == "" and user_p == ""
+    print("  ✓ resolve_stage_prompt cae a CONFIG y a vacío si stage desconocido")
+
+
+def test_save_profile_prompt_upsert(tmp_path):
+    """save_profile_prompt hace UPSERT (no duplica) y respeta profile_id None."""
+    _setup_qc_db(tmp_path)
+    profile_id = 1
+    app.save_profile_prompt(profile_id, "research", "sys1", "user1")
+    out = app.list_profile_prompts(profile_id)
+    assert out["research"]["sys_prompt"] == "sys1"
+    assert out["research"]["user_prompt"] == "user1"
+    app.save_profile_prompt(profile_id, "research", "sys2", "user2")
+    out = app.list_profile_prompts(profile_id)
+    assert out["research"]["sys_prompt"] == "sys2"
+    assert out["research"]["user_prompt"] == "user2"
+    assert len(out) == 1, f"Debe haber 1 fila tras UPSERT, hay {len(out)}"
+    app.save_profile_prompt(None, "research", "sys3", "user3")
+    out = app.list_profile_prompts(profile_id)
+    assert len(out) == 1, "profile_id=None no debe persistir"
+    print("  ✓ save_profile_prompt UPSERT y respeta profile_id=None")
+
+
+def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
+    """init_db() migra filas de stage_prompts y elimina la tabla legacy."""
+    db_path = tmp_path / "test.db"
+    app.DB_PATH = db_path
+    app.init_db()
+    profile_id = 1
+    now = "2025-01-01T00:00:00"
+    import gc
+    with app.get_db() as conn:
+        # init_db() en una DB fresca marca la migración como aplicada
+        # (idempotente cuando la tabla legacy no existe). La "desmarcamos"
+        # para simular una instalación previa al refactor y verificar que
+        # la migración realmente copia filas y elimina la tabla.
+        conn.execute(
+            "DELETE FROM _schema_migrations "
+            "WHERE name='migrate_stage_prompts_to_profile_prompts'"
+        )
+        conn.execute("""
+            CREATE TABLE stage_prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER,
+                stage TEXT,
+                sys_prompt TEXT,
+                user_prompt TEXT,
+                updated_at TEXT,
+                UNIQUE(project_id, stage),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Test', 'Topic', ?, 'research', ?, ?)
+        """, (profile_id, now, now))
+        conn.execute("""
+            INSERT INTO stage_prompts (project_id, stage, sys_prompt,
+                                       user_prompt, updated_at)
+            VALUES (1, 'research', 'sys-from-legacy', 'user-from-legacy', ?)
+        """, (now,))
+        conn.execute("""
+            INSERT INTO stage_prompts (project_id, stage, sys_prompt,
+                                       user_prompt, updated_at)
+            VALUES (1, 'concept', 'sys-concept', 'user-concept', ?)
+        """, (now,))
+    gc.collect()
+    app.init_db()
+    gc.collect()
+    with app.get_db() as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT stage, sys_prompt, user_prompt FROM profile_prompts "
+            "WHERE profile_id=? ORDER BY stage",
+            (profile_id,),
+        )]
+        legacy_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='stage_prompts'"
+        ).fetchone()
+    assert legacy_exists is None, "stage_prompts debe haberse eliminado"
+    assert len(rows) == 2, f"Esperaba 2 filas migradas, hay {len(rows)}"
+    by_stage = {r["stage"]: r for r in rows}
+    assert by_stage["research"]["sys_prompt"] == "sys-from-legacy"
+    assert by_stage["concept"]["user_prompt"] == "user-concept"
+    print("  ✓ migración copia stage_prompts a profile_prompts y borra legacy")
+
+
+# ==========================================================================
 # Runner
 # ==========================================================================
 
@@ -598,6 +698,14 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         test_export_creates_zip(Path(tmp))
         gc.collect()
+
+    print("\n=== TESTS DE PROMPTS POR PERFIL ===")
+    _run_qc_test(test_resolve_stage_prompt_falls_back_to_config,
+                 "resolve_stage_prompt_falls_back_to_config")
+    _run_qc_test(test_save_profile_prompt_upsert,
+                 "save_profile_prompt_upsert")
+    _run_qc_test(test_migration_copies_stage_prompts_to_profile_prompts,
+                 "migration_copies_stage_prompts_to_profile_prompts")
 
     print("\n✅ Todos los tests pasaron\n")
 

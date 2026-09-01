@@ -199,20 +199,48 @@ CREATE TABLE IF NOT EXISTS qc_issues (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS stage_prompts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER,
-    stage TEXT,
-    sys_prompt TEXT,
-    user_prompt TEXT,
-    updated_at TEXT,
-    UNIQUE(project_id, stage),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS profile_prompts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    stage TEXT NOT NULL,
+    sys_prompt TEXT NOT NULL,
+    user_prompt TEXT NOT NULL,
+    updated_at TEXT,
+    UNIQUE(profile_id, stage),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS profile_graph_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    node_key TEXT NOT NULL,
+    label TEXT,
+    sys_prompt TEXT,
+    user_prompt TEXT,
+    inputs_json TEXT,
+    position_x REAL DEFAULT 0,
+    position_y REAL DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    is_fixed INTEGER DEFAULT 0,
+    updated_at TEXT,
+    UNIQUE(profile_id, node_key),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS node_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    node_key TEXT NOT NULL,
+    output TEXT,
+    status TEXT,
+    duration_ms INTEGER,
+    created_at TEXT,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 """
 
@@ -229,6 +257,11 @@ def init_db():
     """Inicializa el esquema y los datos por defecto."""
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS _schema_migrations "
+            "(name TEXT PRIMARY KEY, applied_at TEXT)"
+        )
+        _migrate_stage_prompts_to_profile_prompts(conn)
         # Perfil por defecto si no existe ninguno
         cur = conn.execute("SELECT COUNT(*) AS n FROM profiles")
         if cur.fetchone()["n"] == 0:
@@ -250,7 +283,127 @@ def init_db():
             ))
 
 
-init_db()
+# ---------------------------------------------------------------------------
+# Migraciones opt-in (idempotentes, controladas por _schema_migrations)
+# ---------------------------------------------------------------------------
+
+_LEGACY_STAGE_PROMPTS_MIGRATION = "migrate_stage_prompts_to_profile_prompts"
+
+
+def _migrate_stage_prompts_to_profile_prompts(conn):
+    """Migra filas de `stage_prompts` (legacy, por proyecto) a `profile_prompts` (por perfil).
+
+    Idempotente: solo se aplica una vez. Si la tabla legacy ya no existe,
+    marca la migración como aplicada sin tocar datos.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM _schema_migrations WHERE name=?",
+        (_LEGACY_STAGE_PROMPTS_MIGRATION,),
+    ).fetchone()
+    if row:
+        return
+    legacy = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='stage_prompts'"
+    ).fetchone()
+    if not legacy:
+        conn.execute(
+            "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+            (_LEGACY_STAGE_PROMPTS_MIGRATION, now_iso()),
+        )
+        return
+    backup_path = str(DB_PATH) + ".bak"
+    if not Path(backup_path).exists():
+        shutil.copyfile(str(DB_PATH), backup_path)
+    conn.execute("""
+        INSERT OR IGNORE INTO profile_prompts
+            (profile_id, stage, sys_prompt, user_prompt, updated_at)
+        SELECT p.profile_id, sp.stage, sp.sys_prompt, sp.user_prompt, sp.updated_at
+        FROM stage_prompts sp
+        JOIN projects p ON p.id = sp.project_id
+        WHERE p.profile_id IS NOT NULL
+    """)
+    conn.execute("DROP TABLE stage_prompts")
+    conn.execute(
+        "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_LEGACY_STAGE_PROMPTS_MIGRATION, now_iso()),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Prompts por perfil (graph foundation)
+# ---------------------------------------------------------------------------
+
+
+def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
+    """Devuelve (sys_prompt, user_prompt) del perfil+stage o fallback a CONFIG.
+
+    Si no hay fila en `profile_prompts` y `stage` está en CONFIG["prompts"],
+    devuelve los strings canónicos. Si el stage no existe, devuelve ("", "")
+    y registra un aviso por consola.
+    """
+    if profile_id is not None:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT sys_prompt, user_prompt FROM profile_prompts "
+                "WHERE profile_id=? AND stage=?",
+                (profile_id, stage),
+            ).fetchone()
+            if row:
+                return row["sys_prompt"], row["user_prompt"]
+    cfg = CONFIG.get("prompts", {}).get(stage)
+    if cfg:
+        return cfg.get("system", ""), cfg.get("format", "")
+    print(f"[resolve_stage_prompt] stage '{stage}' no existe en CONFIG['prompts']")
+    return "", ""
+
+
+def save_profile_prompt(profile_id: int | None, stage: str,
+                         sys_prompt: str, user_prompt: str) -> None:
+    """UPSERT en `profile_prompts` por (profile_id, stage). No hace nada si profile_id es None."""
+    if profile_id is None:
+        return
+    now = now_iso()
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO profile_prompts
+                (profile_id, stage, sys_prompt, user_prompt, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(profile_id, stage) DO UPDATE SET
+                sys_prompt=excluded.sys_prompt,
+                user_prompt=excluded.user_prompt,
+                updated_at=excluded.updated_at
+        """, (profile_id, stage, sys_prompt, user_prompt, now))
+
+
+def list_profile_prompts(profile_id: int | None) -> dict[str, dict[str, str]]:
+    """Devuelve `{stage: {sys_prompt, user_prompt, updated_at}}` del perfil."""
+    if profile_id is None:
+        return {}
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT stage, sys_prompt, user_prompt, updated_at "
+            "FROM profile_prompts WHERE profile_id=?",
+            (profile_id,),
+        ).fetchall()
+    out: dict[str, dict[str, str]] = {}
+    for row in rows:
+        out[row["stage"]] = {
+            "sys_prompt": row["sys_prompt"],
+            "user_prompt": row["user_prompt"],
+            "updated_at": row["updated_at"],
+        }
+    return out
+
+
+def get_default_prompts_from_config() -> dict[str, dict[str, str]]:
+    """Devuelve `{stage: {system, format}}` desde CONFIG["prompts"]."""
+    out: dict[str, dict[str, str]] = {}
+    for stage, cfg in CONFIG.get("prompts", {}).items():
+        out[stage] = {
+            "system": cfg.get("system", ""),
+            "format": cfg.get("format", ""),
+        }
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -538,164 +691,6 @@ def fetch_optional_dict(conn, sql, params=()):
     """Ejecuta una consulta y devuelve dict o {} si no hay fila."""
     row = conn.execute(sql, params).fetchone()
     return dict(row) if row else {}
-
-
-def get_saved_prompt(project_id, stage):
-    """Recupera el prompt guardado para una etapa, o None."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM stage_prompts WHERE project_id=? AND stage=?",
-            (project_id, stage),
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def save_stage_prompt(project_id, stage, sys_prompt, user_prompt):
-    """Guarda (o actualiza) el prompt de una etapa en el proyecto."""
-    now = now_iso()
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM stage_prompts WHERE project_id=? AND stage=?",
-            (project_id, stage),
-        ).fetchone()
-        if existing:
-            conn.execute("""
-                UPDATE stage_prompts SET sys_prompt=?, user_prompt=?, updated_at=?
-                WHERE id=?
-            """, (sys_prompt, user_prompt, now, existing["id"]))
-        else:
-            conn.execute("""
-                INSERT INTO stage_prompts (project_id, stage, sys_prompt, user_prompt, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (project_id, stage, sys_prompt, user_prompt, now))
-
-
-def list_saved_prompts(project_id):
-    """Devuelve todos los prompts guardados del proyecto indexados por stage."""
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM stage_prompts WHERE project_id=? ORDER BY updated_at",
-            (project_id,),
-        ).fetchall()
-    return {row["stage"]: dict(row) for row in rows}
-
-
-# ---------------------------------------------------------------------------
-# Auto-prompt: garantiza que siempre quede un prompt guardado por etapa
-# ---------------------------------------------------------------------------
-
-_STAGE_BUILDERS = {
-    "research": lambda proj, prof, ctx: build_research_prompt(proj, prof),
-    "concept": lambda proj, prof, ctx: build_concept_prompt(
-        proj, prof, ctx.get("research") or {},
-    ),
-    "script_long": lambda proj, prof, ctx: build_script_prompt(
-        proj, prof, ctx.get("research") or {}, ctx.get("concept") or {}, "long",
-    ),
-    "script_short": lambda proj, prof, ctx: build_script_prompt(
-        proj, prof, ctx.get("research") or {}, ctx.get("concept") or {}, "short",
-    ),
-    "scenes": lambda proj, prof, ctx: build_scenes_prompt(
-        proj, prof, ctx.get("script") or {},
-    ),
-    "metadata_youtube": lambda proj, prof, ctx: build_metadata_prompt(
-        proj, prof, ctx.get("script") or {}, "youtube",
-    ),
-    "metadata_shorts": lambda proj, prof, ctx: build_metadata_prompt(
-        proj, prof, ctx.get("script") or {}, "shorts",
-    ),
-    "thumbnail_long": lambda proj, prof, ctx: build_thumbnail_prompt(
-        proj, prof, ctx.get("script") or {}, "long",
-    ),
-    "thumbnail_short": lambda proj, prof, ctx: build_thumbnail_prompt(
-        proj, prof, ctx.get("script") or {}, "short",
-    ),
-}
-
-
-def _stage_context(project_id, stage):
-    """Carga el contexto necesario para regenerar el prompt de una etapa."""
-    ctx = {}
-    with get_db() as conn:
-        if stage in ("concept", "script_long", "script_short",
-                     "scenes", "metadata_youtube", "metadata_shorts"):
-            ctx["research"] = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?", (project_id,),
-            )
-        if stage in ("script_long", "script_short", "scenes",
-                     "metadata_youtube", "metadata_shorts",
-                     "thumbnail_long", "thumbnail_short"):
-            ctx["concept"] = fetch_optional_dict(
-                conn, "SELECT * FROM concept WHERE project_id=?", (project_id,),
-            )
-            script_type = "long" if stage in ("script_long", "metadata_youtube", "thumbnail_long") else (
-                "short" if stage in ("script_short", "metadata_shorts", "thumbnail_short") else "long"
-            )
-            ctx["script"] = get_script(project_id, script_type) or {}
-    return ctx
-
-
-def _ensure_stage_prompt(project_id, stage, project, profile, extra_ctx=None):
-    """Si no hay prompt guardado para la etapa, genera y guarda el canónico.
-
-    Solo se ejecuta cuando la etapa ya tiene contenido persistido, para no
-    guardar prompts de etapas vacías.
-    """
-    if get_saved_prompt(project_id, stage):
-        return False
-    with get_db() as conn:
-        has_content = False
-        if stage == "research":
-            has_content = bool(conn.execute(
-                "SELECT content FROM research WHERE project_id=?",
-                (project_id,),
-            ).fetchone()["content"])
-        elif stage == "concept":
-            row = conn.execute(
-                "SELECT angle FROM concept WHERE project_id=?", (project_id,),
-            ).fetchone()
-            has_content = bool(row and row["angle"])
-        elif stage in ("script_long", "script_short"):
-            stype = stage.split("_", 1)[1]
-            has_content = bool(conn.execute(
-                "SELECT id FROM scripts WHERE project_id=? AND type=?",
-                (project_id, stype),
-            ).fetchone())
-        elif stage == "scenes":
-            has_content = conn.execute(
-                "SELECT COUNT(*) AS n FROM scenes WHERE project_id=?",
-                (project_id,),
-            ).fetchone()["n"] > 0
-        elif stage in ("metadata_youtube", "metadata_shorts"):
-            platform = stage.split("_", 1)[1]
-            has_content = bool(conn.execute(
-                "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
-                (project_id, platform),
-            ).fetchone())
-        elif stage in ("thumbnail_long", "thumbnail_short"):
-            script_type = stage.split("_", 1)[1]
-            has_content = bool(conn.execute(
-                "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
-                (project_id, script_type),
-            ).fetchone())
-        else:
-            has_content = False
-    if not has_content:
-        return False
-    builder = _STAGE_BUILDERS.get(stage)
-    if not builder:
-        return False
-    ctx = _stage_context(project_id, stage)
-    if extra_ctx:
-        ctx.update(extra_ctx)
-    try:
-        sys_p, user_p = builder(project, profile, ctx)
-    except Exception:
-        return False
-    if sys_p and user_p:
-        save_stage_prompt(project_id, stage, sys_p, user_p)
-        return True
-    return False
 
 
 # ---------------------------------------------------------------------------
@@ -1508,7 +1503,7 @@ def view_project(project_id):
         project = dict(project)
         profile = get_profile(project["profile_id"])
     project["stages"] = project_stage_status(project)
-    saved_prompts = list_saved_prompts(project_id)
+    saved_prompts = list_profile_prompts(project["profile_id"])
     return render_template("project.html", project=project, profile=profile,
                            saved_prompts=saved_prompts)
 
@@ -1521,23 +1516,6 @@ def delete_project(project_id):
     return redirect(url_for("dashboard"))
 
 
-@app.route("/projects/<int:project_id>/stage-prompts/backfill", methods=["POST"])
-def backfill_stage_prompts(project_id):
-    """Regenera y guarda los prompts de las etapas que tengan contenido."""
-    with get_db() as conn:
-        project = fetch_project_or_404(project_id)
-        profile = get_profile(project["profile_id"])
-
-    generated = 0
-    for stage in ("research", "concept", "script_long", "script_short",
-                  "scenes", "metadata_youtube", "metadata_shorts",
-                  "thumbnail_long", "thumbnail_short"):
-        if _ensure_stage_prompt(project_id, stage, project, profile):
-            generated += 1
-    flash(f"Prompts regenerados: {generated}", "ok")
-    return redirect(url_for("view_project", project_id=project_id))
-
-
 # --- Investigación -----------------------------------------------------------
 
 @app.route("/projects/<int:project_id>/research", methods=["GET", "POST"])
@@ -1546,25 +1524,16 @@ def research(project_id):
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
     research_obj = get_or_create_research(project_id)
-    saved_prompt = get_saved_prompt(project_id, "research")
 
     if request.method == "POST":
         action = request.form.get("action")
         if action == "generate_prompt":
             sys_p, user_p = build_research_prompt(project, profile)
-            save_stage_prompt(project_id, "research", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], "research", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template("research.html", project=project, profile=profile,
                                    research=research_obj, generated=generated,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_prompt=True)
-        elif action == "save_prompt":
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, "research", sys_p, user_p)
-                flash("Prompt guardado en el proyecto", "ok")
-            return redirect(url_for("research", project_id=project_id))
+                                   sys_prompt=sys_p, user_prompt=user_p)
         elif action == "save":
             text = request.form.get("content", "").strip()
             if text:
@@ -1584,16 +1553,13 @@ def research(project_id):
                     ))
                     conn.execute("UPDATE projects SET updated_at=? WHERE id=?",
                                  (now_iso(), project_id))
-                # Auto-guardar el prompt canónico si aún no había uno.
-                _ensure_stage_prompt(project_id, "research", project, profile, None)
                 flash("Investigación guardada", "ok")
             return redirect(url_for("research", project_id=project_id))
 
     sources = json.loads(research_obj.get("sources") or "[]")
     facts = json.loads(research_obj.get("facts") or "[]")
     return render_template("research.html", project=project, profile=profile,
-                           research=research_obj, sources=sources, facts=facts,
-                           saved_prompt=saved_prompt)
+                           research=research_obj, sources=sources, facts=facts)
 
 
 # --- Concepto ----------------------------------------------------------------
@@ -1605,7 +1571,6 @@ def concept(project_id):
         profile = get_profile(project["profile_id"])
         research_obj = fetch_optional_dict(conn, "SELECT * FROM research WHERE project_id=?", (project_id,))
     concept_obj = get_or_create_concept(project_id)
-    saved_prompt = get_saved_prompt(project_id, "concept")
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1614,19 +1579,11 @@ def concept(project_id):
                 flash("Necesitas tener investigación antes de generar el concepto", "error")
                 return redirect(url_for("research", project_id=project_id))
             sys_p, user_p = build_concept_prompt(project, profile, research_obj)
-            save_stage_prompt(project_id, "concept", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], "concept", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template("concept.html", project=project, profile=profile,
                                    concept=concept_obj, generated=generated,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_prompt=True)
-        elif action == "save_prompt":
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, "concept", sys_p, user_p)
-                flash("Prompt guardado en el proyecto", "ok")
-            return redirect(url_for("concept", project_id=project_id))
+                                   sys_prompt=sys_p, user_prompt=user_p)
         elif action == "save":
             text = request.form.get("text", "").strip()
             if text:
@@ -1647,15 +1604,12 @@ def concept(project_id):
                     ))
                     conn.execute("UPDATE projects SET status='concept', updated_at=? WHERE id=?",
                                  (now_iso(), project_id))
-                _ensure_stage_prompt(project_id, "concept", project, profile,
-                                     {"research": research_obj})
                 flash("Concepto guardado", "ok")
             return redirect(url_for("concept", project_id=project_id))
 
     key_points = json.loads(concept_obj.get("key_points") or "[]")
     return render_template("concept.html", project=project, profile=profile,
-                           concept=concept_obj, key_points=key_points,
-                           saved_prompt=saved_prompt)
+                           concept=concept_obj, key_points=key_points)
 
 
 # --- Guiones -----------------------------------------------------------------
@@ -1669,8 +1623,6 @@ def scripts(project_id):
         concept_obj = fetch_optional_dict(conn, "SELECT * FROM concept WHERE project_id=?", (project_id,))
         long_s = get_script(project_id, "long")
         short_s = get_script(project_id, "short")
-    saved_long = get_saved_prompt(project_id, "script_long")
-    saved_short = get_saved_prompt(project_id, "script_short")
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1680,20 +1632,12 @@ def scripts(project_id):
                 flash("Necesitas un concepto antes de generar el guion", "error")
                 return redirect(url_for("concept", project_id=project_id))
             sys_p, user_p = build_script_prompt(project, profile, research_obj, concept_obj, stype)
-            save_stage_prompt(project_id, f"script_{stype}", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], f"script_{stype}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template("scripts.html", project=project, profile=profile,
                                    long_s=long_s, short_s=short_s,
                                    generated=generated, gen_type=stype,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_long=saved_long, saved_short=saved_short)
-        elif action == "save_prompt" and stype in ("long", "short"):
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, f"script_{stype}", sys_p, user_p)
-                flash(f"Prompt de guion {stype} guardado en el proyecto", "ok")
-            return redirect(url_for("scripts", project_id=project_id))
+                                   sys_prompt=sys_p, user_prompt=user_p)
         elif action == "save" and stype in ("long", "short"):
             text = request.form.get("text", "").strip()
             if text:
@@ -1729,16 +1673,11 @@ def scripts(project_id):
                         ))
                     conn.execute("UPDATE projects SET status='scripts', updated_at=? WHERE id=?",
                                  (now_iso(), project_id))
-                _ensure_stage_prompt(
-                    project_id, f"script_{stype}", project, profile,
-                    {"research": research_obj, "concept": concept_obj},
-                )
                 flash(f"Guion {stype} guardado", "ok")
             return redirect(url_for("scripts", project_id=project_id))
 
     return render_template("scripts.html", project=project, profile=profile,
-                           long_s=long_s, short_s=short_s,
-                           saved_long=saved_long, saved_short=saved_short)
+                           long_s=long_s, short_s=short_s)
 
 
 # --- Escenas -----------------------------------------------------------------
@@ -1781,21 +1720,13 @@ def scenes(project_id):
                 flash("Selecciona un guion", "error")
                 return redirect(url_for("scenes", project_id=project_id))
             sys_p, user_p = build_scenes_prompt(project, profile, script)
-            save_stage_prompt(project_id, "scenes", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], "scenes", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template("scenes.html", project=project, profile=profile,
                                    scripts=scripts_rows, scenes=scenes_rows,
                                    generated=generated, gen_script_id=script_id,
                                    sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_prompt=True,
                                    active_script_id=script_id)
-        elif action == "save_prompt":
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, "scenes", sys_p, user_p)
-                flash("Prompt de escenas guardado en el proyecto", "ok")
-            return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
         elif action == "save":
             text = request.form.get("text", "").strip()
             script_id = request.form.get("script_id") or active_script_id
@@ -1843,13 +1774,6 @@ def scenes(project_id):
                         ))
                     conn.execute("UPDATE projects SET status='scenes', updated_at=? WHERE id=?",
                                   (now_iso(), project_id))
-                # Auto-guardar prompt de escenas usando el guion largo como referencia
-                long_script = get_script(project_id, "long") or get_script(project_id, "short")
-                if long_script:
-                    _ensure_stage_prompt(
-                        project_id, "scenes", project, profile,
-                        {"script": long_script},
-                    )
                 flash(f"Guardadas {len(parsed)} escenas del guion seleccionado", "ok")
             return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
         elif action == "delete":
@@ -1858,10 +1782,8 @@ def scenes(project_id):
                 conn.execute("DELETE FROM scenes WHERE id=?", (scene_id,))
             return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
 
-    saved_prompt = get_saved_prompt(project_id, "scenes")
     return render_template("scenes.html", project=project, profile=profile,
                            scripts=scripts_rows, scenes=scenes_rows,
-                           saved_prompt=saved_prompt,
                            active_script_id=active_script_id)
 
 
@@ -1893,23 +1815,13 @@ def metadata(project_id):
                 flash("Selecciona un guion", "error")
                 return redirect(url_for("metadata", project_id=project_id))
             sys_p, user_p = build_metadata_prompt(project, profile, script, platform)
-            save_stage_prompt(project_id, f"metadata_{platform}", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], f"metadata_{platform}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            saved_yt = get_saved_prompt(project_id, "metadata_youtube")
-            saved_sh = get_saved_prompt(project_id, "metadata_shorts")
             return render_template("metadata.html", project=project, profile=profile,
                                    scripts=scripts_rows, meta_by_platform=meta_by_platform,
                                    generated=generated, gen_platform=platform,
                                    gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_yt=saved_yt, saved_sh=saved_sh)
-        elif action == "save_prompt" and platform in ("youtube", "shorts"):
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, f"metadata_{platform}", sys_p, user_p)
-                flash(f"Prompt de metadata {platform} guardado en el proyecto", "ok")
-            return redirect(url_for("metadata", project_id=project_id))
+                                   sys_prompt=sys_p, user_prompt=user_p)
         elif action == "save" and platform in ("youtube", "shorts"):
             text = request.form.get("text", "").strip()
             if text:
@@ -1943,18 +1855,6 @@ def metadata(project_id):
                         """, (project_id, platform, *fields, now_iso()))
                     conn.execute("UPDATE projects SET status='metadata', updated_at=? WHERE id=?",
                                  (now_iso(), project_id))
-                # Resolver script (para el prompt): preferir el enviado en el form,
-                # si no, usar el guion largo o corto del proyecto.
-                script = None
-                sid = request.form.get("script_id")
-                if sid:
-                    script = next((s for s in scripts_rows if str(s["id"]) == str(sid)), None)
-                if not script:
-                    script = get_script(project_id, "long") or get_script(project_id, "short")
-                _ensure_stage_prompt(
-                    project_id, f"metadata_{platform}", project, profile,
-                    {"script": script or {}},
-                )
                 flash(f"Metadata {platform} guardada", "ok")
             return redirect(url_for("metadata", project_id=project_id))
 
@@ -1964,11 +1864,8 @@ def metadata(project_id):
         m["tags_list"] = json.loads(m.get("tags") or "[]")
         m["hashtags_list"] = json.loads(m.get("hashtags") or "[]")
         m["on_screen_list"] = json.loads(m.get("on_screen_text") or "[]")
-    saved_yt = get_saved_prompt(project_id, "metadata_youtube")
-    saved_sh = get_saved_prompt(project_id, "metadata_shorts")
     return render_template("metadata.html", project=project, profile=profile,
-                           scripts=scripts_rows, meta_by_platform=meta_by_platform,
-                           saved_yt=saved_yt, saved_sh=saved_sh)
+                           scripts=scripts_rows, meta_by_platform=meta_by_platform)
 
 
 # --- Miniaturas --------------------------------------------------------------
@@ -1986,8 +1883,6 @@ def thumbnails(project_id):
         ).fetchall()]
 
     thumb_by_type = {t["script_type"]: t for t in thumb_rows}
-    saved_long = get_saved_prompt(project_id, "thumbnail_long")
-    saved_short = get_saved_prompt(project_id, "thumbnail_short")
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -2005,22 +1900,14 @@ def thumbnails(project_id):
                 flash("Selecciona un guion", "error")
                 return redirect(url_for("thumbnails", project_id=project_id))
             sys_p, user_p = build_thumbnail_prompt(project, profile, script, script_type)
-            save_stage_prompt(project_id, f"thumbnail_{script_type}", sys_p, user_p)
+            save_profile_prompt(project["profile_id"], f"thumbnail_{script_type}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template("thumbnails.html", project=project, profile=profile,
                                    scripts=scripts_rows,
                                    thumb_by_type=thumb_by_type,
                                    generated=generated, gen_type=script_type,
                                    gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_long=saved_long, saved_short=saved_short)
-        elif action == "save_prompt":
-            sys_p = request.form.get("sys_prompt", "").strip()
-            user_p = request.form.get("user_prompt", "").strip()
-            if sys_p and user_p:
-                save_stage_prompt(project_id, f"thumbnail_{script_type}", sys_p, user_p)
-                flash(f"Prompt de miniatura {script_type} guardado", "ok")
-            return redirect(url_for("thumbnails", project_id=project_id))
+                                   sys_prompt=sys_p, user_prompt=user_p)
         elif action == "save":
             text = request.form.get("text", "").strip()
             if text:
@@ -2050,21 +1937,11 @@ def thumbnails(project_id):
                         "UPDATE projects SET status='thumbnails', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
                     )
-                # Auto-guardar el prompt canónico de la etapa.
-                script = next(
-                    (s for s in scripts_rows if s["type"] == script_type), None,
-                )
-                if script:
-                    _ensure_stage_prompt(
-                        project_id, f"thumbnail_{script_type}", project, profile,
-                        {"script": script},
-                    )
                 flash(f"Miniatura {script_type} guardada", "ok")
             return redirect(url_for("thumbnails", project_id=project_id))
 
     return render_template("thumbnails.html", project=project, profile=profile,
-                           scripts=scripts_rows, thumb_by_type=thumb_by_type,
-                           saved_long=saved_long, saved_short=saved_short)
+                           scripts=scripts_rows, thumb_by_type=thumb_by_type)
 
 
 # --- QC ----------------------------------------------------------------------
@@ -2298,7 +2175,7 @@ def export(project_id):
                     f.write("\n```\n")
 
         # 07_prompts_usados.md
-        stage_prompts = list_saved_prompts(project_id)
+        stage_prompts = list_profile_prompts(project["profile_id"])
         if stage_prompts:
             stage_labels = {
                 "research": "Investigación",
@@ -2534,6 +2411,8 @@ def inject_globals():
 # ---------------------------------------------------------------------------
 # Arranque
 # ---------------------------------------------------------------------------
+
+init_db()
 
 if __name__ == "__main__":
     import os
