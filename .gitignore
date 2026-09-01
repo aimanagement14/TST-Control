@@ -18,6 +18,7 @@ htmlcov/
 
 instance/
 *.db
+*.db.bak
 *.sqlite
 *.sqlite3
 workflow.db
