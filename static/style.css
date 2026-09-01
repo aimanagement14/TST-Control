@@ -811,25 +811,95 @@ select { appearance: none; background-image: none; cursor: pointer; }
 /* ==========================================================================
    Editor de grafo + runner
    Sala de montaje: integramos React Flow sin romper el tema.
+   Cada nodo es un fotograma; el canvas es la pantalla de control.
    ========================================================================== */
 
 .graph-page-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: minmax(0, 1fr) 360px;
     gap: 1rem;
     align-items: stretch;
 }
-.graph-page-grid.full { grid-template-columns: 1fr; }
+.graph-page-grid.full { grid-template-columns: minmax(0, 1fr); }
 
+/* ===== Lienzo ===== */
 .graph-root {
     width: 100%;
     border: 1px solid var(--line);
     border-radius: var(--r);
-    background: var(--slate);
+    background:
+        radial-gradient(ellipse at 50% 35%, rgba(240, 168, 60, .045), transparent 65%),
+        var(--slate);
     position: relative;
     overflow: hidden;
+    min-height: 520px;
+}
+.graph-root::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, transparent 0 23px, rgba(165, 177, 194, .025) 23px 24px),
+        repeating-linear-gradient(90deg, transparent 0 23px, rgba(165, 177, 194, .025) 23px 24px);
+    z-index: 0;
+}
+.graph-root .react-flow { position: relative; z-index: 1; }
+.graph-root .react-flow__background {
+    background-color: transparent !important;
 }
 
+/* ===== Toolbar dentro del lienzo ===== */
+.graph-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem;
+    background: rgba(17, 22, 33, .92);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow);
+}
+.graph-toolbar .btn {
+    padding: 6px 11px;
+    font-size: .74rem;
+}
+.graph-toolbar .sep {
+    width: 1px; height: 18px;
+    background: var(--line);
+    margin: 0 .15rem;
+}
+
+/* ===== Leyenda de estados ===== */
+.graph-legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .35rem .85rem;
+    align-items: center;
+    padding: .45rem .7rem;
+    background: rgba(17, 22, 33, .88);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    letter-spacing: .04em;
+    color: var(--paper-2);
+    max-width: 260px;
+}
+.graph-legend .legend-item { display: inline-flex; align-items: center; gap: .35rem; }
+.graph-legend .swatch {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--slate-3);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+}
+.graph-legend .swatch.is-running { background: var(--amber); }
+.graph-legend .swatch.is-ok      { background: var(--lock); }
+.graph-legend .swatch.is-error   { background: var(--alert); }
+.graph-legend .swatch.is-custom  { background: transparent; box-shadow: inset 0 0 0 1px dashed var(--paper-3); }
+
+/* ===== Aside / panel de edición ===== */
 .graph-aside {
     background: transparent;
     display: flex;
@@ -838,9 +908,301 @@ select { appearance: none; background-image: none; cursor: pointer; }
     min-width: 0;
 }
 .graph-aside .panel { margin: 0; }
-.graph-aside-panel { display: flex; flex-direction: column; gap: .6rem; }
+.graph-aside-panel {
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
 .graph-aside-panel .eyebrow { margin: 0; }
 
+.graph-aside-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--slate);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 1.1rem 1.15rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+.graph-aside-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+}
+.graph-aside-head .stage-num {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .14em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+.graph-aside-head h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    letter-spacing: .01em;
+}
+.graph-aside-head .node-key {
+    margin: 6px 0 0;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--paper-3);
+    letter-spacing: .04em;
+}
+.graph-aside-foot {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    padding-top: .9rem;
+    border-top: 1px solid var(--line);
+    background: rgba(10, 13, 19, .55);
+    margin: .4rem -1.15rem -1.15rem;
+    padding-left: 1.15rem;
+    padding-right: 1.15rem;
+    padding-bottom: .9rem;
+    border-radius: 0 0 var(--r) var(--r);
+}
+.graph-aside-empty {
+    background: var(--slate);
+    border: 1px dashed var(--line);
+    border-radius: var(--r);
+    padding: 1.5rem 1.25rem;
+    color: var(--paper-2);
+    text-align: center;
+}
+.graph-aside-empty p {
+    margin: 0;
+    font-size: .88rem;
+    color: var(--paper-3);
+}
+.graph-aside-empty .icon {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    line-height: 26px;
+    margin-bottom: .8rem;
+    color: var(--paper-3);
+    font-family: var(--font-mono);
+    font-size: .9rem;
+}
+
+/* ===== Nodos (fotogramas) ===== */
+.react-flow__node-prompt {
+    border: 1px solid var(--line);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .025), transparent 40%),
+        var(--slate-2);
+    color: var(--paper);
+    border-radius: var(--r);
+    font-family: var(--font-display);
+    min-width: 200px;
+    max-width: 240px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 8px 20px rgba(0, 0, 0, .25);
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease,
+        transform .18s ease;
+}
+.react-flow__node-prompt:hover {
+    border-color: var(--paper-3);
+}
+
+.react-flow__node-prompt.is-custom {
+    border-style: dashed;
+    border-color: var(--line);
+}
+.react-flow__node-prompt.is-custom:hover {
+    border-color: var(--paper-3);
+    border-style: solid;
+}
+
+.react-flow__node-prompt.is-running {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 1px rgba(240, 168, 60, .35), 0 8px 20px rgba(0, 0, 0, .25);
+}
+.react-flow__node-prompt.is-ok {
+    border-color: var(--lock);
+    box-shadow: 0 0 0 1px rgba(79, 191, 135, .25), 0 8px 20px rgba(0, 0, 0, .25);
+}
+.react-flow__node-prompt.is-error {
+    border-color: var(--alert);
+    box-shadow: 0 0 0 1px rgba(226, 85, 91, .3), 0 8px 20px rgba(0, 0, 0, .25);
+}
+
+.react-flow__node-prompt.selected {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 1px var(--amber), 0 8px 24px rgba(240, 168, 60, .18);
+}
+
+.node-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: 5px 10px 5px 7px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 13, 19, .55);
+}
+.node-strip .stage {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.node-strip .stage-num {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    color: var(--amber);
+    letter-spacing: .12em;
+}
+.node-strip .perf {
+    display: inline-block;
+    width: 5px; height: 12px;
+    background-image: linear-gradient(180deg, var(--void) 0 4px, transparent 4px 9px, var(--void) 9px);
+    background-size: 5px 12px;
+    background-repeat: no-repeat;
+    opacity: .55;
+}
+.node-strip .status-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--slate-3);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+    flex: 0 0 auto;
+}
+.react-flow__node-prompt.is-running .status-dot { background: var(--amber); animation: pulse 1.4s ease-in-out infinite; }
+.react-flow__node-prompt.is-ok      .status-dot { background: var(--lock); }
+.react-flow__node-prompt.is-error   .status-dot { background: var(--alert); }
+
+.node-body {
+    padding: .7rem .8rem .8rem;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+}
+.node-body .node-title {
+    font-size: .92rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: var(--paper);
+    line-height: 1.15;
+}
+.node-body .node-key {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    color: var(--paper-3);
+    letter-spacing: .04em;
+}
+.node-body .preview {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    color: var(--paper-2);
+    line-height: 1.45;
+    max-height: 2.9em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.node-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 .55rem .55rem;
+}
+.node-actions .node-delete {
+    font-size: .68rem;
+    padding: 3px 8px;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: .55; transform: scale(.85); }
+}
+
+/* ===== Handles ===== */
+.react-flow__handle {
+    width: 10px !important; height: 10px !important;
+    border: 1px solid var(--line) !important;
+    background: var(--slate-3) !important;
+    transition: background .15s ease, border-color .15s ease;
+}
+.react-flow__handle:hover {
+    background: var(--amber) !important;
+    border-color: var(--amber) !important;
+}
+
+/* ===== Edges ===== */
+.react-flow__edge-path {
+    stroke: var(--line);
+    stroke-width: 1.5;
+    transition: stroke .15s ease, stroke-width .15s ease;
+}
+.react-flow__edge.is-running .react-flow__edge-path,
+.react-flow__edge.animated .react-flow__edge-path {
+    stroke: var(--amber);
+    stroke-width: 1.8;
+    stroke-dasharray: 6 4;
+    animation: flow 1.1s linear infinite;
+}
+.react-flow__edge:hover .react-flow__edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--amber);
+    stroke-width: 2;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke-dasharray: none;
+}
+
+@keyframes flow {
+    to { stroke-dashoffset: -20; }
+}
+
+/* ===== MiniMap ===== */
+.react-flow__minimap {
+    background: rgba(17, 22, 33, .92) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: var(--r-sm) !important;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.react-flow__minimap-mask {
+    fill: rgba(10, 13, 19, .82) !important;
+    stroke: var(--amber) !important;
+    stroke-width: 1 !important;
+}
+
+/* ===== Controls ===== */
+.react-flow__controls {
+    background: rgba(17, 22, 33, .92) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: var(--r-sm) !important;
+    box-shadow: var(--shadow) !important;
+    overflow: hidden;
+}
+.react-flow__controls-button {
+    background: transparent !important;
+    color: var(--paper-2) !important;
+    border-bottom: 1px solid var(--line) !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+.react-flow__controls-button:last-child { border-bottom: 0 !important; }
+.react-flow__controls-button:hover {
+    background: var(--slate-3) !important;
+    color: var(--amber) !important;
+}
+.react-flow__controls-button svg { fill: currentColor !important; }
+
+/* ===== Output panel (solo runner) ===== */
 .run-output {
     margin-top: 1rem;
     background: var(--slate);
@@ -858,80 +1220,26 @@ select { appearance: none; background-image: none; cursor: pointer; }
     color: var(--paper-2);
     font-family: var(--font-mono);
     font-size: .8rem;
-    line-height: 1.5;
+    line-height: 1.55;
     white-space: pre-wrap;
     overflow: auto;
-    max-height: 320px;
+    max-height: 360px;
 }
 
-.react-flow__node-prompt {
-    border: 1px solid var(--line);
-    background: var(--slate-2);
-    color: var(--paper);
-    padding: .6rem .8rem;
-    border-radius: var(--r);
-    font-family: var(--font-display);
-    font-size: .85rem;
-    min-width: 160px;
-    transition: border-color .15s ease, background .15s ease;
+/* ===== Responsive ===== */
+@media (max-width: 1080px) {
+    .graph-page-grid {
+        grid-template-columns: 1fr;
+    }
+    .graph-aside {
+        position: sticky;
+        bottom: 12px;
+        z-index: 30;
+    }
+    .graph-legend { display: none; }
 }
-.react-flow__node-prompt.is-running { border-color: var(--amber); }
-.react-flow__node-prompt.is-ok      { border-color: var(--lock); }
-.react-flow__node-prompt.is-error   { border-color: var(--alert); }
-
-.react-flow__node-prompt .node-title {
-    display: flex; align-items: center; gap: .3rem;
-    font-weight: 600; letter-spacing: .02em;
+@media (max-width: 720px) {
+    .graph-root { min-height: 420px; }
+    .react-flow__node-prompt { min-width: 170px; }
+    .graph-toolbar .btn-label { display: none; }
 }
-.react-flow__node-prompt .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: .4rem;
-    background: var(--slate-3);
-}
-.react-flow__node-prompt.is-running .status-dot { background: var(--amber); }
-.react-flow__node-prompt.is-ok      .status-dot { background: var(--lock); }
-.react-flow__node-prompt.is-error   .status-dot { background: var(--alert); }
-
-.react-flow__node-prompt .preview {
-    font-family: var(--font-mono);
-    font-size: .75rem;
-    color: var(--paper-3);
-    margin-top: .4rem;
-    max-height: 60px;
-    overflow: hidden;
-}
-.react-flow__node-prompt .node-delete {
-    margin-top: .5rem;
-    font-size: .7rem;
-    padding: .15rem .4rem;
-}
-
-.react-flow__handle {
-    width: 8px !important; height: 8px !important;
-    border: 1px solid var(--line) !important;
-}
-
-.react-flow__minimap {
-    background: var(--slate) !important;
-    border: 1px solid var(--line) !important;
-    border-radius: var(--r-sm) !important;
-}
-.react-flow__controls {
-    background: var(--slate-2) !important;
-    border: 1px solid var(--line) !important;
-    border-radius: var(--r-sm) !important;
-    box-shadow: none !important;
-}
-.react-flow__controls-button {
-    background: transparent !important;
-    color: var(--paper-2) !important;
-    border-bottom: 1px solid var(--line) !important;
-}
-.react-flow__controls-button:hover {
-    background: var(--slate-3) !important;
-    color: var(--paper) !important;
-}
-
-.page-head-actions { display: flex; gap: .6rem; align-items: center; }

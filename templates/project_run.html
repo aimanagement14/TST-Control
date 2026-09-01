@@ -17,11 +17,11 @@
 </section>
 
 <div class="graph-page-grid">
-    <div id="graph-root" class="graph-root" style="height: calc(100vh - 240px);"></div>
+    <div id="graph-root" class="graph-root"></div>
     <aside id="graph-aside" class="graph-aside"></aside>
 </div>
 
-<section id="run-output" class="run-output"></section>
+<section id="run-output" class="run-output" hidden></section>
 
 <script>
     window.__GRAPH_DATA__ = {{ graph_data | tojson }};
