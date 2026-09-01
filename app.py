@@ -22,7 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, jsonify, send_file, send_from_directory, abort, session
+    flash, jsonify, send_file, send_from_directory, abort, session, g,
+    has_app_context,
 )
 
 # ---------------------------------------------------------------------------
@@ -44,7 +45,9 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 app = Flask(__name__)
 app.secret_key = CONFIG["app"]["secret_key"]
 app.config["JSON_AS_ASCII"] = False
-app.config["TEMPLATES_AUTO_RELOAD"] = True
+# TEMPLATES_AUTO_RELOAD: si no se fija, Flask lo iguala a `app.debug` —
+# True en dev (autoreload al editar plantillas), False en prod (Waitress)
+# para evitar el coste del filesystem check en cada render.
 
 
 @app.route("/favicon.ico")
@@ -247,16 +250,45 @@ CREATE TABLE IF NOT EXISTS node_executions (
 
 
 def get_db():
-    """Obtiene una conexión nueva a la base de datos."""
+    """Obtiene una conexión a la base de datos.
+
+    Dentro de un contexto de aplicación (petición, CLI) la conexión se
+    cachea en ``flask.g`` y se cierra automáticamente por el teardown
+    ``close_db``. Fuera de contexto (tests, scripts) abre una conexión
+    transitoria que el caller cierra con ``with``.
+    """
+    if has_app_context():
+        if "db" not in g:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys = ON")
+        return g.db
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
+@app.teardown_appcontext
+def close_db(exception=None):
+    """Cierra la conexión cacheada en ``g`` al final de cada petición."""
+    db = g.pop("db", None)
+    if db is not None:
+        if exception is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        db.close()
+
+
 def init_db():
     """Inicializa el esquema y los datos por defecto."""
     with get_db() as conn:
+        # WAL + busy_timeout reducen errores "database is locked" cuando
+        # el runner ejecuta varios nodos en paralelo (lectores no bloquean).
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
         conn.executescript(SCHEMA)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS _schema_migrations "
@@ -516,12 +548,13 @@ def fetch_graph_nodes(profile_id: int | None) -> list[dict]:
 
 
 def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
-    """Devuelve aristas como [{id, source, target}] para el frontend."""
+    """Devuelve aristas como [{id, source, target}] para el frontend.
+
+    Solo emite aristas cuyos dos extremos existen como nodo del perfil,
+    para evitar conexiones huérfanas que React Flow renderiza con warning.
+    """
     edges: list[dict] = []
     seen: set[tuple[str, str]] = set()
-    for src, tgt in DEFAULT_EDGES:
-        edges.append({"id": f"e_{src}_{tgt}", "source": src, "target": tgt})
-        seen.add((src, tgt))
     rows: list[dict] = []
     if profile_id:
         with get_db() as conn:
@@ -530,6 +563,12 @@ def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
                 "WHERE profile_id=?",
                 (profile_id,),
             ).fetchall()]
+    valid_keys: set[str] = {r["node_key"] for r in rows}
+    for src, tgt in DEFAULT_EDGES:
+        if src not in valid_keys or tgt not in valid_keys:
+            continue
+        edges.append({"id": f"e_{src}_{tgt}", "source": src, "target": tgt})
+        seen.add((src, tgt))
     for r in rows:
         try:
             inputs = json.loads(r["inputs_json"] or "[]")
@@ -538,7 +577,7 @@ def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
         if not isinstance(inputs, list):
             inputs = []
         for i, src in enumerate(inputs):
-            if not src:
+            if not src or src not in valid_keys:
                 continue
             key = (str(src), r["node_key"])
             if key in seen:
@@ -1016,13 +1055,13 @@ def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def count_words(text):
+def count_words(text: str | None) -> int:
     if not text:
         return 0
     return len(re.findall(r"\b\w+\b", text, flags=re.UNICODE))
 
 
-def estimate_duration_seconds(text, wpm=150):
+def estimate_duration_seconds(text: str | None, wpm: int = 150) -> int:
     """Estima la duración de narración en segundos según palabras por minuto."""
     words = count_words(text)
     if wpm <= 0:
@@ -1183,11 +1222,12 @@ def pipeline_view(project, current=None):
     qc_done = project.get("status") == "ready"
     if not qc_done:
         with get_db() as conn:
-            n_qc = conn.execute(
-                "SELECT COUNT(*) AS n FROM qc_issues WHERE project_id=?",
+            n_unresolved = conn.execute(
+                "SELECT COUNT(*) AS n FROM qc_issues "
+                "WHERE project_id=? AND resolved=0",
                 (project["id"],),
             ).fetchone()["n"]
-            qc_done = n_qc > 0
+            qc_done = n_unresolved > 0
     stages["qc"] = qc_done
 
     cells, pending = [], None
@@ -1570,7 +1610,7 @@ def llm_output_is_manual(text):
 # Parsers
 # ---------------------------------------------------------------------------
 
-def parse_research(text):
+def parse_research(text: str) -> dict[str, str | list[str]]:
     """Parsea una respuesta de investigación en el formato estructurado."""
     sections = {
         "content": "",
@@ -1629,7 +1669,7 @@ def parse_research(text):
     return sections
 
 
-def parse_concept(text):
+def parse_concept(text: str) -> dict[str, str | list[str]]:
     sections = {
         "angle": "",
         "thesis": "",
@@ -1686,7 +1726,7 @@ def parse_concept(text):
     return sections
 
 
-def parse_script(text, script_type):
+def parse_script(text: str, script_type: str) -> dict[str, str]:
     """Parsea un guion largo o corto en sus secciones."""
     out = {
         "title": "",
@@ -1742,7 +1782,7 @@ def parse_script(text, script_type):
     return out
 
 
-def parse_scenes_json(text):
+def parse_scenes_json(text: str) -> list[dict] | None:
     """Intenta extraer un JSON de una respuesta que podría tener prosa alrededor."""
     # Busca el primer [ y el último ]
     start = text.find("[")
@@ -1766,7 +1806,7 @@ def parse_scenes_json(text):
     return None
 
 
-def parse_scenes_tst(text):
+def parse_scenes_tst(text: str) -> list[dict]:
     """Parsea la salida TST Scene Director en bloques ESCENA N / TEXTO AUDIO / IMAGEN.
 
     Acepta líneas adicionales entre los bloques, líneas en blanco, y valores
@@ -1809,7 +1849,7 @@ def parse_scenes_tst(text):
     return scenes
 
 
-def parse_scenes(text):
+def parse_scenes(text: str) -> list[dict] | None:
     """Parsea una respuesta de escenas: intenta primero TST, luego JSON."""
     tst = parse_scenes_tst(text)
     if tst:
@@ -1820,7 +1860,7 @@ def parse_scenes(text):
     return None
 
 
-def parse_prompt_json(text):
+def parse_prompt_json(text: str) -> dict | None:
     """Intenta extraer el JSON de un prompt."""
     m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.DOTALL)
     if m:
@@ -1838,7 +1878,7 @@ def parse_prompt_json(text):
     return None
 
 
-def parse_metadata(text, platform):
+def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
     out = {
         "titles": [],
         "description": "",
@@ -1900,7 +1940,7 @@ def parse_metadata(text, platform):
     return out
 
 
-def parse_thumbnail(text, script_type):
+def parse_thumbnail(text: str, script_type: str) -> dict[str, str]:
     """Extrae el bloque `## MINIATURA` de la respuesta del LLM.
 
     Devuelve `{"prompt": "..."}` con todo el contenido bajo `## MINIATURA`
@@ -1937,9 +1977,12 @@ def parse_thumbnail(text, script_type):
 # QC
 # ---------------------------------------------------------------------------
 
-def run_qc(project_id):
-    """Ejecuta todos los checks y devuelve la lista de issues."""
-    issues = []
+def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
+    """Ejecuta todos los checks y devuelve la lista de issues.
+
+    Cada issue es una tupla ``(stage, severity, message, field)``.
+    """
+    issues: list[tuple[str, str, str, str]] = []
     with get_db() as conn:
         project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
         if not project:
@@ -3189,11 +3232,10 @@ def inject_globals():
 # Arranque
 # ---------------------------------------------------------------------------
 
-init_db()
+with app.app_context():
+    init_db()
 
 if __name__ == "__main__":
-    import os
-    import sys
     print("=" * 60)
     print(f"  {CONFIG['app']['name']} — {CONFIG['app']['tagline']}")
     print(f"  v{CONFIG['app']['version']}")

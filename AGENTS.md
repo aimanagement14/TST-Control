@@ -4,18 +4,67 @@ Guía para agentes de IA que trabajan en este proyecto.
 
 ## Convenciones
 
-- Sigue las convenciones del repositorio (TypeScript estricto, sin `any`).
-- Mantén las funciones pequeñas y con responsabilidad única.
-- No añadas dependencias innecesarias.
-- Documenta únicamente cuando aporte valor.
+- Stack: **Python 3.14 + Flask 3 + Jinja2 + SQLite** (sin ORM), frontend sin build
+  step (`static/app.js`, `static/graph.js`, importmap a `esm.sh`).
+- Type hints donde aporten valor. Evitar `Any` salvo en bordes justificados
+  (parsing LLM, JSON externo).
+- Funciones pequeñas y con responsabilidad única. Un módulo = una responsabilidad.
+- Sin dependencias nuevas sin motivo: `requirements.txt` cubre Flask + waitress.
+- Documentar solo cuando aporte valor: nada de docstrings vacíos ni comentarios
+  redundantes.
+- UI y copy en español por defecto (configurable por preset LLM).
 
 ## Estructura
 
-- Lógica de negocio en servicios.
-- Comandos o entrypoints como capa fina.
-- Errores tipados con clases específicas del proyecto.
-- Tests junto al código que validan.
+- `app.py` — monolito deliberado: rutas + servicios de dominio + parsers + QC.
+  Las funciones puras de parsing/QC viven a nivel de módulo y se cubren con
+  `test_core.py`.
+- `templates/` — Jinja2. `_macros.html`, `_rail.html`, `_stepper.html` para
+  piezas reutilizables; el resto son páginas por etapa.
+- `static/` — JS/CSS sin bundler. `app.js` para chrome general, `graph.js`
+  para el editor de grafo (React Flow v12 por importmap).
+- `config.json` — única fuente para prompts SYS/USER, presets LLM, umbrales
+  QC y tema visual. No se mueve a YAML/ENV sin motivo.
+- `workflow.db` — SQLite. Migraciones controladas por `_schema_migrations`
+  (idempotentes).
+- `test_core.py` — parsers, QC, utilidades, prompts por perfil, CRUD de grafo.
+- `verify_fosiles.py` — verificación end-to-end con datos simulados de LLM
+  (`PROJECT_ID = 1`, crea proyecto si no existe).
+- `docs/ARCHITECTURE.md` y `docs/DECISIONS.md` — las decisiones técnicas y
+  de arquitectura viven ahí, no en comentarios sueltos.
+
+## Backend
+
+- `get_db()` cachea la conexión en `flask.g` durante el ciclo de petición;
+  `close_db` (teardown) la cierra. Fuera de contexto (CLI, tests) abre
+  conexión transitoria.
+- `init_db()` activa `PRAGMA journal_mode=WAL` y `busy_timeout=5000` para
+  tolerar clicks rápidos en el runner del grafo.
+- `call_llm()` cae a modo manual si la API falla o no hay key configurada;
+  nunca deja la app sin respuesta.
+- Los prompts SYS+USER viven por perfil (`profile_prompts`), leídos vía
+  `resolve_stage_prompt()` con fallback a `config.json`. Editar un prompt en
+  el editor de grafo del perfil cambia el comportamiento de todos sus
+  proyectos.
+- QC engine: `error` bloquea la transición a `ready`; `warning` e `info` no.
+- Exportación a ZIP en `projects/<safe_name>_<id>.zip` con contrato fijo
+  (`00_RESUMEN.md`, `01_investigacion.md`, …, `08_paquete_completo.json`).
+
+## Frontend
+
+- Sin build step. Cambios en `static/` se ven al recargar.
+- JS moderno (módulos ES, `fetch`, `URLSearchParams`). No jQuery, no Vue/Svelte.
+- Variables CSS del tema (`--bg`, `--accent`, etc.) en `static/style.css`;
+  no hardcodear colores en componentes.
 
 ## Validación
 
-Antes de cerrar un cambio ejecuta los scripts de `package.json` y los tests disponibles.
+Antes de cerrar un cambio ejecuta, desde la raíz:
+
+```bash
+python test_core.py
+python verify_fosiles.py
+```
+
+Ambos deben pasar en verde. Si añades rutas, prompts, parsers, una etapa o
+una tabla, extiende los tests correspondientes — no los rompas.

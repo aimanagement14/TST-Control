@@ -13,6 +13,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import app
 
+# Forzar UTF-8 en stdout/stderr para que los caracteres (✓, á, ó, →) no rompan
+# en consolas Windows con cp1252 por defecto (Python 3.14 ya no cambia la
+# codificación solo por estar en modo -X utf8).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 
 # ==========================================================================
 # Tests de parsers
