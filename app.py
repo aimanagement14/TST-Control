@@ -467,10 +467,23 @@ def get_or_create_fixed_graph_nodes(profile_id: int | None) -> list[dict]:
         ).fetchall()]
         existing_keys = {row["node_key"] for row in existing}
         now = now_iso()
+        for row in existing:
+            if not row["sys_prompt"] or not row["user_prompt"]:
+                default_sys = CONFIG["prompts"].get(row["node_key"], {}).get("system", "")
+                default_user = CONFIG["prompts"].get(row["node_key"], {}).get("format", "")
+                if default_sys and default_user:
+                    conn.execute(
+                        "UPDATE profile_graph_nodes "
+                        "SET sys_prompt=?, user_prompt=?, updated_at=? "
+                        "WHERE id=?",
+                        (default_sys, default_user, now, row["id"]),
+                    )
         for key in KNOWN_FIXED_NODE_KEYS:
             if key in existing_keys:
                 continue
             x, y = DEFAULT_NODE_POSITIONS.get(key, (0.0, 0.0))
+            default_sys = CONFIG["prompts"].get(key, {}).get("system", "")
+            default_user = CONFIG["prompts"].get(key, {}).get("format", "")
             conn.execute("""
                 INSERT INTO profile_graph_nodes
                     (profile_id, node_key, label, sys_prompt, user_prompt,
@@ -480,7 +493,7 @@ def get_or_create_fixed_graph_nodes(profile_id: int | None) -> list[dict]:
             """, (
                 profile_id, key,
                 DEFAULT_NODE_LABELS.get(key, key),
-                "", "", "[]", x, y,
+                default_sys, default_user, "[]", x, y,
                 KNOWN_FIXED_NODE_KEYS.index(key),
                 now,
             ))
