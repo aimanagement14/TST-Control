@@ -653,6 +653,166 @@ def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
 
 
 # ==========================================================================
+# Tests del graph CRUD y ejecutor unificado
+# ==========================================================================
+
+def _get_default_profile_id(tmp_path):
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        row = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()
+    return row["id"]
+
+
+def test_get_or_create_fixed_graph_nodes(tmp_path):
+    """Crea las 9 filas fijas y no duplica en llamadas sucesivas."""
+    pid = _get_default_profile_id(tmp_path)
+    rows1 = app.get_or_create_fixed_graph_nodes(pid)
+    assert len(rows1) == 9, f"esperaba 9, hay {len(rows1)}"
+    keys = {r["node_key"] for r in rows1}
+    assert keys == set(app.KNOWN_FIXED_NODE_KEYS), keys
+    rows2 = app.get_or_create_fixed_graph_nodes(pid)
+    assert len(rows2) == 9, "segunda llamada no debe duplicar"
+    keys2 = {r["node_key"] for r in rows2}
+    assert keys2 == set(app.KNOWN_FIXED_NODE_KEYS)
+    for r in rows2:
+        assert r["is_fixed"] == 1
+        assert r["position_x"] is not None
+        assert r["position_y"] is not None
+    print("  ✓ get_or_create_fixed_graph_nodes crea 9 filas únicas")
+
+
+def test_save_graph_node_and_delete(tmp_path):
+    """Custom node: save, update, delete. Fijos no se pueden borrar."""
+    pid = _get_default_profile_id(tmp_path)
+    saved = app.save_graph_node(pid, "custom_a", "Custom A", "sys", "user",
+                                "[]", 100, 200, False)
+    assert saved["node_key"] == "custom_a"
+    assert saved["is_fixed"] == 0
+    assert saved["label"] == "Custom A"
+    assert saved["position_x"] == 100
+    assert saved["position_y"] == 200
+    saved2 = app.save_graph_node(pid, "custom_a", "Custom A v2", "sys2",
+                                 "user2", '["research"]', 150, 250, False)
+    assert saved2["label"] == "Custom A v2"
+    assert saved2["position_x"] == 150
+    assert saved2["position_y"] == 250
+    deleted = app.delete_graph_node(pid, "custom_a")
+    assert deleted is True
+    deleted_again = app.delete_graph_node(pid, "custom_a")
+    assert deleted_again is False
+    app.get_or_create_fixed_graph_nodes(pid)
+    deleted_fixed = app.delete_graph_node(pid, "research")
+    assert deleted_fixed is False
+    with app.get_db() as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM profile_graph_nodes "
+            "WHERE profile_id=? AND node_key='research'",
+            (pid,),
+        ).fetchone()["n"]
+    assert n == 1, "el nodo fijo 'research' debe seguir existiendo"
+    print("  ✓ save_graph_node + delete (rechaza fijos)")
+
+
+def test_execute_graph_node_fixed_research(tmp_path):
+    """Ejecuta research en modo manual: persiste node_executions."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Test', 'Tema de prueba', ?, 'research',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+    original_provider = app.CONFIG["llm"]["provider"]
+    app.CONFIG["llm"]["provider"] = "manual"
+    try:
+        result = app.execute_graph_node(1, "research")
+    finally:
+        app.CONFIG["llm"]["provider"] = original_provider
+    assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
+    assert result.get("status") == "ok"
+    assert "Tema de prueba" in result.get("output", ""), \
+        f"manual mode debe contener el tema: {result.get('output')[:200]}"
+    with app.get_db() as conn:
+        row = conn.execute(
+            "SELECT status, output FROM node_executions "
+            "WHERE project_id=1 AND node_key='research' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    assert row is not None, "node_executions no escritas"
+    assert row["status"] == "ok"
+    assert "Tema de prueba" in row["output"]
+    print("  ✓ execute_graph_node (research fixed, manual mode)")
+
+
+def test_execute_graph_node_custom(tmp_path):
+    """Ejecuta un nodo custom con interpolación de inputs."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Custom Test', 'Tema', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+    app.save_graph_node(pid, "my_node", "My Node", "SYS_PROMPT",
+                        "USER con {{ inputs.research }} metido",
+                        '["research"]', 0, 0, False)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO node_executions
+                (project_id, node_key, output, status, created_at)
+            VALUES (1, 'research', 'HECHOS IMPORTANTES', 'ok', '2025-01-01')
+        """)
+    original_provider = app.CONFIG["llm"]["provider"]
+    app.CONFIG["llm"]["provider"] = "manual"
+    try:
+        result = app.execute_graph_node(1, "my_node")
+    finally:
+        app.CONFIG["llm"]["provider"] = original_provider
+    assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
+    with app.get_db() as conn:
+        row = conn.execute(
+            "SELECT status, output FROM node_executions "
+            "WHERE project_id=1 AND node_key='my_node' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    assert row["status"] == "ok"
+    assert "USER con" in row["output"], row["output"]
+    assert "HECHOS IMPORTANTES" in row["output"], \
+        "placeholder {{ inputs.research }} debe haberse interpolado"
+    print("  ✓ execute_graph_node (custom con inputs interpolados)")
+
+
+def test_update_graph_layout(tmp_path):
+    """Persiste las posiciones enviadas."""
+    pid = _get_default_profile_id(tmp_path)
+    app.get_or_create_fixed_graph_nodes(pid)
+    nodes_data = [
+        {"node_key": "research", "position_x": 10.0, "position_y": 20.0},
+        {"node_key": "concept", "position_x": 300.0, "position_y": 40.0},
+        {"node_key": "scenes", "position_x": 700.0, "position_y": 90.0},
+    ]
+    updated = app.update_graph_layout(pid, nodes_data)
+    assert updated == 3, f"esperaba 3 updates, hay {updated}"
+    with app.get_db() as conn:
+        for nd in nodes_data:
+            row = conn.execute(
+                "SELECT position_x, position_y FROM profile_graph_nodes "
+                "WHERE profile_id=? AND node_key=?",
+                (pid, nd["node_key"]),
+            ).fetchone()
+            assert row is not None
+            assert row["position_x"] == nd["position_x"], nd["node_key"]
+            assert row["position_y"] == nd["position_y"], nd["node_key"]
+    empty = app.update_graph_layout(pid, [])
+    assert empty == 0
+    print("  ✓ update_graph_layout persiste posiciones")
+
+
+# ==========================================================================
 # Runner
 # ==========================================================================
 
@@ -706,6 +866,18 @@ def main():
                  "save_profile_prompt_upsert")
     _run_qc_test(test_migration_copies_stage_prompts_to_profile_prompts,
                  "migration_copies_stage_prompts_to_profile_prompts")
+
+    print("\n=== TESTS DE GRAPH CRUD ===")
+    _run_qc_test(test_get_or_create_fixed_graph_nodes,
+                 "get_or_create_fixed_graph_nodes")
+    _run_qc_test(test_save_graph_node_and_delete,
+                 "save_graph_node_and_delete")
+    _run_qc_test(test_update_graph_layout,
+                 "update_graph_layout")
+    _run_qc_test(test_execute_graph_node_fixed_research,
+                 "execute_graph_node_fixed_research")
+    _run_qc_test(test_execute_graph_node_custom,
+                 "execute_graph_node_custom")
 
     print("\n✅ Todos los tests pasaron\n")
 
