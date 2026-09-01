@@ -35,3 +35,6 @@ Thumbs.db
 .playwright-mcp/
 graph-editor-*.png
 project-run-*.png
+
+# Personal setup helper (not part of the shared codebase)
+scripts/setup.ps1
