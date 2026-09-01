@@ -20,6 +20,7 @@
                     {% if p.is_default %}<span class="chip chip-done">Por defecto</span>{% endif %}
                 </h2>
                 <div class="actions tight">
+                    <a class="btn btn-ghost btn-sm" href="/profiles/{{ p.id }}/graph">Abrir editor de grafo</a>
                     {% if not p.is_default %}
                     <form method="post" class="inline-form">
                         <input type="hidden" name="action" value="set_default">

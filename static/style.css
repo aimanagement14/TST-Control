@@ -807,3 +807,131 @@ select { appearance: none; background-image: none; cursor: pointer; }
         scroll-behavior: auto !important;
     }
 }
+
+/* ==========================================================================
+   Editor de grafo + runner
+   Sala de montaje: integramos React Flow sin romper el tema.
+   ========================================================================== */
+
+.graph-page-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1rem;
+    align-items: stretch;
+}
+.graph-page-grid.full { grid-template-columns: 1fr; }
+
+.graph-root {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--slate);
+    position: relative;
+    overflow: hidden;
+}
+
+.graph-aside {
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+.graph-aside .panel { margin: 0; }
+.graph-aside-panel { display: flex; flex-direction: column; gap: .6rem; }
+.graph-aside-panel .eyebrow { margin: 0; }
+
+.run-output {
+    margin-top: 1rem;
+    background: var(--slate);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 1rem;
+}
+.run-output .panel-head { margin: 0 0 .6rem 0; padding: 0; border: 0; }
+.run-output-pre {
+    margin: 0;
+    padding: .8rem;
+    background: var(--void);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--paper-2);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow: auto;
+    max-height: 320px;
+}
+
+.react-flow__node-prompt {
+    border: 1px solid var(--line);
+    background: var(--slate-2);
+    color: var(--paper);
+    padding: .6rem .8rem;
+    border-radius: var(--r);
+    font-family: var(--font-display);
+    font-size: .85rem;
+    min-width: 160px;
+    transition: border-color .15s ease, background .15s ease;
+}
+.react-flow__node-prompt.is-running { border-color: var(--amber); }
+.react-flow__node-prompt.is-ok      { border-color: var(--lock); }
+.react-flow__node-prompt.is-error   { border-color: var(--alert); }
+
+.react-flow__node-prompt .node-title {
+    display: flex; align-items: center; gap: .3rem;
+    font-weight: 600; letter-spacing: .02em;
+}
+.react-flow__node-prompt .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: .4rem;
+    background: var(--slate-3);
+}
+.react-flow__node-prompt.is-running .status-dot { background: var(--amber); }
+.react-flow__node-prompt.is-ok      .status-dot { background: var(--lock); }
+.react-flow__node-prompt.is-error   .status-dot { background: var(--alert); }
+
+.react-flow__node-prompt .preview {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--paper-3);
+    margin-top: .4rem;
+    max-height: 60px;
+    overflow: hidden;
+}
+.react-flow__node-prompt .node-delete {
+    margin-top: .5rem;
+    font-size: .7rem;
+    padding: .15rem .4rem;
+}
+
+.react-flow__handle {
+    width: 8px !important; height: 8px !important;
+    border: 1px solid var(--line) !important;
+}
+
+.react-flow__minimap {
+    background: var(--slate) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: var(--r-sm) !important;
+}
+.react-flow__controls {
+    background: var(--slate-2) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: var(--r-sm) !important;
+    box-shadow: none !important;
+}
+.react-flow__controls-button {
+    background: transparent !important;
+    color: var(--paper-2) !important;
+    border-bottom: 1px solid var(--line) !important;
+}
+.react-flow__controls-button:hover {
+    background: var(--slate-3) !important;
+    color: var(--paper) !important;
+}
+
+.page-head-actions { display: flex; gap: .6rem; align-items: center; }
