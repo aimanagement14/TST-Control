@@ -8,6 +8,55 @@ publicarse una versión.
 - [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.
+- [ ] Sustituir importmap de esm.sh por bundles locales en
+  `static/vendor/` si se requiere soporte offline. Evaluar primero
+  con `chrome://network` cuánto pesa cada recarga en una red lenta.
+- [ ] Añadir tests E2E del runner vía `app.test_client()` que
+  verifiquen cambio de estado `idle → running → ok` en
+  `node_executions` para los 9 nodos fijos.
+
+### Editor de grafo 2026-09-01
+
+- [x] Migrar `stage_prompts` por proyecto a `profile_prompts` por
+  perfil; migración idempotente en `init_db()` con backup
+  `workflow.db.bak` y flag en `_schema_migrations`.
+- [x] `resolve_stage_prompt(profile_id, stage)` como única vía de
+  lectura; fallback a `config.json`. Refactor de los seis handlers
+  para usarla; eliminada la acción POST `save_prompt` y los helpers
+  `get_saved_prompt` / `save_stage_prompt` /
+  `list_saved_prompts` / `_ensure_stage_prompt` /
+  `backfill_stage_prompts`.
+- [x] Tablas nuevas `profile_graph_nodes` (con `is_fixed`, posiciones,
+  `inputs_json`) y `node_executions` (estado, output, duración).
+- [x] Siete rutas nuevas: `/profiles/<id>/graph` (GET),
+  `/profiles/<id>/graph/save-node` (POST),
+  `/profiles/<id>/graph/delete-node` (POST),
+  `/profiles/<id>/graph/layout` (POST),
+  `/projects/<id>/run` (GET),
+  `/projects/<id>/run/execute` (POST),
+  `/projects/<id>/run/reset-node` (POST).
+- [x] Ejecutor unificado `execute_graph_node()` que despacha a los
+  builders/parsers existentes para los nueve nodos fijos y hace
+  `call_llm` directo para los custom, interpolando `{{ inputs.x }}`.
+- [x] `templates/profile_graph.html` y `templates/project_run.html`
+  con layout split, importmap a `@xyflow/react@12.11.6` desde
+  `esm.sh`, panel lateral de edición y barra de estado por nodo.
+- [x] `static/graph.js` como módulo ESM con el componente React
+  Flow, nodos custom (add/remove), persistencia de posiciones con
+  debounce 600 ms y mocks `TODO` para los endpoints hasta la
+  integración final.
+- [x] `templates/project.html` reemplaza el panel «Prompts
+  guardados» por un enlace al editor de grafo del perfil.
+- [x] `static/style.css` con estilos del chrome del grafo y los
+  estados idle/running/ok/error (variables CSS del tema).
+- [x] Tests: `resolve_stage_prompt` con fallback, UPSERT de
+  `save_profile_prompt`, copia de `stage_prompts` a
+  `profile_prompts`, `get_or_create_fixed_graph_nodes`, save+delete
+  de nodo custom, `update_graph_layout`, y `execute_graph_node`
+  para un fijo y un custom en modo manual.
+- [x] Documentación: `docs/ARCHITECTURE.md` (sección Editor de
+  grafo), `docs/DECISIONS.md` (ADRs 2026-09-01), `TASKS.md`,
+  `CHANGELOG.md` y `README.md`.
 
 ### Etapa Miniaturas 2026-08-29
 

@@ -9,6 +9,64 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- Editor visual de grafo por perfil (`/profiles/<id>/graph`): React
+  Flow v12 cargado por importmap desde `esm.sh` (sin build step, sin
+  dependencias NPM). Nueve nodos fijos pre-creados (research, concept,
+  script_long, script_short, scenes, metadata_youtube, metadata_shorts,
+  thumbnail_long, thumbnail_short), posiciones editables con drag &
+  drop, conexiones libres, posibilidad de añadir nodos custom con sus
+  propios prompts SYS y USER. Las posiciones se persisten con debounce
+  de 600 ms.
+- Runner sobre proyecto (`/projects/<id>/run`): misma vista de
+  grafo, ejecución nodo a nodo con un clic. Los nodos fijos reutilizan
+  los builders y parsers existentes; los custom hacen `call_llm`
+  directo interpolando `{{ inputs.<key> }}` con el output de nodos
+  previos. Cada ejecución se persiste en `node_executions` con su
+  estado (`idle`/`running`/`ok`/`error`) y duración.
+- Tablas nuevas `profile_graph_nodes` (con `is_fixed`, posiciones y
+  `inputs_json`) y `node_executions` (estado, output, duración).
+- Funciones nuevas: `resolve_stage_prompt`, `save_profile_prompt`,
+  `list_profile_prompts`, `get_default_prompts_from_config`,
+  `execute_graph_node`, y el conjunto de helpers del grafo
+  (`get_or_create_fixed_graph_nodes`, `fetch_graph_nodes`,
+  `fetch_graph_edges_as_eedges`, etc.).
+- Siete rutas nuevas: `/profiles/<id>/graph` (GET),
+  `/profiles/<id>/graph/save-node` (POST),
+  `/profiles/<id>/graph/delete-node` (POST),
+  `/profiles/<id>/graph/layout` (POST), `/projects/<id>/run` (GET),
+  `/projects/<id>/run/execute` (POST),
+  `/projects/<id>/run/reset-node` (POST).
+
+### Changed
+
+- Los prompts SYS + USER ya no viven a nivel de proyecto sino de
+  perfil, en `profile_prompts` (`UNIQUE(profile_id, stage)`).
+  `resolve_stage_prompt(profile_id, stage)` es la única vía de lectura,
+  con fallback a `config.json`. Cambiar un prompt en un perfil lo
+  cambia para todos los proyectos que lo usen.
+- Las páginas por etapa (research, concept, scripts, scenes,
+  metadata, thumbnails) ya no exponen el formulario «Guardar prompt»:
+  la edición vive en el grafo. Siguen mostrando el prompt generado al
+  vuelo y guardan el output del LLM en la tabla correspondiente.
+- Página de proyecto (`templates/project.html`): el panel
+  «Prompts guardados» pasa a ser un enlace al editor de grafo del
+  perfil.
+
+### Removed
+
+- Tabla legacy `stage_prompts`. Sus filas se migran automáticamente
+  a `profile_prompts` la primera vez que arranca la app (con backup
+  `workflow.db.bak` controlado por `_schema_migrations`).
+- Ruta `POST /projects/<id>/stage-prompts/backfill` y su acción
+  asociada (la regeneración de prompts ahora vive en el grafo).
+- Helpers `get_saved_prompt`, `save_stage_prompt`,
+  `list_saved_prompts`, `_ensure_stage_prompt`,
+  `_stage_context`.
+
+_Entradas previas del [Unreleased] abiertas antes del editor de grafo:_
+
+### Added
+
 - Nueva etapa **Miniaturas** entre `Metadata` y `Control de calidad`, con dos
   paneles (5 min en 16:9 y 1 min en 9:16). Cada panel genera un prompt visual
   cinematográfico fijo listo para Midjourney / Flux / DALL-E, sin texto

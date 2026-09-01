@@ -52,13 +52,13 @@ secciones marcadas con comentarios `---`:
 | Sección | Responsabilidad |
 |---------|-----------------|
 | Configuración | Carga `config.json`, instancia Flask, sirve `/favicon.ico`. |
-| Base de datos | Define el `SCHEMA` (10 tablas), expone `get_db()` con rows como `sqlite3.Row` y `init_db()` para sembrar el perfil por defecto. |
-| Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto/prompt guardado. |
-| Auto-prompt | `_STAGE_BUILDERS` + `_ensure_stage_prompt` que regenera y guarda los prompts canónicos cuando una etapa se persiste por primera vez. |
+| Base de datos | Define el `SCHEMA` (13 tablas tras el editor de grafo), expone `get_db()` con rows como `sqlite3.Row` y `init_db()` para sembrar el perfil por defecto y aplicar migraciones idempotentes controladas por `_schema_migrations`. |
+| Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto, resolución de prompt por perfil (`resolve_stage_prompt`) con fallback a `config.json`. |
 | LLM client | `call_llm` con cuatro proveedores (`manual`, `openai`, `anthropic`, `custom`). Resuelve un preset activo sobre el bloque legacy. |
-| Parsers | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_metadata`. Toleran respuestas del LLM con prosa alrededor. |
+| Parsers | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_metadata`, `parse_thumbnail`. Toleran respuestas del LLM con prosa alrededor. |
 | QC | `run_qc` (lista de tuplas `stage/severity/message/field`) + `save_qc_issues`. |
-| Rutas | Una vista por etapa + dashboard + perfiles + settings + export. |
+| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 9 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), 7 rutas en `/profiles/<id>/graph/*` y `/projects/<id>/run/*`, ejecutor unificado (`execute_graph_node`) que despacha a los builders/parsers existentes para los nodos fijos y hace `call_llm` directo para nodos custom. |
+| Rutas | Una vista por etapa + dashboard + perfiles + editor de grafo + runner + settings + export. |
 | Contexto plantilla | Inyecta `app_name`, `app_tagline`, `app_version` en cada render. |
 | Arranque | `python app.py` (dev) o `python app.py --prod` (waitress). |
 
@@ -86,9 +86,18 @@ defecto (Flask), no se hace `Markup()` en ningún punto.
 
 ### Estáticos (`static/`)
 
-Un único `style.css` (≈480 líneas) con variables CSS para tema oscuro y
-componentes: cards, formularios, grid de proyectos, etapas, QC, presets,
-flash messages. No se usa Tailwind ni preprocesadores.
+Un único `style.css` (≈610 líneas tras el editor de grafo) con variables
+CSS para tema oscuro y componentes: cards, formularios, grid de proyectos,
+etapas, QC, presets, flash messages, además del chrome del editor de
+grafo y los estados visuales de los nodos (idle / running / ok / error).
+No se usa Tailwind ni preprocesadores.
+
+El editor visual se entrega como módulo ESM en `static/graph.js` y se
+carga por importmap desde `esm.sh` (`@xyflow/react@12.11.6`,
+`react@18.3.1`, `react-dom@18.3.1`). El CSS de React Flow se enlaza
+también desde `esm.sh`. Es la única dependencia externa en runtime y
+solo se solicita al abrir `/profiles/<id>/graph` o
+`/projects/<id>/run`; el resto de la app no hace llamadas salientes.
 
 ### Tests
 
@@ -100,13 +109,16 @@ flash messages. No se usa Tailwind ni preprocesadores.
 
 ## Modelo de datos
 
-11 tablas (la tabla `prompts` queda en el esquema por compatibilidad pero
-ya no se usa: cada escena almacena su `visual_description` que sirve
-directamente como prompt de imagen). Las siete entidades centrales
-(`projects`, `research`, `concept`, `scripts`, `scenes`,
-`metadata_records`, `thumbnail_records`) tienen `project_id` con
-`ON DELETE CASCADE`. `stage_prompts` almacena los prompts SYS + USER
-editados por etapa (`UNIQUE(project_id, stage)`).
+13 tablas. Las entidades centrales (`projects`, `research`, `concept`,
+`scripts`, `scenes`, `metadata_records`, `thumbnail_records`) tienen
+`project_id` con `ON DELETE CASCADE`. Los prompts viven ahora a nivel
+de perfil en `profile_prompts` (`UNIQUE(profile_id, stage)`) y se
+resuelven con `resolve_stage_prompt()` buscando primero ahí y haciendo
+fallback a `config.json`. El grafo visual persiste en
+`profile_graph_nodes` (`UNIQUE(profile_id, node_key)`,
+`is_fixed` distingue los 9 nodos pre-creados de los custom) y
+`node_executions` registra cada ejecución por proyecto con su
+output, estado y duración.
 
 `scripts.type` distingue `long` (5 min) de `short` (1 min).
 `scenes.script_id` vincula cada escena con su guion.
@@ -118,15 +130,48 @@ duplicados.
 ## Flujo de datos
 
 1. El usuario crea un proyecto (`POST /projects/new`) → `status='research'`.
-2. Cada etapa expone `generate_prompt` (no destructivo, muestra los
-   prompts y permite pegarlos en un LLM externo) y `save` (persiste la
-   respuesta parseada del LLM).
-3. Tras `save`, `_ensure_stage_prompt` regenera y guarda el prompt
-   canónico si la etapa todavía no tiene uno.
+2. Los prompts SYS + USER del proyecto los resuelve
+   `resolve_stage_prompt(project.profile_id, stage)` consultando
+   primero `profile_prompts` y cayendo a `config.json` cuando no hay
+   override. Esto significa que cualquier proyecto que use el mismo
+   perfil comparte sus prompts.
+3. Cada etapa expone `generate_prompt` (muestra los prompts) y `save`
+   (persiste la respuesta parseada del LLM en su tabla final).
 4. `QC` (`POST /projects/<id>/qc`) corre `run_qc` y mueve el proyecto a
    `status='ready'` cuando no hay errores (warnings/infos son tolerables).
 5. `Export` (`POST /projects/<id>/export`) genera el ZIP y lo envía
    como `send_file(as_attachment=True)`.
+
+## Editor de grafo por perfil
+
+Dos páginas nuevas extienden el flujo clásico sin romperlo.
+
+`/profiles/<id>/graph` — Editor visual (estilo n8n) donde cada nodo es
+una de las nueve etapas del pipeline (`research`, `concept`,
+`script_long`, `script_short`, `scenes`, `metadata_youtube`,
+`metadata_shorts`, `thumbnail_long`, `thumbnail_short`) más los nodos
+custom que el usuario añada. Cada nodo expone sus prompts SYS y USER,
+un nombre editable y conexiones hacia otros nodos (los custom pueden
+recibir como contexto el output de cualquier nodo previo). El grafo
+carga `@xyflow/react` por importmap, persiste posiciones con un debounce
+de 600 ms y guarda los prompts vía `POST /graph/save-node` y
+`/graph/layout`.
+
+`/projects/<id>/run` — Runner que instancia el mismo grafo sobre un
+proyecto. El clic en "Ejecutar" de un nodo llama a
+`POST /run/execute`, que delega en `execute_graph_node()`: para los
+nodos fijos reutiliza los builders y parsers existentes (misma ruta de
+generación y persistencia que la página clásica por etapa); para los
+custom llama al LLM directo, interpolando `{{ inputs.<key> }}` con los
+outputs previos y guardando el resultado en `node_executions`. Cada
+nodo muestra su estado (`idle / running / ok / error`) en una esquina,
+codificado con las variables CSS del tema.
+
+Las páginas clásicas de cada etapa siguen funcionando: cuando el
+usuario genera o guarda contenido allí, los prompts reales son los
+del perfil (vía `resolve_stage_prompt`), por lo que el editor visual
+queda como única fuente de edición y las páginas por etapa son una
+vista enfocada de la misma información.
 
 ## Límites y dependencias externas
 

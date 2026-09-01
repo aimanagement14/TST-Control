@@ -69,6 +69,27 @@ Configura una clave de OpenAI en `Configuración` y la herramienta
 llamará al LLM directamente. Compatible con cualquier endpoint
 OpenAI-compatible (LM Studio, Ollama con shim, etc.).
 
+## Editor visual de grafo (por perfil)
+
+Además del flujo guiado por etapas, cada perfil expone un lienzo
+estilo n8n en `/profiles/<id>/graph` donde puedes:
+
+- Ver y editar los prompts de las nueve etapas fijas en un solo
+  vistazo.
+- Añadir nodos custom con tus propios prompts SYS y USER y
+  conectarlos entre sí para encadenar su output.
+- Mover los nodos con drag & drop; las posiciones se guardan
+  solas.
+- Ejecutar el grafo paso a paso sobre un proyecto desde
+  `/projects/<id>/run`: el runner reutiliza los builders y parsers
+  existentes para los nodos fijos y muestra el output en un panel
+  lateral con el estado de cada nodo (`idle` / `running` / `ok` /
+  `error`).
+
+El grafo se renderiza con React Flow v12 cargado por importmap desde
+`esm.sh`, así que no hace falta build step ni dependencias NPM.
+Más detalle en `docs/ARCHITECTURE.md` y `docs/DECISIONS.md`.
+
 ## Perfiles
 
 Guarda configuraciones reutilizables:
