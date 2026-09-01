@@ -13,6 +13,7 @@ import os
 import re
 import json
 import sqlite3
+import time
 import urllib.request
 import zipfile
 import shutil
@@ -404,6 +405,594 @@ def get_default_prompts_from_config() -> dict[str, dict[str, str]]:
             "format": cfg.get("format", ""),
         }
     return out
+
+
+# ---------------------------------------------------------------------------
+# Graph: constantes y CRUD de nodos por perfil
+# ---------------------------------------------------------------------------
+
+KNOWN_FIXED_NODE_KEYS = [
+    "research", "concept", "script_long", "script_short", "scenes",
+    "metadata_youtube", "metadata_shorts", "thumbnail_long", "thumbnail_short",
+]
+
+DEFAULT_NODE_LABELS = {
+    "research": "Investigación",
+    "concept": "Concepto",
+    "script_long": "Guion 5 min",
+    "script_short": "Guion 1 min",
+    "scenes": "Escenas",
+    "metadata_youtube": "Metadata YouTube",
+    "metadata_shorts": "Metadata Shorts",
+    "thumbnail_long": "Miniatura 16:9",
+    "thumbnail_short": "Miniatura 9:16",
+}
+
+DEFAULT_NODE_POSITIONS = {
+    "research": (0.0, 0.0),
+    "concept": (280.0, 0.0),
+    "script_long": (560.0, 0.0),
+    "script_short": (560.0, 180.0),
+    "scenes": (840.0, 90.0),
+    "metadata_youtube": (1120.0, 0.0),
+    "metadata_shorts": (1120.0, 180.0),
+    "thumbnail_long": (1400.0, 0.0),
+    "thumbnail_short": (1400.0, 180.0),
+}
+
+DEFAULT_EDGES = [
+    ("research", "concept"),
+    ("concept", "script_long"),
+    ("concept", "script_short"),
+    ("script_long", "scenes"),
+    ("script_short", "scenes"),
+    ("script_long", "metadata_youtube"),
+    ("script_short", "metadata_shorts"),
+    ("script_long", "thumbnail_long"),
+    ("script_short", "thumbnail_short"),
+]
+
+MAX_OUTPUT_BYTES = 50 * 1024
+
+
+def get_or_create_fixed_graph_nodes(profile_id: int | None) -> list[dict]:
+    """Asegura las 9 filas fijas y devuelve todas como lista de dicts."""
+    if not profile_id:
+        return []
+    with get_db() as conn:
+        existing = [dict(r) for r in conn.execute(
+            "SELECT * FROM profile_graph_nodes "
+            "WHERE profile_id=? AND is_fixed=1",
+            (profile_id,),
+        ).fetchall()]
+        existing_keys = {row["node_key"] for row in existing}
+        now = now_iso()
+        for key in KNOWN_FIXED_NODE_KEYS:
+            if key in existing_keys:
+                continue
+            x, y = DEFAULT_NODE_POSITIONS.get(key, (0.0, 0.0))
+            conn.execute("""
+                INSERT INTO profile_graph_nodes
+                    (profile_id, node_key, label, sys_prompt, user_prompt,
+                     inputs_json, position_x, position_y, sort_order,
+                     is_fixed, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            """, (
+                profile_id, key,
+                DEFAULT_NODE_LABELS.get(key, key),
+                "", "", "[]", x, y,
+                KNOWN_FIXED_NODE_KEYS.index(key),
+                now,
+            ))
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM profile_graph_nodes "
+            "WHERE profile_id=? AND is_fixed=1 ORDER BY sort_order, id",
+            (profile_id,),
+        ).fetchall()]
+
+
+def fetch_graph_nodes(profile_id: int | None) -> list[dict]:
+    if not profile_id:
+        return []
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM profile_graph_nodes WHERE profile_id=? "
+            "ORDER BY sort_order, id",
+            (profile_id,),
+        ).fetchall()]
+
+
+def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
+    """Devuelve aristas como [{id, source, target}] para el frontend."""
+    edges: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for src, tgt in DEFAULT_EDGES:
+        edges.append({"id": f"e_{src}_{tgt}", "source": src, "target": tgt})
+        seen.add((src, tgt))
+    rows: list[dict] = []
+    if profile_id:
+        with get_db() as conn:
+            rows = [dict(r) for r in conn.execute(
+                "SELECT node_key, inputs_json FROM profile_graph_nodes "
+                "WHERE profile_id=?",
+                (profile_id,),
+            ).fetchall()]
+    for r in rows:
+        try:
+            inputs = json.loads(r["inputs_json"] or "[]")
+        except Exception:
+            inputs = []
+        if not isinstance(inputs, list):
+            inputs = []
+        for i, src in enumerate(inputs):
+            if not src:
+                continue
+            key = (str(src), r["node_key"])
+            if key in seen:
+                continue
+            edges.append({
+                "id": f"e_{src}_{r['node_key']}_{i}",
+                "source": str(src),
+                "target": r["node_key"],
+            })
+            seen.add(key)
+    return edges
+
+
+def save_graph_node(profile_id: int, node_key: str, label: str,
+                    sys_prompt: str, user_prompt: str,
+                    inputs_json: str, position_x: float,
+                    position_y: float, is_fixed: bool) -> dict:
+    """UPSERT en profile_graph_nodes; devuelve el dict persistido."""
+    now = now_iso()
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM profile_graph_nodes "
+            "WHERE profile_id=? AND node_key=?",
+            (profile_id, node_key),
+        ).fetchone()
+        if row:
+            conn.execute("""
+                UPDATE profile_graph_nodes
+                SET label=?, sys_prompt=?, user_prompt=?, inputs_json=?,
+                    position_x=?, position_y=?, is_fixed=?, updated_at=?
+                WHERE id=?
+            """, (
+                label, sys_prompt, user_prompt, inputs_json,
+                float(position_x), float(position_y),
+                1 if is_fixed else 0, now, row["id"],
+            ))
+            return dict(conn.execute(
+                "SELECT * FROM profile_graph_nodes WHERE id=?",
+                (row["id"],),
+            ).fetchone())
+        conn.execute("""
+            INSERT INTO profile_graph_nodes
+                (profile_id, node_key, label, sys_prompt, user_prompt,
+                 inputs_json, position_x, position_y, sort_order,
+                 is_fixed, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            profile_id, node_key, label, sys_prompt, user_prompt,
+            inputs_json, float(position_x), float(position_y),
+            0, 1 if is_fixed else 0, now,
+        ))
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+        return dict(conn.execute(
+            "SELECT * FROM profile_graph_nodes WHERE id=?",
+            (new_id,),
+        ).fetchone())
+
+
+def delete_graph_node(profile_id: int, node_key: str) -> bool:
+    """Borra un nodo NO fijo. Devuelve True si se borró una fila."""
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM profile_graph_nodes "
+            "WHERE profile_id=? AND node_key=? AND is_fixed=0",
+            (profile_id, node_key),
+        )
+        return cur.rowcount > 0
+
+
+def update_graph_layout(profile_id: int,
+                        nodes_data: list[dict]) -> int:
+    """Actualiza posiciones. Devuelve el número de filas tocadas."""
+    count = 0
+    now = now_iso()
+    with get_db() as conn:
+        for item in nodes_data:
+            nk = item.get("node_key")
+            if not nk:
+                continue
+            cur = conn.execute(
+                "UPDATE profile_graph_nodes SET position_x=?, position_y=?, "
+                "updated_at=? WHERE profile_id=? AND node_key=?",
+                (
+                    float(item.get("position_x", 0) or 0),
+                    float(item.get("position_y", 0) or 0),
+                    now, profile_id, str(nk),
+                ),
+            )
+            count += cur.rowcount
+    return count
+
+
+def _interpolate_inputs(template: str, project_id: int,
+                        inputs: list[str]) -> str:
+    """Sustituye {{ inputs.X }} con el último output del nodo X."""
+    if not template or not inputs:
+        return template or ""
+    placeholders = ",".join("?" for _ in inputs)
+    with get_db() as conn:
+        try:
+            rows = conn.execute(
+                f"SELECT node_key, output FROM node_executions "
+                f"WHERE project_id=? AND node_key IN ({placeholders}) "
+                f"ORDER BY id DESC",
+                (project_id, *inputs),
+            ).fetchall()
+        except Exception:
+            rows = []
+    latest: dict[str, str] = {}
+    for r in rows:
+        latest.setdefault(r["node_key"], r["output"] or "")
+    out = template
+    for key in inputs:
+        placeholder = "{{ inputs." + str(key) + " }}"
+        out = out.replace(placeholder, latest.get(key, ""))
+    return out
+
+
+def _truncate_to_bytes(text: str, limit: int) -> str:
+    if not text:
+        return text or ""
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
+        return text
+    return encoded[:limit].decode("utf-8", "replace")
+
+
+def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
+    """Best-effort: persiste el raw en la tabla del stage correspondiente."""
+    now = now_iso()
+    with get_db() as conn:
+        if node_key == "research":
+            parsed = parse_research(raw)
+            conn.execute("""
+                INSERT INTO research (project_id, content, sources, facts,
+                    theories, unverified, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    content=excluded.content,
+                    sources=excluded.sources,
+                    facts=excluded.facts,
+                    theories=excluded.theories,
+                    unverified=excluded.unverified,
+                    updated_at=excluded.updated_at
+            """, (
+                project_id, parsed["content"] or raw,
+                json.dumps(parsed["sources"], ensure_ascii=False),
+                json.dumps(parsed["facts"], ensure_ascii=False),
+                json.dumps(parsed["theories"], ensure_ascii=False),
+                json.dumps(parsed["unverified"], ensure_ascii=False),
+                now,
+            ))
+        elif node_key == "concept":
+            parsed = parse_concept(raw)
+            conn.execute("""
+                INSERT INTO concept (project_id, angle, thesis, key_points,
+                    emotional_hook, what_they_learn, what_they_feel,
+                    risks, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    angle=excluded.angle,
+                    thesis=excluded.thesis,
+                    key_points=excluded.key_points,
+                    emotional_hook=excluded.emotional_hook,
+                    what_they_learn=excluded.what_they_learn,
+                    what_they_feel=excluded.what_they_feel,
+                    risks=excluded.risks,
+                    updated_at=excluded.updated_at
+            """, (
+                project_id, parsed["angle"] or raw,
+                parsed["thesis"],
+                json.dumps(parsed["key_points"], ensure_ascii=False),
+                parsed["emotional_hook"],
+                json.dumps(parsed["what_they_learn"], ensure_ascii=False),
+                json.dumps(parsed["what_they_feel"], ensure_ascii=False),
+                json.dumps(parsed["risks"], ensure_ascii=False),
+                now,
+            ))
+        elif node_key in ("script_long", "script_short"):
+            stype = "long" if node_key == "script_long" else "short"
+            parsed = parse_script(raw, stype)
+            body = parsed["body_full"] or raw
+            wc = count_words(body)
+            existing = conn.execute(
+                "SELECT id FROM scripts WHERE project_id=? AND type=?",
+                (project_id, stype),
+            ).fetchone()
+            if existing:
+                conn.execute("""
+                    UPDATE scripts SET title=?, hook=?, context=?, development=?,
+                        revelations=?, conclusion=?, cta=?, body_full=?,
+                        word_count=?, updated_at=? WHERE id=?
+                """, (
+                    parsed["title"], parsed["hook"], parsed["context"],
+                    parsed["development"], parsed["revelations"],
+                    parsed["conclusion"], parsed["cta"],
+                    body, wc, now, existing["id"],
+                ))
+            else:
+                conn.execute("""
+                    INSERT INTO scripts (project_id, type, title, hook, context,
+                        development, revelations, conclusion, cta, body_full,
+                        word_count, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    project_id, stype, parsed["title"], parsed["hook"],
+                    parsed["context"], parsed["development"],
+                    parsed["revelations"], parsed["conclusion"],
+                    parsed["cta"], body, wc, now,
+                ))
+        elif node_key == "scenes":
+            parsed = parse_scenes(raw) or []
+            target = conn.execute(
+                "SELECT id FROM scripts WHERE project_id=? AND type='long'",
+                (project_id,),
+            ).fetchone()
+            sid = target["id"] if target else None
+            if sid is not None and parsed:
+                conn.execute(
+                    "DELETE FROM scenes WHERE project_id=? AND script_id=?",
+                    (project_id, sid),
+                )
+                wpm = 150
+                proj = conn.execute(
+                    "SELECT profile_id FROM projects WHERE id=?",
+                    (project_id,),
+                ).fetchone()
+                if proj and proj["profile_id"]:
+                    prof = conn.execute(
+                        "SELECT narration_speed FROM profiles WHERE id=?",
+                        (proj["profile_id"],),
+                    ).fetchone()
+                    if prof and prof["narration_speed"]:
+                        wpm = prof["narration_speed"]
+                total_words = sum(
+                    count_words(sc.get("narration_segment", "")) for sc in parsed
+                )
+                for sc in parsed:
+                    try:
+                        scene_num = int(sc.get("scene_number", 0) or 0)
+                    except Exception:
+                        scene_num = 0
+                    try:
+                        dur = int(sc.get("duration_seconds", 0) or 0)
+                    except Exception:
+                        dur = 0
+                    if not dur and total_words > 0:
+                        w = count_words(sc.get("narration_segment", ""))
+                        dur = max(1, round(w / wpm * 60))
+                    conn.execute("""
+                        INSERT INTO scenes (project_id, script_id, scene_number,
+                            narration, visual_description, camera_movement,
+                            transition, duration_seconds, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        project_id, sid, scene_num,
+                        sc.get("narration_segment", ""),
+                        sc.get("image_prompt", "")
+                            or sc.get("visual_description", ""),
+                        sc.get("camera_movement", "") or "",
+                        sc.get("transition", "") or "",
+                        dur, now,
+                    ))
+        elif node_key in ("metadata_youtube", "metadata_shorts"):
+            platform = "youtube" if node_key == "metadata_youtube" else "shorts"
+            parsed = parse_metadata(raw, platform)
+            existing = conn.execute(
+                "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
+                (project_id, platform),
+            ).fetchone()
+            fields = (
+                json.dumps(parsed["titles"], ensure_ascii=False),
+                parsed["description"],
+                json.dumps(parsed["chapters"], ensure_ascii=False),
+                json.dumps(parsed["tags"], ensure_ascii=False),
+                json.dumps(parsed["hashtags"], ensure_ascii=False),
+                parsed["caption"], parsed["hook"], parsed["cta"],
+                json.dumps(parsed["on_screen_text"], ensure_ascii=False),
+            )
+            if existing:
+                conn.execute("""
+                    UPDATE metadata_records SET titles=?, description=?,
+                        chapters=?, tags=?, hashtags=?, caption=?, hook=?, cta=?,
+                        on_screen_text=?, updated_at=? WHERE id=?
+                """, (*fields, now, existing["id"]))
+            else:
+                conn.execute("""
+                    INSERT INTO metadata_records (project_id, platform, titles,
+                        description, chapters, tags, hashtags, caption, hook,
+                        cta, on_screen_text, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (project_id, platform, *fields, now))
+        elif node_key in ("thumbnail_long", "thumbnail_short"):
+            stype = "long" if node_key == "thumbnail_long" else "short"
+            parsed = parse_thumbnail(raw, stype)
+            prompt_text = (parsed.get("prompt") or "").strip() or raw.strip()
+            existing = conn.execute(
+                "SELECT id FROM thumbnail_records "
+                "WHERE project_id=? AND script_type=?",
+                (project_id, stype),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE thumbnail_records SET prompt=?, updated_at=? WHERE id=?",
+                    (prompt_text, now, existing["id"]),
+                )
+            else:
+                conn.execute("""
+                    INSERT INTO thumbnail_records
+                        (project_id, script_type, prompt, updated_at)
+                    VALUES (?, ?, ?, ?)
+                """, (project_id, stype, prompt_text, now))
+
+
+def _load_first_script(project_id: int, script_type: str) -> dict:
+    """Devuelve el primer guion del tipo pedido o un dict vacío con campos clave."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM scripts WHERE project_id=? AND type=? LIMIT 1",
+            (project_id, script_type),
+        ).fetchone()
+        if row:
+            return dict(row)
+    return {"title": "", "hook": "", "body_full": "", "word_count": 0,
+            "context": "", "development": "", "revelations": "",
+            "conclusion": "", "cta": ""}
+
+
+def _build_user_msg_for_fixed(project_id: int, profile: dict | None,
+                              project: dict, node_key: str) -> str:
+    """Construye el user_msg para un nodo fijo."""
+    if node_key == "research":
+        _, user_msg = build_research_prompt(project, profile)
+        return user_msg
+    if node_key == "concept":
+        with get_db() as conn:
+            research_obj = fetch_optional_dict(
+                conn, "SELECT * FROM research WHERE project_id=?",
+                (project_id,),
+            )
+        _, user_msg = build_concept_prompt(project, profile, research_obj)
+        return user_msg
+    if node_key == "script_long":
+        with get_db() as conn:
+            research_obj = fetch_optional_dict(
+                conn, "SELECT * FROM research WHERE project_id=?",
+                (project_id,),
+            )
+            concept_obj = fetch_optional_dict(
+                conn, "SELECT * FROM concept WHERE project_id=?",
+                (project_id,),
+            )
+        _, user_msg = build_script_prompt(
+            project, profile, research_obj, concept_obj, "long",
+        )
+        return user_msg
+    if node_key == "script_short":
+        with get_db() as conn:
+            research_obj = fetch_optional_dict(
+                conn, "SELECT * FROM research WHERE project_id=?",
+                (project_id,),
+            )
+            concept_obj = fetch_optional_dict(
+                conn, "SELECT * FROM concept WHERE project_id=?",
+                (project_id,),
+            )
+        _, user_msg = build_script_prompt(
+            project, profile, research_obj, concept_obj, "short",
+        )
+        return user_msg
+    if node_key == "scenes":
+        script = _load_first_script(project_id, "long")
+        _, user_msg = build_scenes_prompt(project, profile, script)
+        return user_msg
+    if node_key == "metadata_youtube":
+        script = _load_first_script(project_id, "long")
+        _, user_msg = build_metadata_prompt(project, profile, script, "youtube")
+        return user_msg
+    if node_key == "metadata_shorts":
+        script = _load_first_script(project_id, "short")
+        _, user_msg = build_metadata_prompt(project, profile, script, "shorts")
+        return user_msg
+    if node_key == "thumbnail_long":
+        script = _load_first_script(project_id, "long")
+        _, user_msg = build_thumbnail_prompt(project, profile, script, "long")
+        return user_msg
+    if node_key == "thumbnail_short":
+        script = _load_first_script(project_id, "short")
+        _, user_msg = build_thumbnail_prompt(project, profile, script, "short")
+        return user_msg
+    raise ValueError(f"Nodo fijo desconocido: {node_key}")
+
+
+def execute_graph_node(project_id: int, node_key: str) -> dict:
+    """Ejecuta un nodo del grafo. Devuelve dict listo para JSON."""
+    t0 = time.monotonic()
+    try:
+        with get_db() as conn:
+            proj = conn.execute(
+                "SELECT * FROM projects WHERE id=?", (project_id,),
+            ).fetchone()
+            if proj is None:
+                return {"ok": False, "status": "error",
+                        "error": "Proyecto no encontrado"}
+            project = dict(proj)
+        profile = get_profile(project["profile_id"]) or get_default_profile()
+        profile_id = profile["id"] if profile else None
+        node_row = None
+        if profile_id:
+            with get_db() as conn:
+                row = conn.execute(
+                    "SELECT * FROM profile_graph_nodes "
+                    "WHERE profile_id=? AND node_key=?",
+                    (profile_id, node_key),
+                ).fetchone()
+            node_row = dict(row) if row else None
+
+        if node_key in KNOWN_FIXED_NODE_KEYS:
+            sys_p, _ = resolve_stage_prompt(profile_id, node_key)
+            user_msg = _build_user_msg_for_fixed(
+                project_id, profile, project, node_key,
+            )
+            raw = call_llm(sys_p, user_msg)
+            _persist_fixed_result(project_id, node_key, raw)
+        else:
+            if not node_row:
+                return {"ok": False, "status": "error",
+                        "error": "Nodo personalizado no encontrado"}
+            sys_p = node_row.get("sys_prompt") or ""
+            template = node_row.get("user_prompt") or ""
+            try:
+                inputs = json.loads(node_row.get("inputs_json") or "[]")
+            except Exception:
+                inputs = []
+            if not isinstance(inputs, list):
+                inputs = []
+            user_msg = _interpolate_inputs(template, project_id, inputs)
+            raw = call_llm(sys_p, user_msg)
+
+        raw = _truncate_to_bytes(raw, MAX_OUTPUT_BYTES)
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        with get_db() as conn:
+            conn.execute("""
+                INSERT INTO node_executions
+                    (project_id, node_key, output, status, duration_ms, created_at)
+                VALUES (?, ?, ?, 'ok', ?, ?)
+            """, (project_id, node_key, raw, duration_ms, now_iso()))
+            last = conn.execute(
+                "SELECT id, status, duration_ms, created_at FROM node_executions "
+                "WHERE id=last_insert_rowid()"
+            ).fetchone()
+        return {
+            "ok": True, "status": "ok", "output": raw,
+            "node_executions": dict(last) if last else {},
+        }
+    except Exception as e:
+        msg = str(e)[:4096]
+        try:
+            with get_db() as conn:
+                conn.execute("""
+                    INSERT INTO node_executions
+                        (project_id, node_key, output, status, created_at)
+                    VALUES (?, ?, ?, 'error', ?)
+                """, (project_id, node_key, msg, now_iso()))
+        except Exception:
+            pass
+        return {"ok": False, "status": "error", "error": str(e)[:500]}
 
 
 # ---------------------------------------------------------------------------
@@ -2361,6 +2950,181 @@ def settings():
     # Filtrar presets reales (sin _comment)
     presets = {k: v for k, v in CONFIG["llm"].get("presets", {}).items() if not k.startswith("_")}
     return render_template("settings.html", config=CONFIG, presets=presets)
+
+
+# --- Graph (editor y runner) -------------------------------------------------
+
+@app.route("/profiles/<int:profile_id>/graph", methods=["GET"])
+def view_profile_graph(profile_id: int):
+    profile = get_profile(profile_id)
+    if not profile:
+        abort(404)
+    get_or_create_fixed_graph_nodes(profile_id)
+    nodes_rows = fetch_graph_nodes(profile_id)
+    graph_data = {
+        "mode": "editor",
+        "profileId": profile["id"],
+        "profileName": profile["name"],
+        "saveUrl": url_for("save_graph_node", profile_id=profile["id"]),
+        "deleteUrl": url_for("delete_graph_node", profile_id=profile["id"]),
+        "layoutUrl": url_for("save_graph_layout", profile_id=profile["id"]),
+        "nodes": [
+            {
+                "id": n["node_key"],
+                "key": n["node_key"],
+                "label": n["label"] or n["node_key"],
+                "sysPrompt": n["sys_prompt"] or "",
+                "userPrompt": n["user_prompt"] or "",
+                "position": {"x": n["position_x"], "y": n["position_y"]},
+                "isFixed": bool(n["is_fixed"]),
+                "inputs": json.loads(n["inputs_json"] or "[]"),
+                "status": "idle",
+            }
+            for n in nodes_rows
+        ],
+        "edges": fetch_graph_edges_as_eedges(profile_id),
+    }
+    return render_template("profile_graph.html", profile=profile,
+                           graph_data=graph_data)
+
+
+@app.route("/profiles/<int:profile_id>/graph/save-node", methods=["POST"])
+def save_graph_node_route(profile_id: int):
+    if not get_profile(profile_id):
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    node_key = body.get("node_key")
+    if not node_key:
+        abort(400)
+    label = (body.get("label") or node_key) or ""
+    sys_prompt = body.get("sys_prompt") or ""
+    user_prompt = body.get("user_prompt") or ""
+    inputs = body.get("inputs") or []
+    if not isinstance(inputs, list):
+        abort(400)
+    pos = body.get("position") or {}
+    is_fixed = bool(body.get("is_fixed", node_key in KNOWN_FIXED_NODE_KEYS))
+    node = save_graph_node(
+        profile_id, str(node_key), str(label), str(sys_prompt),
+        str(user_prompt),
+        json.dumps(inputs, ensure_ascii=False),
+        float(pos.get("x", 0) or 0),
+        float(pos.get("y", 0) or 0),
+        is_fixed,
+    )
+    return jsonify({"ok": True, "node": node})
+
+
+@app.route("/profiles/<int:profile_id>/graph/delete-node", methods=["POST"])
+def delete_graph_node_route(profile_id: int):
+    if not get_profile(profile_id):
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    node_key = body.get("node_key")
+    if not node_key:
+        abort(400)
+    deleted = delete_graph_node(profile_id, str(node_key))
+    return jsonify({"ok": True, "deleted": deleted})
+
+
+@app.route("/profiles/<int:profile_id>/graph/layout", methods=["POST"])
+def save_graph_layout(profile_id: int):
+    if not get_profile(profile_id):
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    nodes_data = body.get("nodes") or []
+    if not isinstance(nodes_data, list):
+        abort(400)
+    updated = update_graph_layout(profile_id, nodes_data)
+    return jsonify({"ok": True, "updated": updated})
+
+
+@app.route("/projects/<int:project_id>/run", methods=["GET"])
+def view_project_run(project_id: int):
+    project = fetch_project_or_404(project_id)
+    profile = get_profile(project["profile_id"]) or get_default_profile()
+    if not profile:
+        abort(404)
+    get_or_create_fixed_graph_nodes(profile["id"])
+    nodes_rows = fetch_graph_nodes(profile["id"])
+    with get_db() as conn:
+        exec_rows = [dict(r) for r in conn.execute(
+            "SELECT node_key, output, status, duration_ms, created_at "
+            "FROM node_executions WHERE project_id=? ORDER BY id DESC",
+            (project_id,),
+        ).fetchall()]
+    latest_by_node: dict[str, dict] = {}
+    for r in exec_rows:
+        latest_by_node.setdefault(r["node_key"], r)
+    graph_data = {
+        "mode": "runner",
+        "profileId": profile["id"],
+        "profileName": profile["name"],
+        "projectId": project["id"],
+        "projectName": project["name"],
+        "executeUrl": url_for("execute_graph_node_route",
+                              project_id=project["id"]),
+        "resetUrl": url_for("reset_graph_node_route",
+                            project_id=project["id"]),
+        "nodes": [
+            {
+                "id": n["node_key"],
+                "key": n["node_key"],
+                "label": n["label"] or n["node_key"],
+                "sysPrompt": n["sys_prompt"] or "",
+                "userPrompt": n["user_prompt"] or "",
+                "position": {"x": n["position_x"], "y": n["position_y"]},
+                "isFixed": bool(n["is_fixed"]),
+                "inputs": json.loads(n["inputs_json"] or "[]"),
+                "status": (
+                    latest_by_node[n["node_key"]]["status"]
+                    if n["node_key"] in latest_by_node else "idle"
+                ),
+                "lastOutput": (
+                    latest_by_node[n["node_key"]]["output"]
+                    if n["node_key"] in latest_by_node else ""
+                ),
+                "durationMs": (
+                    latest_by_node[n["node_key"]]["duration_ms"]
+                    if n["node_key"] in latest_by_node else None
+                ),
+                "lastRunAt": (
+                    latest_by_node[n["node_key"]]["created_at"]
+                    if n["node_key"] in latest_by_node else None
+                ),
+            }
+            for n in nodes_rows
+        ],
+        "edges": fetch_graph_edges_as_eedges(profile["id"]),
+    }
+    return render_template("project_run.html", project=project,
+                           profile=profile, graph_data=graph_data)
+
+
+@app.route("/projects/<int:project_id>/run/execute", methods=["POST"])
+def execute_graph_node_route(project_id: int):
+    fetch_project_or_404(project_id)
+    body = request.get_json(silent=True) or {}
+    node_key = body.get("node_key")
+    if not node_key:
+        abort(400)
+    result = execute_graph_node(project_id, str(node_key))
+    return jsonify(result)
+
+
+@app.route("/projects/<int:project_id>/run/reset-node", methods=["POST"])
+def reset_graph_node_route(project_id: int):
+    fetch_project_or_404(project_id)
+    body = request.get_json(silent=True) or {}
+    node_key = body.get("node_key")
+    if not node_key:
+        abort(400)
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM node_executions WHERE project_id=? AND node_key=?",
+            (project_id, str(node_key)),
+        )
+    return jsonify({"ok": True, "deleted": cur.rowcount})
 
 
 # ---------------------------------------------------------------------------
