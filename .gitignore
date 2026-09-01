@@ -30,3 +30,8 @@ projects/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Playwright MCP review artifacts
+.playwright-mcp/
+graph-editor-*.png
+project-run-*.png
