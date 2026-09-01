@@ -2965,8 +2965,8 @@ def view_profile_graph(profile_id: int):
         "mode": "editor",
         "profileId": profile["id"],
         "profileName": profile["name"],
-        "saveUrl": url_for("save_graph_node", profile_id=profile["id"]),
-        "deleteUrl": url_for("delete_graph_node", profile_id=profile["id"]),
+        "saveUrl": url_for("save_graph_node_route", profile_id=profile["id"]),
+        "deleteUrl": url_for("delete_graph_node_route", profile_id=profile["id"]),
         "layoutUrl": url_for("save_graph_layout", profile_id=profile["id"]),
         "nodes": [
             {

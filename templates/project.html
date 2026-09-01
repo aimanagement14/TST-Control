@@ -66,43 +66,14 @@
     {% endfor %}
 </div>
 
-{% if saved_prompts %}
-{% set stage_pages = {
-    'research': ('Investigación', 'research'),
-    'concept': ('Concepto', 'concept'),
-    'script_long': ('Guion 5 min', 'scripts'),
-    'script_short': ('Guion 1 min', 'scripts'),
-    'scenes': ('Escenas', 'scenes'),
-    'metadata_youtube': ('Metadata YouTube', 'metadata'),
-    'metadata_shorts': ('Metadata Shorts', 'metadata'),
-    'thumbnail_long': ('Miniatura 5 min', 'thumbnails'),
-    'thumbnail_short': ('Miniatura 1 min', 'thumbnails'),
-} %}
+{% if profile %}
 <div class="panel mt-3">
     <div class="panel-head">
-        <h3>Prompts guardados</h3>
+        <h3>Prompts por perfil</h3>
         <span class="chip">{{ saved_prompts|length }} de 9</span>
-        <form method="post" action="{{ url_for('backfill_stage_prompts', project_id=project.id) }}"
-              class="inline-form"
-              onsubmit="return confirm('Se generan los prompts que falten en etapas que ya tienen contenido. Los prompts que editaste a mano se conservan.')">
-            <button class="btn btn-ghost btn-sm">Rellenar los que falten</button>
-        </form>
+        <a class="btn btn-ghost btn-sm" href="/profiles/{{ profile.id }}/graph">Abrir editor de grafo</a>
     </div>
-    <p class="hint">Cada etapa guarda el prompt con el que se generó su contenido. Se incluyen en la exportación.</p>
-    <ul class="data-list mt-2">
-        {% for stage, labels in stage_pages.items() %}
-        {% set prompt = saved_prompts.get(stage) %}
-        {% if prompt %}
-        <li>
-            <span>
-                <span class="rundown-label">{{ labels[0] }}</span>
-                <span class="hint">{{ prompt.user_prompt[:110] }}{% if prompt.user_prompt|length > 110 %}…{% endif %}</span>
-            </span>
-            <a href="{{ url_for(labels[1], project_id=project.id) }}" class="btn btn-ghost btn-sm">Abrir etapa</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-    </ul>
+    <p class="hint">Los prompts del proyecto viven en el perfil. Se editan desde el editor visual de grafo (modo n8n), donde también puedes añadir nodos custom.</p>
 </div>
 {% endif %}
 
