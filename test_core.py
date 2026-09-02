@@ -493,7 +493,7 @@ def test_qc_passes_complete_project(tmp_path):
         # Metadata
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, updated_at)
-            VALUES (1, 'youtube', '[]', '2025-01-01')
+            VALUES (1, 'youtube_long', '[]', '2025-01-01')
         """)
     issues = app.run_qc(1)
     errors = [i for i in issues if i[1] == "error"]
@@ -533,7 +533,7 @@ def test_export_creates_zip(tmp_path):
             """, (i + 1,))
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, description, updated_at)
-            VALUES (1, 'youtube', '["t1"]', 'desc', '2025-01-01')
+            VALUES (1, 'youtube_long', '["t1"]', 'desc', '2025-01-01')
         """)
     # Override projects dir
     import os

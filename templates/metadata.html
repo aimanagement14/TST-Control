@@ -3,7 +3,7 @@
 {% set current_stage = 'metadata' %}
 {% block title %}Metadata · {{ project.name }}{% endblock %}
 
-{% macro meta_panel(platform, label, lede, saved) %}
+{% macro meta_panel(platform, label, lede, default_script_type, saved) %}
 {% set m = meta_by_platform.get(platform) %}
 {% set is_active = gen_platform == platform and generated %}
 <section class="panel">
@@ -24,7 +24,7 @@
             <select name="script_id">
                 {% for s in scripts %}
                 <option value="{{ s.id }}"
-                        {% if (platform == 'shorts' and s.type == 'short') or (platform == 'youtube' and s.type == 'long') %}selected{% endif %}>
+                        {% if s.type == default_script_type %}selected{% endif %}>
                     {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
                     — {{ s.title or 'sin título' }}
                 </option>
@@ -135,7 +135,7 @@
             <label class="field">
                 <span class="sr-only">Respuesta del LLM para {{ label }}</span>
                 <textarea name="text" rows="10"
-                          placeholder="Pega aquí la respuesta con títulos, descripción, tags y CTA.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
+                          placeholder="Pega aquí la respuesta con las secciones indicadas en el lede.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
             </label>
             <div class="actions">
                 <button type="submit" class="btn btn-primary">
@@ -148,8 +148,8 @@
 {% endmacro %}
 
 {% block content %}
-{{ ui.stage_head(project, '07', 'Metadata',
-    'Títulos, descripción, tags y CTA por plataforma. Es lo que decide si el vídeo se encuentra y se clica.') }}
+{{ ui.stage_head(project, '06', 'Metadata',
+    'Una ficha por plataforma y por guion. Es lo que decide si el vídeo se encuentra y se clica.') }}
 
 {% if not scripts %}
 <div class="empty">
@@ -159,12 +159,20 @@
 </div>
 {% else %}
 <div class="pair">
-    {{ meta_panel('youtube', 'YouTube',
-        'Formato horizontal: cinco títulos, descripción larga con fuentes, capítulos y quince tags.',
-        saved_yt) }}
-    {{ meta_panel('shorts', 'Shorts · Reels · TikTok',
-        'Formato vertical: caption con gancho textual, hashtags y tres textos en pantalla.',
-        saved_sh) }}
+    {{ meta_panel('youtube_long', 'YouTube · 5 min',
+        'Formato horizontal largo: cinco títulos, descripción en prosa y quince tags.',
+        'long', saved_yt_long) }}
+    {{ meta_panel('facebook_long', 'Facebook · 5 min',
+        'Formato horizontal largo: descripción completa en prosa continua, sin negritas ni listas.',
+        'long', saved_fb_long) }}
+</div>
+<div class="pair mt-3">
+    {{ meta_panel('youtube_short', 'YouTube Shorts · 1 min',
+        'Formato vertical corto: tres títulos, descripción breve, hashtags y tags.',
+        'short', saved_yt_short) }}
+    {{ meta_panel('reels_short', 'Facebook Reels · 1 min',
+        'Formato vertical corto: descripción en prosa continua con gancho y hashtags.',
+        'short', saved_reels_short) }}
 </div>
 {% endif %}
 {% endblock %}

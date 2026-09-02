@@ -455,7 +455,7 @@ def main():
         f"/projects/{PROJECT_ID}/metadata",
         data={
             "action": "save",
-            "platform": "youtube",
+            "platform": "youtube_long",
             "script_id": str(long_s["id"]),
             "text": METADATA_YOUTUBE_TEXT,
         },
@@ -464,7 +464,7 @@ def main():
     log("Metadata YT POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
         m_yt = dict(conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube'",
+            "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_long'",
             (PROJECT_ID,),
         ).fetchone())
     titles = json.loads(m_yt["titles"] or "[]")
@@ -483,7 +483,7 @@ def main():
         f"/projects/{PROJECT_ID}/metadata",
         data={
             "action": "save",
-            "platform": "shorts",
+            "platform": "youtube_short",
             "script_id": str(short_s["id"]),
             "text": METADATA_SHORTS_TEXT,
         },
@@ -492,7 +492,7 @@ def main():
     log("Metadata Shorts POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
         m_sh = dict(conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=? AND platform='shorts'",
+            "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_short'",
             (PROJECT_ID,),
         ).fetchone())
     sh_hashtags = json.loads(m_sh["hashtags"] or "[]")
@@ -578,8 +578,8 @@ Close-up of an ancient trilobite fossil eye filling the frame, orange and teal c
         "03_guiones/guion_long.md",
         "03_guiones/guion_short.md",
         "04_escenas/",
-        "05_metadata/metadata_youtube.md",
-        "05_metadata/metadata_shorts.md",
+        "05_metadata/metadata_youtube_long.md",
+        "05_metadata/metadata_youtube_short.md",
         "06_thumbnails/thumbnail_long.md",
         "06_thumbnails/thumbnail_short.md",
         "08_paquete_completo.json",

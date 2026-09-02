@@ -11,6 +11,7 @@ Arquitectura deliberadamente simple:
 
 import os
 import re
+import sys
 import json
 import sqlite3
 import time
@@ -841,8 +842,17 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                         sc.get("transition", "") or "",
                         dur, now,
                     ))
-        elif node_key in ("metadata_youtube", "metadata_shorts"):
-            platform = "youtube" if node_key == "metadata_youtube" else "shorts"
+        elif node_key in ("metadata_youtube", "metadata_shorts",
+                          "metadata_youtube_long", "metadata_youtube_short",
+                          "metadata_facebook_long", "metadata_reels_short"):
+            platform = {
+                "metadata_youtube": "youtube_long",
+                "metadata_shorts": "youtube_short",
+                "metadata_youtube_long": "youtube_long",
+                "metadata_youtube_short": "youtube_short",
+                "metadata_facebook_long": "facebook_long",
+                "metadata_reels_short": "reels_short",
+            }[node_key]
             parsed = parse_metadata(raw, platform)
             existing = conn.execute(
                 "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
@@ -1417,12 +1427,24 @@ def build_scenes_prompt(project, profile, script):
 
 
 def build_metadata_prompt(project, profile, script, platform):
-    if platform == "youtube":
-        sys_prompt = CONFIG["prompts"]["metadata_youtube"]["system"]
-        fmt = CONFIG["prompts"]["metadata_youtube"]["format"]
-    else:
-        sys_prompt = CONFIG["prompts"]["metadata_shorts"]["system"]
-        fmt = CONFIG["prompts"]["metadata_shorts"]["format"]
+    """Resuelve (system, format) para la plataforma pedida.
+
+    Las plataformas válidas son ``youtube_long``, ``facebook_long``,
+    ``youtube_short`` y ``reels_short``. Mantiene retrocompatibilidad con los
+    nombres antiguos ``youtube`` y ``shorts``.
+    """
+    legacy = {"youtube": "metadata_youtube", "shorts": "metadata_shorts"}
+    key = (
+        f"metadata_{platform}"
+        if f"metadata_{platform}" in CONFIG.get("prompts", {})
+        else legacy.get(platform, f"metadata_{platform}")
+    )
+    cfg = CONFIG["prompts"].get(key)
+    if not cfg:
+        print(f"[build_metadata_prompt] platform '{platform}' no tiene prompt en CONFIG")
+        return "", ""
+    sys_prompt = cfg["system"]
+    fmt = cfg["format"]
     platforms_raw = profile["platforms"] if profile else ""
     platforms_list = []
     if platforms_raw:
@@ -2450,10 +2472,13 @@ def metadata(project_id):
 
     meta_by_platform = {m["platform"]: m for m in meta_rows}
 
+    valid_platforms = ("youtube_long", "facebook_long",
+                       "youtube_short", "reels_short")
+
     if request.method == "POST":
         action = request.form.get("action")
         platform = request.form.get("platform")
-        if action == "generate_prompt" and platform in ("youtube", "shorts"):
+        if action == "generate_prompt" and platform in valid_platforms:
             script_id = request.form.get("script_id")
             script = next((s for s in scripts_rows if str(s["id"]) == str(script_id)), None)
             if not script:
@@ -2466,8 +2491,12 @@ def metadata(project_id):
                                    scripts=scripts_rows, meta_by_platform=meta_by_platform,
                                    generated=generated, gen_platform=platform,
                                    gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p)
-        elif action == "save" and platform in ("youtube", "shorts"):
+                                   sys_prompt=sys_p, user_prompt=user_p,
+                                   saved_yt_long=list_profile_prompts(project["profile_id"]).get("metadata_youtube_long"),
+                                   saved_fb_long=list_profile_prompts(project["profile_id"]).get("metadata_facebook_long"),
+                                   saved_yt_short=list_profile_prompts(project["profile_id"]).get("metadata_youtube_short"),
+                                   saved_reels_short=list_profile_prompts(project["profile_id"]).get("metadata_reels_short"))
+        elif action == "save" and platform in valid_platforms:
             text = request.form.get("text", "").strip()
             if text:
                 parsed = parse_metadata(text, platform)
@@ -2509,8 +2538,16 @@ def metadata(project_id):
         m["tags_list"] = json.loads(m.get("tags") or "[]")
         m["hashtags_list"] = json.loads(m.get("hashtags") or "[]")
         m["on_screen_list"] = json.loads(m.get("on_screen_text") or "[]")
-    return render_template("metadata.html", project=project, profile=profile,
-                           scripts=scripts_rows, meta_by_platform=meta_by_platform)
+
+    saved_prompts = list_profile_prompts(project["profile_id"])
+    return render_template(
+        "metadata.html", project=project, profile=profile,
+        scripts=scripts_rows, meta_by_platform=meta_by_platform,
+        saved_yt_long=saved_prompts.get("metadata_youtube_long"),
+        saved_fb_long=saved_prompts.get("metadata_facebook_long"),
+        saved_yt_short=saved_prompts.get("metadata_youtube_short"),
+        saved_reels_short=saved_prompts.get("metadata_reels_short"),
+    )
 
 
 # --- Miniaturas --------------------------------------------------------------
