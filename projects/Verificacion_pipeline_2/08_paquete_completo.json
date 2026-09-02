@@ -1,0 +1,278 @@
+{
+  "project": {
+    "id": 2,
+    "name": "Verificacion pipeline",
+    "topic": "Tema sintetico para smoke test del pipeline",
+    "profile_id": 1,
+    "status": "ready",
+    "created_at": "2026-01-01T00:00:00",
+    "updated_at": "2026-09-01T22:52:28"
+  },
+  "profile": {
+    "id": 1,
+    "name": "Todo Sobre Todo / Misterio",
+    "content_type": "Documental de misterio",
+    "audience": "Curiosos, aficionados a lo alternativo, 25-55 años",
+    "tone": "Serio con toques intrigantes, narrativo",
+    "style": "Cinematográfico, contrastado, con toques conspiranoicos",
+    "mystery_level": 7,
+    "drama_level": 6,
+    "narration_speed": 150,
+    "platforms": "[\"youtube\", \"shorts\", \"tiktok\", \"instagram\", \"facebook\"]",
+    "notes": null,
+    "is_default": 1,
+    "created_at": "2026-08-28T23:11:56.614966"
+  },
+  "research": {
+    "id": 14,
+    "project_id": 2,
+    "content": "El derretimiento de glaciares en el Himalaya nepalí está exponiendo restos geológicos, paleontológicos y arqueológicos a un ritmo sin precedentes. Algunos hallazgos virales en redes hablan de un \"fósil misterioso\" tras el colapso de un glaciar; en realidad, el Himalaya contiene abundantes fósiles marinos del antiguo Mar de Tetis, elevados por la colisión tectónica entre las placas india y euroasiática. La cobertura mediática suele mezclar estos hallazgos geológicos con la tradición folclórica del Yeti, cuyos supuestos restos físicos analizados científicamente han resultado ser de origen animal conocido.",
+    "sources": "[\"https://www.usgs.gov/special-topics/plate-tectonics/science/himalayas\", \"https://www.nature.com/articles/s41586-019-1180-2\", \"https://www.icimod.org/article/himalaya-glacier-mass-balance\", \"https://www.pnas.org/doi/10.1073/pnas.2217561120\", \"https://royalsocietypublishing.org/doi/10.1098/rspb.2017.1304\", \"https://www.sciencedirect.com/journal/journal-of-asian-earth-sciences\", \"https://www.cambridge.org/core/journals/antiquity\"]",
+    "facts": "[\"El Himalaya se formó por la colisión de las placas india y euroasiática iniciada hace ~50 millones de años (Fuente: USGS)\", \"El Mar de Tetis existió entre el Mesozoico y el Paleógeno, dejando fósiles marinos en lo que hoy es el Himalaya (Fuente: Nature, 2019)\", \"El retroceso glaciar en el Himalaya se acelera desde 1970 y se intensifica por el cambio climático (Fuente: ICIMOD, 2023)\", \"En 2023 un estudio identificó ADN antiguo de plantas y artrópodos en sedimentos del glaciar de Khumbu (Fuente: PNAS, 2023)\", \"Los supuestos \\\"scalps\\\" de Yeti en monasterios nepalíes fueron analizados y corresponden a osos pardos y ganado (Fuente: Proceedings of the Royal Society B, 2017)\", \"En 2019 se hallaron microfósiles de fitoplancton del Eoceno en la Formación Gokarna, Nepal (Fuente: Journal of Asian Earth Sciences)\", \"Los fósiles marinos más comunes en el Himalaya son ammonites, braquiópodos y nummulites (Fuente: Geology Today, 2021)\", \"El término \\\"arqueología glacial\\\" describe cómo los deshielos exponen artefactos orgánicos preservados (Fuente: Antiquity, 2022)\", \"50 millones de años: inicio del levantamiento del Himalaya\", \"~8.000 m: altitud media del Himalaya\", \"1970-2020: periodo de aceleración del retroceso glaciar documentado\", \"Eoceno: época geológica de muchos fósiles expuestos en Nepal\", \"2017: año del análisis genético de supuestos restos de Yeti\", \"Mar de Tetis: océano desaparecido que dio origen a muchos fósiles himalayos\"]",
+    "theories": "[\"Teoría geológica estándar: el \\\"fósil misterioso\\\" es un fósil marino del Tetis expuesto por el deshielo. A favor: explica los hallazgos reales documentados. En contra: no encaja con la narrativa de misterio.\", \"Teoría Yeti criptozoológico: ciertos restos pertenecen a un primate desconocido. A favor: tradición oral y folclore local milenario. En contra: análisis genéticos de supuestos restos los identifican como osos.\", \"Teoría conspirativa viral: el hallazgo prueba civilizaciones prehistóricas avanzadas. A favor: engagement en redes. En contra: ausencia total de evidencia física verificable.\", \"Teoría arqueológica: muchos hallazgos son vestigios humanos rituales o funerarios de los últimos siglos, no fósiles paleontológicos. A favor: contexto cultural documentado. En contra: se confunden con frecuencia.\", \"¿Cómo separar en medios la divulgación paleontológica del sensacionalismo paranormal?\", \"¿Qué protocolo científico aplicar para autentificar hallazgos virales antes de su difusión?\", \"¿Cómo proteger yacimientos recién expuestos de saqueo y tráfico de fósiles?\"]",
+    "unverified": "[\"\\\"Fósil misterioso de Nepal\\\" viral en redes: sin paper publicado, requiere verificación primaria.\", \"Identificación de posibles \\\"huellas humanas prehistóricas\\\" en roca nepalí: pendiente de datación.\"]",
+    "updated_at": "2026-09-01T22:52:28"
+  },
+  "concept": {
+    "id": 12,
+    "project_id": 2,
+    "angle": "Separar la realidad geológica del Himalaya —los fósiles marinos del Mar de Tetis expuestos por el deshielo— del ruido viral que mezcla estos hallazgos con la mitología del Yeti. Un documental que muestre lo extraordinario de lo real, sin necesidad de inventar misterios.",
+    "thesis": "El Himalaya guarda un registro paleontológico extraordinario y verificable; los \"misterios virales\" suelen ocultar hallazgos reales que la ciencia ya puede explicar.",
+    "key_points": "[\"El Himalaya como archivo geológico del Mar de Tetis.\", \"La aceleración del deshielo y la \\\"arqueología glacial\\\".\", \"La tradición Yeti frente al análisis genético de supuestos restos.\", \"Fósiles reales documentados en Nepal y su valor científico.\"]",
+    "emotional_hook": "Asombro al descubrir que la \"montaña sagrada\" es también un cementerio de criaturas marinas de hace 50 millones de años.",
+    "what_they_learn": "[\"Por qué hay fósiles marinos en la cima del mundo.\", \"Qué dice realmente la ciencia sobre los supuestos restos de Yeti.\", \"Cómo distinguir hallazgos reales de bulos virales.\", \"Por qué el deshielo expone y a la vez destruye patrimonio.\"]",
+    "what_they_feel": "[\"Asombro ante la escala del tiempo geológico.\", \"Curiosidad por visitar Nepal con ojos nuevos.\", \"Indignación ante el sensacionalismo viral.\", \"Respeto por la ciencia que separa hecho de ficción.\"]",
+    "risks": "[\"Caer en narrativa sensacionalista paranormal y contradecir el ángulo.\", \"Sensibilidades culturales locales sobre la figura del Yeti.\", \"Uso indebido de imágenes de yacimientos protegidos.\"]",
+    "updated_at": "2026-09-01T22:52:28"
+  },
+  "scripts": [
+    {
+      "id": 19,
+      "project_id": 2,
+      "type": "long",
+      "title": "El Himalaya guarda los mares que el mundo olvidó",
+      "hook": "Donde hoy se levanta la montaña más alta del planeta, hubo un mar entero. Sus criaturas descansan ahora bajo glaciares que el sol, poco a poco, está derritiendo.",
+      "context": "Cada año, el Himalaya pierde milímetros de hielo que han permanecido durante milenios. Lo que ese hielo esconde cambia la historia que contamos sobre el planeta. La colisión de las placas tectónicas india y euroasiática levantó un océano entero. Sus habitantes quedaron grabados en la roca. Y ahora, empujados por el deshielo, vuelven a la superficie ante los ojos de los geólogos y paleontólogos que recorren las morrenas en busca de respuestas.",
+      "development": "### BLOQUE 1: El archivo del Tetis\nHace cincuenta millones de años, una placa oceánica se subdujo bajo otra continental. El fondo del Mar de Tetis se elevó, se plegó, se fracturó, y acabó convertido en la cordillera más alta del mundo. En sus estratos quedaron atrapados ammonites con espirales perfectas, braquiópodos con conchas brillantes y nummulites del tamaño de una moneda. La montaña entera es un libro abierto de paleontología, escrito en piedra caliza y pizarra, listo para quien quiera leerlo con paciencia y respeto por las escalas de tiempo que maneja la Tierra.\n\n### BLOQUE 2: La arqueología del deshielo\nDesde 1970 los glaciares del Himalaya pierden masa de forma acelerada. El hielo que durante siglos protegió restos orgánicos los está soltando uno a uno. En 2023, un equipo internacional recuperó ADN antiguo de plantas y artrópodos en sedimentos del glaciar de Khumbu. No es una casualidad. La arqueología glacial se ha convertido en una disciplina nueva que une glaciólogos, genetistas y paleontólogos en torno a una misma pregunta: ¿qué ha estado guardando el hielo durante miles de años?\n\n### BLOQUE 3: La sombra del Yeti\nDurante siglos, los monasterios budistas nepalíes guardaron restos atribuidos al Yeti. Cueros cabelludos, huesos, fragmentos de piel. En 2017, un análisis genético publicado en la Royal Society los identificó con claridad: pertenecían a osos pardos del Himalaya y a ganado de la región. La tradición oral sigue viva, las expediciones siguen saliendo cada primavera, pero la ciencia ya tiene una respuesta. Y esa respuesta es más interesante que el mito, porque habla de cómo una cultura convierte sus montañas en leyenda.\n\n### BLOQUE 4: Lo que se pierde al derretirse\nCada fósil que el hielo suelta es también un fósil que la intemperie empieza a destruir. Lluvia, viento, ciclos de hielo y deshielo. No hay tiempo para el sensacionalismo viral. El Himalaya nos regala una ventana única al pasado profundo de la Tierra. Si no la cuidamos, si no la estudiamos con rigor, si no la documentamos antes de que se deteriore, la perderemos al ritmo del deshielo. La urgencia no es solo climática: es también patrimonial y científica, y necesita equipos internacionales, financiación estable y divulgación seria para que cada descubrimiento llegue al público sin filtros sensacionalistas.",
+      "revelations": "La verdadera rareza no es un monstruo. Es que criaturas marinas de hace cincuenta millones de años estén asomando entre las nieves del techo del mundo. Es que un océano entero se haya convertido en una cordillera. Y es que el cambio climático esté reescribiendo, en tiempo real, lo que sabemos del pasado profundo del planeta. El Himalaya no necesita ficción: ya cuenta la historia más asombrosa que podamos imaginar.",
+      "conclusion": "El Himalaya no necesita misterios inventados. Tiene los mares más antiguos del planeta grabados en su roca. Solo hay que mirar con los pies en la tierra, las manos en la pizarra y la cabeza abierta a lo que la geología lleva cincuenta millones de años intentando contarnos. La realidad, una vez más, supera a la leyenda, y la próxima vez que alguien te hable de un fósil misterioso caído del cielo, recuerda que la verdadera rareza ya está ahí fuera, escrita en piedra, esperando a quien quiera leerla sin prisa y sin filtros de conspiración.",
+      "cta": "Si quieres más documentales donde desmontamos bulos y celebramos la realidad, suscríbete al canal y activa la campana. Nos vemos en el siguiente misterio resuelto.",
+      "body_full": "Donde hoy se levanta la montaña más alta del planeta, hubo un mar entero. Sus criaturas descansan ahora bajo glaciares que el sol, poco a poco, está derritiendo.\n\nCada año, el Himalaya pierde milímetros de hielo que han permanecido durante milenios. Lo que ese hielo esconde cambia la historia que contamos sobre el planeta. La colisión de las placas tectónicas india y euroasiática levantó un océano entero. Sus habitantes quedaron grabados en la roca. Y ahora, empujados por el deshielo, vuelven a la superficie ante los ojos de los geólogos y paleontólogos que recorren las morrenas en busca de respuestas.\n\n### BLOQUE 1: El archivo del Tetis\nHace cincuenta millones de años, una placa oceánica se subdujo bajo otra continental. El fondo del Mar de Tetis se elevó, se plegó, se fracturó, y acabó convertido en la cordillera más alta del mundo. En sus estratos quedaron atrapados ammonites con espirales perfectas, braquiópodos con conchas brillantes y nummulites del tamaño de una moneda. La montaña entera es un libro abierto de paleontología, escrito en piedra caliza y pizarra, listo para quien quiera leerlo con paciencia y respeto por las escalas de tiempo que maneja la Tierra.\n\n### BLOQUE 2: La arqueología del deshielo\nDesde 1970 los glaciares del Himalaya pierden masa de forma acelerada. El hielo que durante siglos protegió restos orgánicos los está soltando uno a uno. En 2023, un equipo internacional recuperó ADN antiguo de plantas y artrópodos en sedimentos del glaciar de Khumbu. No es una casualidad. La arqueología glacial se ha convertido en una disciplina nueva que une glaciólogos, genetistas y paleontólogos en torno a una misma pregunta: ¿qué ha estado guardando el hielo durante miles de años?\n\n### BLOQUE 3: La sombra del Yeti\nDurante siglos, los monasterios budistas nepalíes guardaron restos atribuidos al Yeti. Cueros cabelludos, huesos, fragmentos de piel. En 2017, un análisis genético publicado en la Royal Society los identificó con claridad: pertenecían a osos pardos del Himalaya y a ganado de la región. La tradición oral sigue viva, las expediciones siguen saliendo cada primavera, pero la ciencia ya tiene una respuesta. Y esa respuesta es más interesante que el mito, porque habla de cómo una cultura convierte sus montañas en leyenda.\n\n### BLOQUE 4: Lo que se pierde al derretirse\nCada fósil que el hielo suelta es también un fósil que la intemperie empieza a destruir. Lluvia, viento, ciclos de hielo y deshielo. No hay tiempo para el sensacionalismo viral. El Himalaya nos regala una ventana única al pasado profundo de la Tierra. Si no la cuidamos, si no la estudiamos con rigor, si no la documentamos antes de que se deteriore, la perderemos al ritmo del deshielo. La urgencia no es solo climática: es también patrimonial y científica, y necesita equipos internacionales, financiación estable y divulgación seria para que cada descubrimiento llegue al público sin filtros sensacionalistas.\n\nLa verdadera rareza no es un monstruo. Es que criaturas marinas de hace cincuenta millones de años estén asomando entre las nieves del techo del mundo. Es que un océano entero se haya convertido en una cordillera. Y es que el cambio climático esté reescribiendo, en tiempo real, lo que sabemos del pasado profundo del planeta. El Himalaya no necesita ficción: ya cuenta la historia más asombrosa que podamos imaginar.\n\nEl Himalaya no necesita misterios inventados. Tiene los mares más antiguos del planeta grabados en su roca. Solo hay que mirar con los pies en la tierra, las manos en la pizarra y la cabeza abierta a lo que la geología lleva cincuenta millones de años intentando contarnos. La realidad, una vez más, supera a la leyenda, y la próxima vez que alguien te hable de un fósil misterioso caído del cielo, recuerda que la verdadera rareza ya está ahí fuera, escrita en piedra, esperando a quien quiera leerla sin prisa y sin filtros de conspiración.\n\nSi quieres más documentales donde desmontamos bulos y celebramos la realidad, suscríbete al canal y activa la campana. Nos vemos en el siguiente misterio resuelto.",
+      "structure_json": null,
+      "word_count": 663,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 20,
+      "project_id": 2,
+      "type": "short",
+      "title": "Himalaya: el mar que se hizo montaña",
+      "hook": "El techo del mundo fue un océano.",
+      "context": "Hace 50 millones de años, las placas tectónicas levantaron el Mar de Tetis hasta formar el Himalaya que conocemos hoy. Sus fósiles marinos —ammonites, nummulites, braquiópodos— están grabados en la roca. El deshielo los está sacando a la luz poco a poco. En 2023 se recuperó ADN antiguo en el glaciar de Khumbu, y la arqueología glacial ya es una disciplina científica con identidad propia.",
+      "development": "",
+      "revelations": "En 2017, supuestos restos del Yeti analizados genéticamente resultaron ser de oso pardo. La tradición sobrevive. La ciencia ya respondió. Y la respuesta es más extraordinaria que el mito, porque cuenta cómo la Tierra transforma un océano entero en la cordillera más alta del planeta.",
+      "conclusion": "La montaña guarda un océano. Solo necesitamos ojos para verlo.",
+      "cta": "Sígueme para más bulos desmontados.",
+      "body_full": "El techo del mundo fue un océano.\n\nHace 50 millones de años, las placas tectónicas levantaron el Mar de Tetis hasta formar el Himalaya que conocemos hoy. Sus fósiles marinos —ammonites, nummulites, braquiópodos— están grabados en la roca. El deshielo los está sacando a la luz poco a poco. En 2023 se recuperó ADN antiguo en el glaciar de Khumbu, y la arqueología glacial ya es una disciplina científica con identidad propia.\n\nEn 2017, supuestos restos del Yeti analizados genéticamente resultaron ser de oso pardo. La tradición sobrevive. La ciencia ya respondió. Y la respuesta es más extraordinaria que el mito, porque cuenta cómo la Tierra transforma un océano entero en la cordillera más alta del planeta.\n\nLa montaña guarda un océano. Solo necesitamos ojos para verlo.\n\nSígueme para más bulos desmontados.",
+      "structure_json": null,
+      "word_count": 132,
+      "updated_at": "2026-09-01T22:52:28"
+    }
+  ],
+  "scenes": [
+    {
+      "id": 719,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 1,
+      "narration": "Donde hoy se levanta la montaña más alta del planeta, hubo un mar. Sus criaturas descansan ahora bajo glaciares que el sol está derritiendo.",
+      "visual_description": "Amanecer sobre el Himalaya, pico nevado bañado en luz dorada, glaciar descendiendo por la ladera, vista aérea que desciende lentamente hasta una grieta donde asoma roca oscura.",
+      "camera_movement": "aéreo",
+      "transition": "fundido",
+      "duration_seconds": 15,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 720,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 2,
+      "narration": "Cada año, el Himalaya pierde milímetros de hielo que han permanecido durante milenios. Lo que ese hielo esconde cambia la historia que contamos sobre el planeta.",
+      "visual_description": "Time-lapse de un glaciar retrocediendo, comparación antes/después de la línea de hielo, agua de deshielo formando un río turbio entre morrenas.",
+      "camera_movement": "travelling",
+      "transition": "corte seco",
+      "duration_seconds": 25,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 721,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 3,
+      "narration": "Hace cincuenta millones de años, una placa oceánica se subdujo bajo otra continental. El fondo del Mar de Tetis se elevó y plegó hasta formar la cordillera más alta del mundo.",
+      "visual_description": "Animación esquemática de placas tectónicas chocando, el fondo marino plegándose, estratos sedimentarios ascendiendo, transición al Himalaya actual.",
+      "camera_movement": "zoom in",
+      "transition": "cortinilla",
+      "duration_seconds": 35,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 722,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 4,
+      "narration": "En sus estratos quedaron atrapados ammonites, braquiópodos y nummulites. La montaña entera es un libro abierto de paleontología.",
+      "visual_description": "Primer plano de un ammonite fosilizado emergiendo de roca gris, luz rasante lateral que resalta las espirales del fósil.",
+      "camera_movement": "primer plano",
+      "transition": "corte seco",
+      "duration_seconds": 30,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 723,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 5,
+      "narration": "Desde 1970 los glaciares del Himalaya pierden masa de forma acelerada. El hielo que durante siglos protegió restos orgánicos los está soltando. En 2023 un equipo recuperó ADN antiguo en el glaciar de Khumbu.",
+      "visual_description": "Investigadores con ropa de alta montaña extrayendo muestras de sedimento en la base de un glaciar, tubos de ensayo etiquetados, luz fría azulada.",
+      "camera_movement": "paneo lento",
+      "transition": "disolución",
+      "duration_seconds": 40,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 724,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 6,
+      "narration": "Lo que aparece no es un monstruo: es un registro científico excepcional.",
+      "visual_description": "Detalle de un fósil diminuto bajo microscopio de campo, manos con guantes de nitrilo sosteniendo la muestra, fondo oscuro.",
+      "camera_movement": "zoom in",
+      "transition": "corte seco",
+      "duration_seconds": 18,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 725,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 7,
+      "narration": "Durante siglos, los monasterios nepalíes guardaron restos atribuidos al Yeti. En 2017, un análisis genético publicado en la Royal Society los identificó como osos pardos y ganado.",
+      "visual_description": "Interior de un monasterio nepalí con luz de velas, cajas antiguas con cueros cabelludos, transición a una gráfica de barras con resultados del estudio genético.",
+      "camera_movement": "estático",
+      "transition": "fundido",
+      "duration_seconds": 35,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 726,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 8,
+      "narration": "La verdadera rareza no es un monstruo. Es que criaturas marinas de hace cincuenta millones de años estén asomando entre las nieves del techo del mundo.",
+      "visual_description": "Plano cenital de la cumbre del Everest al atardecer, nubes envolviendo la cima, sensación de inmensidad y silencio.",
+      "camera_movement": "aéreo",
+      "transition": "corte seco",
+      "duration_seconds": 22,
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 727,
+      "project_id": 2,
+      "script_id": 19,
+      "scene_number": 9,
+      "narration": "El Himalaya no necesita misterios inventados. Tiene los mares más antiguos del planeta grabados en su roca. Solo hay que mirar con los pies en la tierra.",
+      "visual_description": "Vista panorámica del Himalaya con texto en pantalla desvaneciéndose, un geólogo sentado en una roca con martillo en mano mirando la cordillera.",
+      "camera_movement": "travelling",
+      "transition": "fundido",
+      "duration_seconds": 15,
+      "updated_at": "2026-09-01T22:52:28"
+    }
+  ],
+  "metadata": [
+    {
+      "id": 21,
+      "project_id": 2,
+      "platform": "youtube_long",
+      "titles": "[\"El Himalaya guarda un mar de 50 millones de años\", \"El techo del mundo fue un océano (y el deshielo lo destapa)\", \"Fósiles del Mar de Tetis en el Himalaya: la verdad\", \"Yeti, bulos y paleontología real en Nepal\", \"Cuando el Himalaya era mar: lo que el deshielo está sacando\"]",
+      "description": "Cada año, los glaciares del Himalaya pierden milímetros de hielo milenario. Lo que ese hielo ha protegido durante milenios está cambiando lo que sabemos del pasado profundo del planeta. En este documental desmontamos la narrativa viral de los \"fósiles misteriosos\" tras el deshielo nepalí y mostramos la realidad geológica verificable: ammonites, braquiópodos y nummulites del antiguo Mar de Tetis, elevados por la colisión tectónica entre la placa india y la euroasiática hace 50 millones de años. Analizamos también el estudio genético de 2017 que identificó los supuestos restos del Yeti como pertenecientes a osos pardos y ganado, y ponemos en valor la arqueología glacial como nueva disciplina científica.\nSi te interesan los documentales donde desmontamos bulos y celebramos la realidad, suscríbete al canal y activa la campana.\nFuentes mencionadas en el vídeo:\n- USGS: https://www.usgs.gov/special-topics/plate-tectonics/science/himalayas\n- Nature (2019): https://www.nature.com/articles/s41586-019-1180-2\n- ICIMOD (2023): https://www.icimod.org/article/himalaya-glacier-mass-balance\n- PNAS (2023): https://www.pnas.org/doi/10.1073/pnas.2217561120\n- Royal Society B (2017): https://royalsocietypublishing.org/doi/10.1098/rspb.2017.1304",
+      "chapters": "[\"00:00 Hook — Donde hubo un mar\", \"00:15 El deshielo que cambia la historia\", \"01:00 El archivo del Mar de Tetis\", \"01:35 La arqueología del deshielo\", \"02:15 La sombra del Yeti\", \"03:30 Lo que el hielo esconde de verdad\", \"04:00 Conclusión\"]",
+      "tags": "[\"himalaya\", \"fosiles\", \"mar\", \"de\", \"tetis\", \"paleontologia\", \"yeti\", \"nepal\", \"deshielo\", \"cambio\", \"climatico\", \"tectonica\", \"de\", \"placas\", \"geologia\", \"arqueologia\", \"glaciar\", \"ammonites\", \"braquiopodos\", \"documental\", \"misterio\", \"todo\", \"sobre\", \"todo\"]",
+      "hashtags": "[\"#himalaya\", \"#fosiles\", \"#paleontologia\", \"#tetis\", \"#yetis\"]",
+      "caption": "",
+      "hook": "",
+      "cta": "Suscríbete al canal y activa la campana para más documentales donde desmontamos bulos y celebramos la realidad.",
+      "on_screen_text": "[]",
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 22,
+      "project_id": 2,
+      "platform": "youtube_short",
+      "titles": "[]",
+      "description": "",
+      "chapters": "[]",
+      "tags": "[]",
+      "hashtags": "[\"#himalaya\", \"#fosiles\", \"#tetis\", \"#yetis\", \"#nepal\", \"#paleontologia\", \"#arqueologia\", \"#deshielo\", \"#documental\", \"#shorts\"]",
+      "caption": "El Himalaya fue un océano.\nSus criaturas descansan bajo glaciares que se derriten.\nLo que está apareciendo cambia la historia del planeta.",
+      "hook": "El techo del mundo fue un mar.",
+      "cta": "Sígueme para más bulos desmontados.",
+      "on_screen_text": "[\"EL HIMALAYA FUE UN OCÉANO\", \"HACE 50 MILLONES DE AÑOS\", \"EL DESHIELO LO ESTÁ DESTAPANDO\"]",
+      "updated_at": "2026-09-01T22:52:28"
+    }
+  ],
+  "thumbnails": [
+    {
+      "id": 13,
+      "project_id": 2,
+      "script_type": "long",
+      "prompt": "A half-buried trilobite fossil in red sandstone, lit by a single volumetric sunbeam through desert dust, hyper-detailed textures, cinematic orange and teal grading, 16:9 composition, off-center focal point, documentary premium quality.",
+      "updated_at": "2026-09-01T22:52:28"
+    },
+    {
+      "id": 14,
+      "project_id": 2,
+      "script_type": "short",
+      "prompt": "Close-up of an ancient trilobite fossil eye filling the frame, orange and teal color grading, volumetric rim light, 9:16 vertical composition, centered subject, cinematic hyperrealism.",
+      "updated_at": "2026-09-01T22:52:28"
+    }
+  ],
+  "stage_prompts": {
+    "concept": {
+      "sys_prompt": "Eres un director creativo especializado en contenido de misterio, conspiraciones y temáticas alternativas para un canal llamado 'Todo Sobre Todo'. Creas conceptos que enganchan, mantienen la tensión y dejan al espectador reflexionando. Tu trabajo es encontrar el ángulo más potente de un tema.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\nInvestigación disponible:\nLa afirmación de que **“se encontró un fósil en Nepal después de la tragedia del glaciar”** no está respaldada, hasta el **29 de agosto de 2026**, por ninguna fuente científica, gubernamental o periodística fiable que haya podido localizar. La tragedia sí ocurrió: el **26 de agosto de 2026**, un colapso glacial en el área de Langtang, cerca de la frontera entre Nepal y China, desencadenó una enorme avalancha de hielo y roca y posteriormente una inundación/debris flow que recorrió aproximadamente 100 km. El USGS sitúa el origen en una pared montañosa glaciada al norte de Langtang Lirung y estima que el colapso produjo energía equivalente a un terremoto de magnitud 5,2. ([USGS][1])\n\nLa parte del **fósil**, sin embargo, es otra historia. Nepal posee un registro fósil muy importante, incluidos fósiles marinos del Himalaya del Tetis, ammonites jurásicos y vertebrados de las formaciones Siwalik, pero **no aparece documentado un descubrimiento de un fósil realizado como consecuencia de la inundación del 26 de agosto de 2026**. La explicación más prudente para el origen de la historia es una mezcla de un acontecimiento real extremadamente reciente con información paleontológica auténtica de Nepal, o una publicación/red social que haya presentado como nuevo un fósil antiguo o un fragmento geológico. En otras palabras: el glaciar es real; el fósil posterior, por ahora, no está demostrado. ([Departamento de Minería y Geología][2])\n\nPerfil del proyecto:\n- Tono: Serio con toques intrigantes, narrativo\n- Estilo: Cinematográfico, contrastado, con toques conspiranoicos\n- Nivel de misterio: 7/10\n- Nivel de dramatización: 6/10\n\nGenera un concepto potente y devuelve SIEMPRE en este formato:\n\nDevuelve SIEMPRE en este formato:\n\n## ÁNGULO\n[1 párrafo: cuál es el enfoque principal y por qué]\n\n## TESIS CENTRAL\n[1-2 frases: la idea fuerza del video]\n\n## PUNTOS CLAVE A DESARROLLAR\n1. [punto 1]\n2. [punto 2]\n3. [punto 3]\n4. [punto 4]\n5. [punto 5]\n\n## GANCHO EMOCIONAL\n[qué tiene que sentir el espectador en los primeros 10 segundos]\n\n## LO QUE EL ESPECTADOR DEBE APRENDER\n[3-4 ideas]\n\n## LO QUE EL ESPECTADOR DEBE SENTIR\n[3-4 emociones]\n\n## RIESGOS\n[qué podría salir mal o generar problemas éticos/legales]",
+      "updated_at": "2026-08-29T17:11:04"
+    },
+    "metadata_shorts": {
+      "sys_prompt": "Eres experto en copy para videos verticales cortos (YouTube Shorts, Instagram Reels, TikTok). Escribes ganchos textuales que se ven sin audio y funcionan con audio.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\nTítulo del guion: \nHook: \nTipo de contenido: Documental de misterio\nPlataformas objetivo: youtube, shorts, tiktok, instagram, facebook\n\nGuion completo:\n\n\nDevuelve en este formato:\n\nDevuelve SIEMPRE en este formato:\n\n## CAPTION (con gancho textual)\n[3-4 líneas máximo, primera línea = gancho visual]\n\n## HOOK (5 segundos)\n[frase exacta que detiene el scroll]\n\n## HASHTAGS (8-12)\n#[hashtag1] #[hashtag2] ...\n\n## CTA\n[1 frase, llamada a seguir/comentar/compartir]\n\n## TEXTO EN PANTALLA (3 piezas)\n1. [texto corto para superponer al inicio]\n2. [texto en el momento clave]\n3. [texto en el cierre]",
+      "updated_at": "2026-08-29T18:38:56"
+    },
+    "metadata_youtube": {
+      "sys_prompt": "Eres experto en SEO y copywriting para YouTube especializado en contenido de misterio, conspiraciones y temáticas alternativas. Escribes para que el video se encuentre, se clique y se retenga.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\nTítulo del guion: \nHook: \nTipo de contenido: Documental de misterio\nPlataformas objetivo: youtube, shorts, tiktok, instagram, facebook\n\nGuion completo:\n\n\nDevuelve en este formato:\n\nDevuelve SIEMPRE en este formato:\n\n## TITULOS (5 opciones)\n1. [título 1, máximo 60 caracteres]\n2. [título 2]\n3. [título 3]\n4. [título 4]\n5. [título 5]\n\n## DESCRIPCIÓN\n[200-300 palabras, con resumen del tema, gancho, palabras clave naturales, y al final fuentes mencionadas]\n\n## CAPÍTULOS\n00:00 [nombre del capítulo]\n01:00 [nombre del capítulo]\n[uno por cada bloque principal del guion]\n\n## TAGS (15)\n[tag1, tag2, ... sin #]\n\n## HASHTAGS (5)\n#[hashtag1] #[hashtag2] ...\n\n## CTA\n[llamada a la acción, 1-2 frases]",
+      "updated_at": "2026-08-29T18:37:57"
+    },
+    "research": {
+      "sys_prompt": "Eres un investigador documental riguroso. Tu trabajo es proporcionar información verificada, contrastada y citada sobre el tema solicitado. Priorizas fuentes primarias, papers, testigos documentados y archivos desclasificados. Separas claramente entre hechos confirmados, afirmaciones de fuentes y teorías. Cuando algo es incierto, lo dices. Nunca inventas fuentes ni datos.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\r\nCanal: Todo Sobre Todo\r\nTipo de contenido: Documental de misterio\r\nPerfil de misterio: 7/10\r\n\r\nInvestiga este tema de forma rigurosa y devuelve SIEMPRE en este formato:\r\n\r\nDevuelve SIEMPRE la respuesta en este formato exacto:\r\n\r\n## RESUMEN\r\n[2-3 párrafos con lo esencial del tema]\r\n\r\n## HECHOS CONFIRMADOS\r\n- [hecho 1 con su fuente entre paréntesis]\r\n- [hecho 2 con su fuente entre paréntesis]\r\n- [mínimo 8 hechos]\r\n\r\n## TEORÍAS Y VERSIONES\r\n- [teoría 1: quien la sostiene, argumentos a favor y en contra]\r\n- [teoría 2: idem]\r\n- [mínimo 4 teorías]\r\n\r\n## CONTROVERSIAS Y DEBATES\r\n- [punto 1]\r\n- [punto 2]\r\n\r\n## DATOS CLAVE\r\n- [cifras, fechas, nombres, lugares relevantes]\r\n\r\n## FUENTES\r\n- [URL o referencia de fuente 1]\r\n- [URL o referencia de fuente 2]\r\n- [mínimo 6 fuentes verificables]\r\n\r\n## AFIRMACIONES QUE REQUIEREN VERIFICACIÓN\r\n- [afirmación 1: por qué es dudosa]\r\n- [afirmación 2: por qué es dudosa]",
+      "updated_at": "2026-08-29T18:48:42"
+    },
+    "scenes": {
+      "sys_prompt": "Eres TST Scene Director, director visual especializado en transformar guiones documentales de Todo Sobre Todo (TST) en secuencias de imágenes cinematográficas de alto impacto. Tu única función es convertir texto narrativo en prompts visuales cinematográficos. NO escribes, modificas, resumes, reinterpretas, agregas ni eliminas información del guion. Traduces visualmente el texto exacto proporcionado.\r\n\r\nObjetivo Principal\r\nGenerar una secuencia de imágenes tipo fotograma de documental premium que aumente la retención, genere curiosidad, cree inmersión, transmita escala, provoque misterio y eleve la calidad cinematográfica.\r\n\r\nRegla Suprema\r\nEL TEXTO DEL USUARIO ES SAGRADO. Nunca modificar, resumir, reescribir, reorganizar, simplificar, cambiar palabras, eliminar frases ni alterar el orden. Copia el texto EXACTAMENTE como fue entregado. La sincronización entre narración e imagen es obligatoria.\r\n\r\nAnálisis del Guion y Sincronización\r\nAntes de generar, analiza el guion completo. Divide el texto en segmentos narrativos uniformes y cortos para mantener un ritmo dinámico y una distribución homogénea en todo el video. Nunca concentres demasiadas frases en una sola escena ni aceleres solo el inicio o el final. Crea un prompt de imagen para cada segmento manteniendo sincronización absoluta entre audio e imagen.\r\n\r\nFilosofía y Estilo Visual Obligatorio\r\nInterpreta cinematográficamente para amplificar el misterio, escala, emoción, profundidad, atmósfera y descubrimiento, inspirándote en producciones como Ancient Apocalypse, Planet Earth, Dune, Interstellar, Arrival o Prometheus. Todas las imágenes deben incluir de forma natural las palabras clave: Cinematic Hyperrealism, Orange & Teal Color Grading, Volumetric Lighting, Atmospheric Fog, Ultra Detailed Textures, Realistic Shadows, Epic Scale, Documentary Cinematography, Filmic Lighting, Natural Depth of Field, High Dynamic Range, Realistic Environmental Details, Cinematic Composition, Documentary Premium Quality.\r\n\r\nRetención y Progresión Visual\r\nLas primeras escenas son críticas: Escena 1 debe causar asombro inmediato, Escena 2 debe aumentar el misterio y Escena 3 debe generar una pregunta visual. Cada escena subsiguiente debe aportar información visual nueva, variando composiciones, encuadres, sujetos, perspectivas, iluminación y escenarios. Evita repeticiones.\r\n\r\nPrompts de Imagen\r\nDescribe únicamente la imagen perfecta a generar. Nunca incluyas instrucciones de animación o movimientos de cámara (como slow dolly, drone shot, tracking shot, crane shot, orbit shot, cinematic reveal, camera movement, zoom o paneo). Cada prompt debe describir de forma ultra detallada el sujeto principal, entorno, atmósfera, iluminación y composición, integrando el estilo documental cinematográfico obligatorio.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\r\nEstilo visual: Cinematográfico, contrastado, con toques conspiranoicos\r\nDuración total objetivo: 68 segundos\r\n\r\nGuion a convertir en escenas:\r\n\r\n\r\nDevuelve SOLO el JSON con las escenas, en este formato:\r\n\r\nFORMATO DE SALIDA OBLIGATORIO (texto plano, NO uses JSON, NO uses markdown, NO envuelvas en bloques de código):\r\n\r\nDevuelve la respuesta EXCLUSIVAMENTE con esta estructura repetida por cada escena, separadas por una línea en blanco:\r\n\r\nESCENA 1\r\nTEXTO AUDIO: [texto exacto del guion que se narra en esta escena, copiado palabra por palabra del guion original, sin modificar, resumir ni reordenar]\r\nIMAGEN: [prompt cinematográfico ultra detallado de 50-90 palabras que describe SOLO la imagen fija a generar. Debe integrar de forma natural las palabras clave: Cinematic Hyperrealism, Orange & Teal Color Grading, Volumetric Lighting, Atmospheric Fog, Ultra Detailed Textures, Realistic Shadows, Epic Scale, Documentary Cinematography, Filmic Lighting, Natural Depth of Field, High Dynamic Range, Realistic Environmental Details, Cinematic Composition, Documentary Premium Quality. NO incluir términos de movimiento de cámara (slow dolly, drone shot, tracking, crane, orbit, zoom, paneo, etc.).]\r\n\r\nESCENA 2\r\nTEXTO AUDIO: [...]\r\nIMAGEN: [...]\r\n\r\n(continúa hasta cubrir TODO el guion)\r\n\r\nReglas TST innegociables:\r\n- narration_segment = copia EXACTA del guion original, sin modificar ni resumir\r\n- image_prompt describe SOLO la imagen fija, sin instrucciones de cámara ni animación\r\n- Mínimo 6 escenas (recomendado 8-14 para video 5 min, 6-10 para video 1 min)\r\n- Total narration_segment debe cubrir el guion completo sin omitir frases\r\n- La primera escena SIEMPRE debe ser visualmente potente (no pantalla negra con texto)\r\n- Escena 1 causa asombro inmediato, Escena 2 aumenta misterio, Escena 3 plantea pregunta visual\r\n- Cada escena subsiguiente aporta información visual nueva, variando composiciones y encuadres\r\n- Cada escena debe poder existir visualmente sin depender de la anterior\r\n- Variar sujetos, perspectivas, iluminación y escenarios; evitar repeticiones\r\n- NO antepongas introducciones, explicaciones, JSON ni ningún texto fuera de los bloques ESCENA N",
+      "updated_at": "2026-08-29T18:48:53"
+    },
+    "script_long": {
+      "sys_prompt": "Eres guionista de documentales cinematográficos de 5 minutos para el canal 'Todo Sobre Todo'. Escribes para ser narrado en voz en off, con pausas marcadas, ritmo y tensión creciente. No usas lenguaje técnico innecesario. Combinas datos con atmósfera.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\nDuración objetivo: 5 minutos\nÁngulo: El ángulo más potente no es afirmar que apareció un fósil misterioso, sino **investigar por qué empezó a circular esa historia justo después de una catástrofe real**. El video puede construir una tensión entre dos mundos: por un lado, un glaciar que literalmente se desmorona y arrastra toneladas de material; por otro, la posibilidad de que entre los sedimentos haya quedado expuesto algo perteneciente a un pasado remoto. La pregunta central sería: **¿realmente apareció un fósil después del desastre, o estamos ante una historia que nació al mezclar un fenómeno geológico real con los fósiles extraordinarios que Nepal ya posee?** El misterio está precisamente en aquello que todavía no podemos demostrar.\nTesis: **El glaciar colapsó, la montaña se movió y un rumor comenzó a crecer: que entre los restos apareció un fósil. Pero cuando seguimos las pruebas, encontramos algo más inquietante que un fósil: una historia sin espécimen, sin ubicación y sin análisis científico.**\n\nLa verdadera investigación consiste en descubrir **de dónde salió esa afirmación y por qué resulta tan fácil de creer**.\nPuntos clave:\n- **La tragedia que realmente ocurrió.**\n- Reconstruir cinematográficamente el colapso en Langtang: hielo, roca, agua y sedimentos desplazándose por decenas de kilómetros. Establecer desde el principio qué está confirmado y qué no.\n- **El extraño momento en que aparece la historia del fósil.**\n- Presentar la afirmación como una pista, no como una verdad. ¿Quién dijo primero que se había encontrado? ¿Existe una fotografía original? ¿Quién habría recogido la pieza? ¿Dónde exactamente? La ausencia de respuestas se convierte en parte de la investigación.\n- **Nepal ya esconde fósiles auténticamente extraordinarios.**\n- Introducir los ammonites del antiguo mar de Tetis, los fósiles de los Siwalik y los famosos Shaligram. Esto demuestra que encontrar un fósil en Nepal no sería extraordinario por sí mismo. Lo extraordinario sería **su relación demostrada con la catástrofe**.\n- **La hipótesis que cambia completamente la historia: el fósil pudo haber sido expuesto, no creado.**\n- El flujo de escombros pudo remover materiales geológicos antiguos. Pero para demostrar que una pieza procede directamente del material movilizado por el desastre habría que establecer su procedencia estratigráfica. Una fotografía de una piedra no basta. Aquí aparece el choque entre la narrativa viral y el método científico.\n- **El verdadero misterio: ¿quién creó la conexión?**\n- Cerrar siguiendo tres posibilidades: un hallazgo real todavía no estudiado, una pieza fósil antigua presentada erróneamente como nueva, o una historia viral construida sobre la tragedia. El video no debería resolver artificialmente el misterio. **La falta de evidencia debe ser el último dato, no un obstáculo que haya que esconder.**\n\nDatos de la investigación:\nLa afirmación de que **“se encontró un fósil en Nepal después de la tragedia del glaciar”** no está respaldada, hasta el **29 de agosto de 2026**, por ninguna fuente científica, gubernamental o periodística fiable que haya podido localizar. La tragedia sí ocurrió: el **26 de agosto de 2026**, un colapso glacial en el área de Langtang, cerca de la frontera entre Nepal y China, desencadenó una enorme avalancha de hielo y roca y posteriormente una inundación/debris flow que recorrió aproximadamente 100 km. El USGS sitúa el origen en una pared montañosa glaciada al norte de Langtang Lirung y estima que el colapso produjo energía equivalente a un terremoto de magnitud 5,2. ([USGS][1])\n\nLa parte del **fósil**, sin embargo, es otra historia. Nepal posee un registro fósil muy importante, incluidos fósiles marinos del Himalaya del Tetis, ammonites jurásicos y vertebrados de las formaciones Siwalik, pero **no aparece documentado un descubrimiento de un fósil realizado como consecuencia de la inundación del 26 de agosto de 2026**. La explicación más prudente para el origen de la historia es una mezcla de un acontecimiento real extremadamente reciente con información paleontológica auténtica de Nepal, o una publicación/red social que haya presentado como nuevo un fósil antiguo o un fragmento geológico. En otras palabras: el glaciar es real; el fósil posterior, por ahora, no está demostrado. ([Departamento de Minería y Geología][2])\n\nTono: Serio con toques intrigantes, narrativo\nNivel de misterio: 7/10\nVelocidad narración: 150 ppm\n\nEscribe el guion y devuelve SIEMPRE en este formato:\n\nDevuelve SIEMPRE en este formato:\n\n## TITULO\n[título del video]\n\n## HOOK (0:00 - 0:15)\n[texto del gancho inicial, máximo 40 palabras]\n\n## CONTEXTO (0:15 - 1:00)\n[presentación del tema, por qué importa, qué vamos a explorar]\n\n## DESARROLLO (1:00 - 3:30)\n[3-4 bloques separados por '### BLOQUE N: [título del bloque]' cada uno con 80-120 palabras]\n\n### BLOQUE 1: [título]\n[texto]\n\n### BLOQUE 2: [título]\n[texto]\n\n### BLOQUE 3: [título]\n[texto]\n\n### BLOQUE 4: [título]\n[texto]\n\n## REVELACIONES (3:30 - 4:30)\n[los momentos de mayor tensión o sorpresa, conectados con los bloques anteriores]\n\n## CONCLUSIÓN (4:30 - 4:50)\n[cierre reflexivo]\n\n## CTA (4:50 - 5:00)\n[llamada a la acción, sin ser invasiva]",
+      "updated_at": "2026-08-29T17:13:09"
+    },
+    "script_short": {
+      "sys_prompt": "Eres guionista de videos cortos de 1 minuto (60-75 segundos) para el canal 'Todo Sobre Todo'. Cada palabra cuenta. El hook debe ser inmediato. No hay tiempo para contexto largo. Vas directo al misterio y terminas con un remate que deja pensando.",
+      "user_prompt": "Tema: se encontró un fossil en nepal después de la tragedia del glaciar\nDuración objetivo: 1 minuto (60-75 segundos)\nÁngulo: El ángulo más potente no es afirmar que apareció un fósil misterioso, sino **investigar por qué empezó a circular esa historia justo después de una catástrofe real**. El video puede construir una tensión entre dos mundos: por un lado, un glaciar que literalmente se desmorona y arrastra toneladas de material; por otro, la posibilidad de que entre los sedimentos haya quedado expuesto algo perteneciente a un pasado remoto. La pregunta central sería: **¿realmente apareció un fósil después del desastre, o estamos ante una historia que nació al mezclar un fenómeno geológico real con los fósiles extraordinarios que Nepal ya posee?** El misterio está precisamente en aquello que todavía no podemos demostrar.\nTesis: **El glaciar colapsó, la montaña se movió y un rumor comenzó a crecer: que entre los restos apareció un fósil. Pero cuando seguimos las pruebas, encontramos algo más inquietante que un fósil: una historia sin espécimen, sin ubicación y sin análisis científico.**\n\nLa verdadera investigación consiste en descubrir **de dónde salió esa afirmación y por qué resulta tan fácil de creer**.\nPuntos clave:\n- **La tragedia que realmente ocurrió.**\n- Reconstruir cinematográficamente el colapso en Langtang: hielo, roca, agua y sedimentos desplazándose por decenas de kilómetros. Establecer desde el principio qué está confirmado y qué no.\n- **El extraño momento en que aparece la historia del fósil.**\n- Presentar la afirmación como una pista, no como una verdad. ¿Quién dijo primero que se había encontrado? ¿Existe una fotografía original? ¿Quién habría recogido la pieza? ¿Dónde exactamente? La ausencia de respuestas se convierte en parte de la investigación.\n- **Nepal ya esconde fósiles auténticamente extraordinarios.**\n- Introducir los ammonites del antiguo mar de Tetis, los fósiles de los Siwalik y los famosos Shaligram. Esto demuestra que encontrar un fósil en Nepal no sería extraordinario por sí mismo. Lo extraordinario sería **su relación demostrada con la catástrofe**.\n- **La hipótesis que cambia completamente la historia: el fósil pudo haber sido expuesto, no creado.**\n- El flujo de escombros pudo remover materiales geológicos antiguos. Pero para demostrar que una pieza procede directamente del material movilizado por el desastre habría que establecer su procedencia estratigráfica. Una fotografía de una piedra no basta. Aquí aparece el choque entre la narrativa viral y el método científico.\n- **El verdadero misterio: ¿quién creó la conexión?**\n- Cerrar siguiendo tres posibilidades: un hallazgo real todavía no estudiado, una pieza fósil antigua presentada erróneamente como nueva, o una historia viral construida sobre la tragedia. El video no debería resolver artificialmente el misterio. **La falta de evidencia debe ser el último dato, no un obstáculo que haya que esconder.**\n\nDatos de la investigación:\nLa afirmación de que **“se encontró un fósil en Nepal después de la tragedia del glaciar”** no está respaldada, hasta el **29 de agosto de 2026**, por ninguna fuente científica, gubernamental o periodística fiable que haya podido localizar. La tragedia sí ocurrió: el **26 de agosto de 2026**, un colapso glacial en el área de Langtang, cerca de la frontera entre Nepal y China, desencadenó una enorme avalancha de hielo y roca y posteriormente una inundación/debris flow que recorrió aproximadamente 100 km. El USGS sitúa el origen en una pared montañosa glaciada al norte de Langtang Lirung y estima que el colapso produjo energía equivalente a un terremoto de magnitud 5,2. ([USGS][1])\n\nLa parte del **fósil**, sin embargo, es otra historia. Nepal posee un registro fósil muy importante, incluidos fósiles marinos del Himalaya del Tetis, ammonites jurásicos y vertebrados de las formaciones Siwalik, pero **no aparece documentado un descubrimiento de un fósil realizado como consecuencia de la inundación del 26 de agosto de 2026**. La explicación más prudente para el origen de la historia es una mezcla de un acontecimiento real extremadamente reciente con información paleontológica auténtica de Nepal, o una publicación/red social que haya presentado como nuevo un fósil antiguo o un fragmento geológico. En otras palabras: el glaciar es real; el fósil posterior, por ahora, no está demostrado. ([Departamento de Minería y Geología][2])\n\nTono: Serio con toques intrigantes, narrativo\nNivel de misterio: 7/10\nVelocidad narración: 150 ppm\n\nEscribe el guion y devuelve SIEMPRE en este formato:\n\nDevuelve SIEMPRE en este formato:\n\n## TITULO\n[título del video]\n\n## HOOK (0:00 - 0:05)\n[máximo 15 palabras, debe detener el scroll]\n\n## INFORMACIÓN ESENCIAL (0:05 - 0:35)\n[3-4 frases cortas y contundentes con los datos clave]\n\n## ESCALADA (0:35 - 0:55)\n[el giro o la pregunta que cambia la perspectiva]\n\n## REMATE (0:55 - 1:00)\n[1-2 frases con impacto]\n\n## CTA (1:00 - 1:05)\n[llamada a la acción breve]",
+      "updated_at": "2026-08-29T17:24:10"
+    }
+  },
+  "exported_at": "2026-09-01T22:52:28"
+}
