@@ -38,3 +38,7 @@ project-run-*.png
 
 # Personal setup helper (not part of the shared codebase)
 scripts/setup.ps1
+
+# Logs del servidor de desarrollo (Flask dev / waitress)
+*.log
+!scripts/setup.ps1
