@@ -28,8 +28,8 @@ Guía para agentes de IA que trabajan en este proyecto.
 - `workflow.db` — SQLite. Migraciones controladas por `_schema_migrations`
   (idempotentes).
 - `test_core.py` — parsers, QC, utilidades, prompts por perfil, CRUD de grafo.
-- `verify_fosiles.py` — verificación end-to-end con datos simulados de LLM
-  (`PROJECT_ID = 1`, crea proyecto si no existe).
+- `verify_project.py` — verificación end-to-end con datos simulados de LLM
+  (`PROJECT_ID = 2`, crea proyecto sintético si no existe).
 - `docs/ARCHITECTURE.md` y `docs/DECISIONS.md` — las decisiones técnicas y
   de arquitectura viven ahí, no en comentarios sueltos.
 
@@ -69,7 +69,7 @@ Antes de cerrar un cambio ejecuta, desde la raíz:
 
 ```bash
 python test_core.py
-python verify_fosiles.py
+python verify_project.py
 ```
 
 Ambos deben pasar en verde. Si añades rutas, prompts, parsers, una etapa o

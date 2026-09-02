@@ -103,9 +103,9 @@ solo se solicita al abrir `/profiles/<id>/graph` o
 
 - `test_core.py`: tests de parsers, utilidades, QC engine y export.
   Sustituye `DB_PATH` por una ruta temporal durante los tests QC/export.
-- `verify_fosiles.py`: smoke test end-to-end que ejecuta el flujo
-  completo contra `app.test_client()` con datos simulados. Crea el
-  proyecto si no existe.
+- `verify_project.py`: smoke test end-to-end que ejecuta el flujo
+  completo contra `app.test_client()` con datos simulados. Crea un
+  proyecto sintético con `PROJECT_ID=2` si no existe.
 
 ## Modelo de datos
 

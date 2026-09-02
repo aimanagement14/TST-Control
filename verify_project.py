@@ -1,14 +1,21 @@
 """
-Verificación end-to-end del proyecto 'Todo sobre los Fosiles'.
-Ejecuta el flujo completo usando el test client de Flask:
+Verificación end-to-end genérica del pipeline.
+
+Ejecuta el flujo completo usando el test client de Flask con datos simulados
+del LLM (modo manual):
+
+- Crea (si no existe) un proyecto sintético con id=PROJECT_ID
 - Refuerza la investigación con secciones parseables
 - Genera concepto
 - Genera guion largo + corto
 - Genera escenas
-- Genera prompts visuales
 - Genera metadata YouTube + Shorts
 - Ejecuta QC
 - Exporta el ZIP
+
+PROJECT_ID se eligió alto (2) para no chocar con proyectos reales que el
+usuario pueda tener en id=1. Renombrar este archivo o cambiar el id es
+trivial.
 """
 import io
 import json
@@ -19,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import app
 
-PROJECT_ID = 1
+PROJECT_ID = 2
 
 
 def ensure_project():
@@ -46,8 +53,8 @@ def ensure_project():
                VALUES (?, ?, ?, ?, 'research', ?, ?)""",
             (
                 PROJECT_ID,
-                "Todo sobre los Fosiles",
-                "Fósiles del Himalaya",
+                "Verificacion pipeline",
+                "Tema sintetico para smoke test del pipeline",
                 profile_id,
                 "2026-01-01T00:00:00",
                 "2026-01-01T00:00:00",
@@ -590,8 +597,8 @@ Close-up of an ancient trilobite fossil eye filling the frame, orange and teal c
 
     # Validar contenido de un par de archivos
     resumen = zf.read([n for n in names if n.endswith("00_RESUMEN.md")][0]).decode("utf-8")
-    log("Resumen contiene tema", "Fósiles" in resumen or "fosiles" in resumen.lower(),
-        "Fósiles" in resumen or "fosiles" in resumen.lower())
+    resumen_ok = "Verificacion pipeline" in resumen or "Himalaya" in resumen
+    log("Resumen contiene tema", resumen_ok, resumen_ok)
     bundle = json.loads(zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0])
                         .decode("utf-8"))
     log("Bundle JSON", f"keys: {list(bundle.keys())[:6]}...",

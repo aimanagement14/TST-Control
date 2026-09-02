@@ -138,12 +138,13 @@ Listo para conectar con tu pipeline de producción.
 
 ## Verificación end-to-end
 
-`verify_fosiles.py` ejecuta el flujo completo contra el test client de Flask
-utilizando datos simulados del LLM. Crea un proyecto si no existe, pasa por
-las 7 etapas, ejecuta el control de calidad y genera el ZIP.
+`verify_project.py` ejecuta el flujo completo contra el test client de Flask
+utilizando datos simulados del LLM. Crea un proyecto sintético con
+`PROJECT_ID=2` si no existe, pasa por las 7 etapas, ejecuta el control de
+calidad y genera el ZIP.
 
 ```bash
-python verify_fosiles.py
+python verify_project.py
 ```
 
 Útil para detectar regresiones sin depender de un LLM real.
