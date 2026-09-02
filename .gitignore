@@ -45,3 +45,10 @@ project-run-*.png
 # Assets locales generados por la app (uploads de usuario).
 # El directorio no existe aún; se anticipa para evitar commits accidentales.
 static/uploads/
+
+# Salida runtime de verify_project.py (proyecto sintetico con PROJECT_ID=2).
+# `projects/` SÍ se versiona con proyectos reales del usuario (Fosiles,
+# Arboles, etc.), pero la regeneracion automatica de la verificacion no
+# debe contaminar `git status`.
+projects/Verificacion_pipeline_*/
+projects/Verificacion_pipeline_*.zip

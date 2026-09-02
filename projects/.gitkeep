@@ -1,8 +1,11 @@
-Esta carpeta la genera la app en tiempo de ejecucion.
+Esta carpeta contiene los proyectos reales del usuario y se versiona.
 
-Cada proyecto que el usuario crea via la UI sincroniza aqui su
-contenido (00_RESUMEN.md, 01_investigacion.md, etc.). Esta en
-.gitignore funcional: los contenidos no se commitean, solo este
-placeholder para que la carpeta exista en el checkout.
+Los proyectos que el usuario crea via la UI sincronizan aqui su
+contenido (00_RESUMEN.md, 01_investigacion.md, etc.) por medio de
+`sync_project_folder()`. El contrato de archivos es fijo.
 
-Para ver un proyecto de muestra oficial, mira `examples/`.
+La salida runtime de `verify_project.py` (proyecto sintetico con
+PROJECT_ID=2) se regenera en esta misma carpeta con el nombre
+`Verificacion_pipeline_2/`, pero esta cubierta por `.gitignore` para
+no contaminar `git status`. El snapshot canonico de esa referencia
+vive en `examples/Verificacion_pipeline_2/`.
