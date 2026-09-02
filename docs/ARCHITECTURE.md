@@ -14,6 +14,11 @@ listo para producción — se pueda ejecutar localmente, auditar con un par
 de tests y desplegar con `waitress` en Windows o el dev-server de Flask
 en cualquier plataforma.
 
+`projects/` es el directorio de exports generados por la app en tiempo
+de ejecución (no se versiona, solo `.gitkeep`). `examples/` contiene la
+muestra oficial `Todo_sobre_los_Fosiles_1/` y su ZIP, versionada como
+referencia del contrato de entrega.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       Navegador                             │

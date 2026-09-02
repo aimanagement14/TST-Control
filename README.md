@@ -16,7 +16,8 @@ TodoSobreTodo/
 ├── workflow.db       # base de datos SQLite (se crea al arrancar)
 ├── templates/        # HTML Jinja2
 ├── static/           # CSS y JS de interfaz
-├── projects/         # exportaciones
+├── projects/         # exports generados por la app (no versionados)
+├── examples/         # muestras oficiales versionadas
 └── requirements.txt
 ```
 

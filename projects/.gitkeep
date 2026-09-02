@@ -1,0 +1,8 @@
+Esta carpeta la genera la app en tiempo de ejecucion.
+
+Cada proyecto que el usuario crea via la UI sincroniza aqui su
+contenido (00_RESUMEN.md, 01_investigacion.md, etc.). Esta en
+.gitignore funcional: los contenidos no se commitean, solo este
+placeholder para que la carpeta exista en el checkout.
+
+Para ver un proyecto de muestra oficial, mira `examples/`.
