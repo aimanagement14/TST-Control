@@ -16,13 +16,19 @@ Guía para agentes de IA que trabajan en este proyecto.
 
 ## Estructura
 
-- `app.py` — monolito deliberado: rutas + servicios de dominio + parsers + QC.
-  Las funciones puras de parsing/QC viven a nivel de módulo y se cubren con
-  `test_core.py`.
+- `app.py` — pieza central del monolito (ADR-001): rutas clásicas por etapa,
+  configuración, gestión de BD, registro de blueprints. Conserva además los
+  builders/persistencia de etapas y el ejecutor del grafo; las funciones puras
+  viven fuera (ver `services/` y `blueprints/`).
+- `services/` — funciones puras extraídas en T2.1 (parsers, `call_llm`, QC).
+  **No** dependen de `request`/`g`/`session`. Cubiertas por `test_core.py`.
+- `blueprints/` — `graph_bp` y `runner_bp` extraídos en T2.2 como PoC del
+  monolito. Cada blueprint declara su `url_prefix` y usa local imports para
+  evitar ciclos con `app`.
 - `templates/` — Jinja2. `_macros.html`, `_rail.html`, `_stepper.html` para
   piezas reutilizables; el resto son páginas por etapa.
 - `static/` — JS/CSS sin bundler. `app.js` para chrome general, `graph.js`
-  para el editor de grafo (React Flow v12 por importmap).
+  + `static/graph/*.js` para el editor de grafo (React Flow v12 por importmap).
 - `config.json` — única fuente para prompts SYS/USER, presets LLM, umbrales
   QC y tema visual. No se mueve a YAML/ENV sin motivo.
 - `workflow.db` — SQLite. Migraciones controladas por `_schema_migrations`
