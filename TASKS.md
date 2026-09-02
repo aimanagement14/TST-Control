@@ -16,6 +16,16 @@ publicarse una versión.
 - [x] T0.4 — Logging estructurado (`logging.basicConfig` + logger
   `tst`) en arranque y rutas; nivel configurable con `TST_LOG_LEVEL`.
 
+### Sprint auditoría 2026-09 (Phase 1 — Dependencias y CI)
+
+- [x] T1.1 — Lockfile reproducible: `requirements.in` (specs) +
+  `requirements.lock` (versions pinned de transitivas) +
+  `requirements.txt` (copia del lock para `pip install` directo en
+  CI y dev).
+- [x] T1.2 — Workflow de CI en `.github/workflows/ci.yml`: corre
+  `test_core.py` y `verify_project.py` en Python 3.13 sobre
+  `push` y `pull_request` a `main`. Badge en `README.md`.
+
 - [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.

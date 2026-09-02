@@ -15,6 +15,13 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
   handlers migran a `log.warning` / `log.exception` para dejar
   trazabilidad antes de abordar `except Exception:` silenciosos
   (T3.1).
+- Lockfile reproducible: `requirements.in` (specs de alto nivel) +
+  `requirements.lock` (versiones pinned de todas las transitivas,
+  generado con `pip-tools`) + `requirements.txt` (copia del lock
+  para `pip install -r` directo en CI y dev).
+- Workflow de CI (`.github/workflows/ci.yml`): corre `test_core.py`
+  y `verify_project.py` en Python 3.13 sobre `push` y
+  `pull_request` a `main`. Badge en `README.md`.
 
 ### Changed
 
