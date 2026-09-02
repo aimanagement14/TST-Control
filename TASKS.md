@@ -132,6 +132,23 @@ publicarse una versión.
 
 ## Cerradas (vista resumida)
 
+### Auditoría 2026-09-02
+
+- [x] T-DOC-1 — `AGENTS.md` actualizado para reflejar la extracción de
+  `services/` (T2.1) y `blueprints/` (T2.2) en lugar de declarar el
+  monolito como única capa.
+- [x] T-LAYOUT-1 — Proyectos huérfanos versionados en `projects/`
+  (`Todo_sobre_los_arboles_gigantes_9/`, `Verificacion_pipeline_2/` y
+  su `.zip`) movidos a `examples/` con `git mv`. `projects/` queda
+  con `.gitkeep` exclusivamente.
+- [x] T-DOC-2 — `README.md` lista `services/` y `blueprints/` en el
+  árbol del proyecto, junto a las tres muestras oficiales en
+  `examples/` (Fosiles, Arboles, Pipeline).
+- [x] T-DOC-3 — `LICENSE` MIT añadido en la raíz (recomendación de
+  `devkit audit`).
+- [x] Validación: `python test_core.py` y `python verify_project.py`
+  verdes tras el movimiento de proyectos.
+
 ### Reducción de pipeline 2026-08-29
 
 - [x] Eliminar etapa 06 «Prompts visuales» (ruta, plantilla, builder,
