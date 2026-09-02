@@ -33,9 +33,16 @@ Guía para agentes de IA que trabajan en este proyecto.
   QC y tema visual. No se mueve a YAML/ENV sin motivo.
 - `workflow.db` — SQLite. Migraciones controladas por `_schema_migrations`
   (idempotentes).
+- `projects/` — proyectos reales del usuario, **versionados**. Cada uno vive
+  en `projects/<safe_name>_<id>/` (carpeta sincronizada con
+  `sync_project_folder()`) y, opcionalmente, `projects/<safe_name>_<id>.zip`.
+- `examples/` — referencia canónica del pipeline. Hoy contiene solo
+  `Verificacion_pipeline_2/` (y su `.zip`), snapshot del proyecto sintético
+  que `verify_project.py` regenera cada vez que corre.
 - `test_core.py` — parsers, QC, utilidades, prompts por perfil, CRUD de grafo.
 - `verify_project.py` — verificación end-to-end con datos simulados de LLM
-  (`PROJECT_ID = 2`, crea proyecto sintético si no existe).
+  (`PROJECT_ID = 2`, crea proyecto sintético si no existe). Su salida
+  (`projects/Verificacion_pipeline_2*`) está cubierta por `.gitignore`.
 - `docs/ARCHITECTURE.md` y `docs/DECISIONS.md` — las decisiones técnicas y
   de arquitectura viven ahí, no en comentarios sueltos.
 

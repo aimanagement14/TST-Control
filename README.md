@@ -18,8 +18,8 @@ TodoSobreTodo/
 ├── workflow.db       # base de datos SQLite (se crea al arrancar)
 ├── templates/        # HTML Jinja2
 ├── static/           # CSS y JS de interfaz
-├── projects/         # exports generados por la app en runtime (no versionados)
-├── examples/         # muestras oficiales versionadas (Fosiles, Arboles, Pipeline)
+├── projects/         # proyectos reales del usuario (versionados); el output de verify_project.py va a .gitignore
+├── examples/         # referencia canonica del pipeline (Verificacion_pipeline_2 + .zip)
 └── requirements.txt
 ```
 

@@ -14,10 +14,13 @@ listo para producción — se pueda ejecutar localmente, auditar con un par
 de tests y desplegar con `waitress` en Windows o el dev-server de Flask
 en cualquier plataforma.
 
-`projects/` es el directorio de exports generados por la app en tiempo
-de ejecución (no se versiona, solo `.gitkeep`). `examples/` contiene la
-muestra oficial `Todo_sobre_los_Fosiles_1/` y su ZIP, versionada como
-referencia del contrato de entrega.
+`projects/` contiene los proyectos reales del usuario y se versiona
+(cada uno en `projects/<safe_name>_<id>/` más, opcionalmente,
+`projects/<safe_name>_<id>.zip`). El output runtime de `verify_project.py`
+(`projects/Verificacion_pipeline_2*`) está cubierto por `.gitignore` para
+no contaminar `git status`. `examples/` guarda la referencia canónica del
+pipeline: hoy solo `Verificacion_pipeline_2/` (y su `.zip`), snapshot del
+proyecto sintético que `verify_project.py` regenera cada vez que corre.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -141,7 +144,10 @@ solo se solicita al abrir `/profiles/<id>/graph` o
   Sustituye `DB_PATH` por una ruta temporal durante los tests QC/export.
 - `verify_project.py`: smoke test end-to-end que ejecuta el flujo
   completo contra `app.test_client()` con datos simulados. Crea un
-  proyecto sintético con `PROJECT_ID=2` si no existe.
+  proyecto sintético con `PROJECT_ID=2` si no existe. Su salida se
+  regenera en `projects/Verificacion_pipeline_2/` y queda cubierta
+  por `.gitignore`; el snapshot canónico de esa referencia vive en
+  `examples/Verificacion_pipeline_2/`.
 
 ## Modelo de datos
 
