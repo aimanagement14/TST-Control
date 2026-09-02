@@ -9,6 +9,38 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- Logger estructurado `tst` (`logging.basicConfig` con nivel
+  configurable vía `TST_LOG_LEVEL`). Los prints del bloque `__main__`
+  migran a `log.info` / `log.error`, y los prints de error en
+  handlers migran a `log.warning` / `log.exception` para dejar
+  trazabilidad antes de abordar `except Exception:` silenciosos
+  (T3.1).
+
+### Changed
+
+- `app.secret_key` deja de leerse de `config.json` (que ya no la
+  contiene). Ahora se lee de la variable de entorno
+  `FLASK_SECRET_KEY`, con fallback a `config.json` solo para dev.
+  Sin variable definida, `app.py` falla con `RuntimeError` claro al
+  arrancar.
+- `PRODUCT.md` y `README.md` alinean el pipeline a las 8 etapas
+  reales (`research → concept → scripts → scenes → metadata →
+  thumbnails → qc → export`). Las menciones históricas a la
+  reducción de 8 a 7 etapas (CHANGELOG, docs/DECISIONS) se
+  mantienen como contexto de la decisión 2026-08-29.
+
+### Fixed
+
+- **Seguridad**: `config.json` ya no contiene la clave de Flask en
+  claro. Se sustituye por `FLASK_SECRET_KEY` (variable de entorno)
+  con fallback a `config.json` solo para dev. `README.md` documenta
+  cómo generar la clave con
+  `python -c 'import secrets; print(secrets.token_hex(32))'`.
+
+_Entradas previas del [Unreleased] abiertas antes del editor de grafo:_
+
+### Added
+
 - Editor visual de grafo por perfil (`/profiles/<id>/graph`): React
   Flow v12 cargado por importmap desde `esm.sh` (sin build step, sin
   dependencias NPM). Nueve nodos fijos pre-creados (research, concept,

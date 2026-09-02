@@ -5,6 +5,17 @@ publicarse una versión.
 
 ## Pendientes
 
+### Sprint auditoría 2026-09 (Phase 0 — Quick wins)
+
+- [x] T0.1 — `secret_key` desde variable de entorno
+  (`FLASK_SECRET_KEY`), con fallback a `config.json` solo para dev.
+- [x] T0.2 — Corregir "7 etapas" en `PRODUCT.md` y `README.md` (ahora
+  8 etapas: research → concept → scripts → scenes → metadata →
+  thumbnails → qc → export).
+- [x] T0.3 — Añadir `static/uploads/` a `.gitignore`.
+- [x] T0.4 — Logging estructurado (`logging.basicConfig` + logger
+  `tst`) en arranque y rutas; nivel configurable con `TST_LOG_LEVEL`.
+
 - [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.
