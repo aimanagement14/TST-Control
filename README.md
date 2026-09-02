@@ -11,13 +11,15 @@ No genera imágenes, videos ni audio. Solo planifica y prepara.
 
 ```
 TodoSobreTodo/
-├── app.py            # toda la lógica
+├── app.py            # pieza central: rutas, BD, registro de blueprints
+├── services/         # funciones puras (parsers, llm, qc) extraídas del monolito
+├── blueprints/       # graph_bp y runner_bp (editor de grafo + runner por proyecto)
 ├── config.json       # configuración, perfiles, plantillas de prompts
 ├── workflow.db       # base de datos SQLite (se crea al arrancar)
 ├── templates/        # HTML Jinja2
 ├── static/           # CSS y JS de interfaz
-├── projects/         # exports generados por la app (no versionados)
-├── examples/         # muestras oficiales versionadas
+├── projects/         # exports generados por la app en runtime (no versionados)
+├── examples/         # muestras oficiales versionadas (Fosiles, Arboles, Pipeline)
 └── requirements.txt
 ```
 
