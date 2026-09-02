@@ -21,13 +21,18 @@ en cualquier plataforma.
                           │  HTTP
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Flask app (app.py)                                         │
+│  Flask app (app.py + blueprints/)                           │
+│  ┌────────────┐ ┌───────────────────────┐ ┌──────────────┐  │
+│  │  Rutas     │ │  Blueprints (T2.2)    │ │  Re-exports  │  │
+│  │  (vistas)  │ │  graph_bp / runner_bp │ │  de services │  │
+│  └────────────┘ └───────────────────────┘ └──────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  services/ (T2.1) — funciones no-HTTP                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │   Rutas      │  │   Parsers    │  │  LLM client       │  │
-│  │  (vistas)    │  │              │  │  (manual / API)   │  │
-│  └──────────────┘  └──────────────┘  └───────────────────┘  │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │  QC engine   │  │  Export ZIP  │  │  Prompt builder   │  │
+│  │   parsers    │  │     llm      │  │       qc          │  │
 │  └──────────────┘  └──────────────┘  └───────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                           │  sqlite3
@@ -46,21 +51,47 @@ en cualquier plataforma.
 
 ### `app.py`
 
-Único módulo Python de la aplicación. Se organiza internamente en
-secciones marcadas con comentarios `---`:
+Monolito Flask que sigue siendo la pieza central del proyecto
+(ADR-001), pero ahora **delega** parte de su trabajo a `services/`
+y `blueprints/`. Conserva internamente:
 
 | Sección | Responsabilidad |
 |---------|-----------------|
-| Configuración | Carga `config.json`, instancia Flask, sirve `/favicon.ico`. |
+| Configuración | Carga `config.json`, instancia Flask, sirve `/favicon.ico`, registra los blueprints (`graph_bp`, `runner_bp`). |
 | Base de datos | Define el `SCHEMA` (13 tablas tras el editor de grafo), expone `get_db()` con rows como `sqlite3.Row` y `init_db()` para sembrar el perfil por defecto y aplicar migraciones idempotentes controladas por `_schema_migrations`. |
 | Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto, resolución de prompt por perfil (`resolve_stage_prompt`) con fallback a `config.json`. |
-| LLM client | `call_llm` con cuatro proveedores (`manual`, `openai`, `anthropic`, `custom`). Resuelve un preset activo sobre el bloque legacy. |
-| Parsers | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_metadata`, `parse_thumbnail`. Toleran respuestas del LLM con prosa alrededor. |
-| QC | `run_qc` (lista de tuplas `stage/severity/message/field`) + `save_qc_issues`. |
-| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 9 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), 7 rutas en `/profiles/<id>/graph/*` y `/projects/<id>/run/*`, ejecutor unificado (`execute_graph_node`) que despacha a los builders/parsers existentes para los nodos fijos y hace `call_llm` directo para nodos custom. |
-| Rutas | Una vista por etapa + dashboard + perfiles + editor de grafo + runner + settings + export. |
+| LLM client | Re-exporta `call_llm`, `_manual_fallback`, `llm_output_is_manual` desde `services.llm` (T2.1). |
+| Parsers | Re-exporta `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail` desde `services.parsers` (T2.1). |
+| QC | Re-exporta `run_qc` y `save_qc_issues` desde `services.qc` (T2.1). |
+| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 9 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), helpers de persistencia. Las rutas HTTP viven ahora en `blueprints/graph.py`. |
+| Runner | Lógica de `execute_graph_node` y helpers. Las rutas HTTP viven en `blueprints/runner.py`. |
+| Rutas | Vistas por etapa, dashboard, perfiles (excepto graph), settings y export. |
 | Contexto plantilla | Inyecta `app_name`, `app_tagline`, `app_version` en cada render. |
 | Arranque | `python app.py` (dev) o `python app.py --prod` (waitress). |
+
+### `services/`
+
+Funciones puras o casi-puras extraídas de `app.py` durante T2.1.
+**No** dependen de Flask context (`request`, `g`, `session`).
+`services.llm` y `services.qc` hacen local import de `app` para
+leer `CONFIG`, `get_db` y compañía, evitando ciclos.
+
+| Archivo | Funciones |
+|---------|-----------|
+| `services/parsers.py` | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_scenes`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail`, `count_words`, `estimate_duration_seconds`. |
+| `services/llm.py` | `call_llm`, `_manual_fallback`, `llm_output_is_manual`. |
+| `services/qc.py` | `run_qc`, `save_qc_issues`. |
+
+### `blueprints/`
+
+Blueprints Flask extraídos de `app.py` durante T2.2. Cada
+blueprint declara su `url_prefix` y los handlers usan local import
+de `app` para resolver helpers de dominio sin ciclos.
+
+| Blueprint | Prefijo | Rutas |
+|-----------|---------|-------|
+| `blueprints/graph.py` (`graph_bp`) | `/profiles` | GET `/<id>/graph`, POST `/<id>/graph/save-node`, POST `/<id>/graph/delete-node`, POST `/<id>/graph/layout`. |
+| `blueprints/runner.py` (`runner_bp`) | `/projects` | GET `/<id>/run`, POST `/<id>/run/execute`, POST `/<id>/run/reset-node`. |
 
 ### `config.json`
 

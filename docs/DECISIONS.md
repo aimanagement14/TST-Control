@@ -255,3 +255,58 @@ página para revisar el conjunto.
   `stage_prompts → profile_prompts`, y la rama custom del ejecutor;
   `verify_fosiles.py` sigue cubriendo el flujo end-to-end clásico,
   que no cambia.
+
+## 2026-09-01 — Extracción de services/ y blueprints/ como PoC
+
+**Contexto:** El monolito deliberado (ADR-001) había crecido hasta
+3 500 líneas y la auditoría 2026-09-01 identificó que mezclaba
+varias responsabilidades (rutas HTTP, parsers, llamadas LLM, reglas
+QC, prompts builders, persistencia). El monolito sigue siendo válido
+como filosofía de proyecto pero dos áreas estaban claramente
+aisladas del resto: el editor de grafo (`/profiles/<id>/graph/*`) y
+el runner (`/projects/<id>/run/*`), candidatos naturales a blueprint.
+También había lógica no-HTTP (parsers puros, `call_llm`, `run_qc`)
+que vivía entre las rutas y dificultaba los tests aislados.
+
+**Decisión:** Hacer una **PoC** que valida dos extracciones
+mínimas e independientes:
+
+1. `services/` para funciones puras / no-HTTP:
+   - `services/parsers.py` — 9 parsers + `count_words`,
+     `estimate_duration_seconds`. Sin dependencias de Flask, CONFIG
+     ni DB.
+   - `services/llm.py` — `call_llm`, `_manual_fallback`,
+     `llm_output_is_manual`. Lee `CONFIG` con local import.
+   - `services/qc.py` — `run_qc`, `save_qc_issues`. Lee `get_db`,
+     `CONFIG["qc"]["checks"]`, `format_timecode`, `now_iso` con
+     local import.
+
+2. `blueprints/` para dominios aislados:
+   - `blueprints/graph.py` — `graph_bp` con las 4 rutas del editor.
+   - `blueprints/runner.py` — `runner_bp` con las 3 rutas del
+     runner. Cada blueprint usa local import dentro de los handlers
+     para romper el ciclo con `app.py`.
+
+`app.py` re-exporta los símbolos extraídos para preservar la API
+existente (`from app import parse_research` sigue funcionando, lo
+que evita tocar `test_core.py` ni `verify_project.py`).
+
+**Consecuencias:**
+- `app.py` pasa de 3 500 a 2 477 líneas (-29%).
+- La separación `services/` vs `blueprints/` deja clara la frontera
+  entre lógica reutilizable (sin Flask) y capa HTTP.
+- Los local imports rompen los ciclos a costa de un coste mínimo
+  en tiempo de import por request (resoluble con caché si hace
+  falta, no es problema hoy).
+- Las plantillas que recibían `graph_data.saveUrl`/etc. no cambian
+  porque los blueprints siguen emitiendo las mismas URLs vía
+  `url_for(...)` con prefijo del blueprint.
+
+**Reversibilidad (qué se撤収 si la PoC no convence):**
+- `git revert` de los commits de T2.1 y T2.2.
+- El monolito sigue funcionando idéntico porque `app.py`
+  re-exporta los símbolos. Solo cambia la estructura de carpetas.
+- Si la fricción (local imports, navegación entre archivos,
+  doble fuente de verdad) supera el beneficio, ADR-001 sigue
+  vigente y se documenta aquí que "monolito confirmado para este
+  proyecto".
