@@ -39,6 +39,26 @@ publicarse una versión.
   explícita. `docs/ARCHITECTURE.md` actualizado con el diagrama
   y la tabla de módulos.
 
+### Sprint auditoría 2026-09 (Phase 3 — Robustez)
+
+- [x] T3.1 — Logging en `except Exception:` silenciosos. Cubre
+  ~20 casos en `app.py` (rollback teardown, json.loads en parser
+  best-effort, JSON.parse de platforms, persistencia de error en
+  `node_executions`, etc.) y los 7 de `services/parsers.py` /
+  `services/llm.py`. Criterio: `log.exception` para críticos de
+  mutación, `log.warning` para recuperables, `log.debug` para
+  silenciosos legítimos con comentario.
+- [x] T3.2 — `static/graph.js` dividido en 4 módulos ESM bajo
+  `static/graph/` (`nodes.js`, `api.js`, `layout.js`,
+  `index.js`). El `graph.js` queda como re-export de 6 líneas
+  para no tocar las plantillas. Smoke test del editor y del
+  runner OK.
+- [x] T3.3 — Muestra oficial `Todo_sobre_los_Fosiles_1/` movida
+  a `examples/` con `git mv` (preserva historial). `projects/`
+  queda con `.gitkeep` que explica que su contenido lo genera la
+  app en runtime. `app.py` ya usaba `PROJECTS_DIR`, sin paths
+  hardcodeados.
+
 - [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.

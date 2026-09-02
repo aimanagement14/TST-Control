@@ -43,6 +43,16 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
   thumbnails → qc → export`). Las menciones históricas a la
   reducción de 8 a 7 etapas (CHANGELOG, docs/DECISIONS) se
   mantienen como contexto de la decisión 2026-08-29.
+- `static/graph.js` se divide en 4 módulos ESM bajo `static/graph/`
+  (`nodes.js`, `api.js`, `layout.js`, `index.js`). `graph.js`
+  queda como re-export de 6 líneas para preservar el `<script
+  src="graph.js">` de las plantillas. Cada módulo tiene una
+  responsabilidad única: componentes UI, backend client + stubs,
+  layout helpers, y entry que monta la app.
+- `examples/` recibe la muestra oficial versionada
+  `Todo_sobre_los_Fosiles_1/` (con su `.zip`). `projects/`
+  queda como directorio generado por la app en runtime, con
+  `.gitkeep` que lo explica.
 
 ### Fixed
 
