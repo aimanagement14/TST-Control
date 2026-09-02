@@ -2,8 +2,7 @@
   "app": {
     "name": "Todo Sobre Todo",
     "tagline": "Centro de producción de contenido",
-    "version": "1.0.0",
-    "secret_key": "tst-local-dev-key-change-in-production"
+    "version": "1.0.0"
   },
   "llm": {
     "provider": "manual",

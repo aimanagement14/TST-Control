@@ -44,7 +44,13 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
 PROJECTS_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
-app.secret_key = CONFIG["app"]["secret_key"]
+_secret_key = os.environ.get("FLASK_SECRET_KEY") or CONFIG.get("app", {}).get("secret_key", "")
+if not _secret_key:
+    raise RuntimeError(
+        "FLASK_SECRET_KEY no definida. Exporta la variable de entorno "
+        "(recomendado) o define 'app.secret_key' en config.json solo para dev local."
+    )
+app.secret_key = _secret_key
 app.config["JSON_AS_ASCII"] = False
 # TEMPLATES_AUTO_RELOAD: si no se fija, Flask lo iguala a `app.debug` —
 # True en dev (autoreload al editar plantillas), False en prod (Waitress)

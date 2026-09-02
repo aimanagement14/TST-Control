@@ -26,10 +26,17 @@ Sin ORM, sin microservicios, sin 47 capas de abstracción.
 # 1. Dependencias (solo Flask)
 python3 -m pip install -r requirements.txt
 
-# 2. Arrancar
+# 2. Generar y exportar la clave secreta de Flask (obligatorio)
+#    PowerShell:
+$env:FLASK_SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+#    bash / WSL:
+#    export FLASK_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+#    Si no defines la variable, app.py falla al arrancar con un RuntimeError claro.
+
+# 3. Arrancar
 python3 app.py
 
-# 3. Abrir
+# 4. Abrir
 # http://localhost:5000
 ```
 
