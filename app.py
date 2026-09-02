@@ -15,6 +15,7 @@ import sys
 import json
 import sqlite3
 import time
+import logging
 import urllib.request
 import zipfile
 import shutil
@@ -26,6 +27,12 @@ from flask import (
     flash, jsonify, send_file, send_from_directory, abort, session, g,
     has_app_context,
 )
+
+logging.basicConfig(
+    level=os.environ.get("TST_LOG_LEVEL", "INFO"),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+log = logging.getLogger("tst")
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -393,7 +400,7 @@ def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
     cfg = CONFIG.get("prompts", {}).get(stage)
     if cfg:
         return cfg.get("system", ""), cfg.get("format", "")
-    print(f"[resolve_stage_prompt] stage '{stage}' no existe en CONFIG['prompts']")
+    log.warning("[resolve_stage_prompt] stage '%s' no existe en CONFIG['prompts']", stage)
     return "", ""
 
 
@@ -1447,7 +1454,7 @@ def build_metadata_prompt(project, profile, script, platform):
     )
     cfg = CONFIG["prompts"].get(key)
     if not cfg:
-        print(f"[build_metadata_prompt] platform '{platform}' no tiene prompt en CONFIG")
+        log.warning("[build_metadata_prompt] platform '%s' no tiene prompt en CONFIG", platform)
         return "", ""
     sys_prompt = cfg["system"]
     fmt = cfg["format"]
@@ -2166,7 +2173,7 @@ def new_project():
         try:
             sync_project_folder(new_id)
         except Exception as e:
-            print(f"[sync_project_folder] create project {new_id}: {e}")
+            log.exception("[sync_project_folder] create project %s", new_id)
         return redirect(url_for("view_project", project_id=new_id))
     return render_template("new_project.html", profiles=profiles, default_profile=get_default_profile())
 
@@ -2196,7 +2203,7 @@ def delete_project(project_id):
         try:
             delete_project_folder(project_id, name)
         except Exception as e:
-            print(f"[delete_project_folder] {project_id}: {e}")
+            log.exception("[delete_project_folder] %s", project_id)
     flash("Proyecto eliminado", "ok")
     return redirect(url_for("dashboard"))
 
@@ -2242,7 +2249,7 @@ def research(project_id):
             try:
                 sync_project_folder(project_id)
             except Exception as e:
-                print(f"[sync_project_folder] research {project_id}: {e}")
+                log.exception("[sync_project_folder] research %s", project_id)
             return redirect(url_for("research", project_id=project_id))
 
     sources = json.loads(research_obj.get("sources") or "[]")
@@ -2297,7 +2304,7 @@ def concept(project_id):
             try:
                 sync_project_folder(project_id)
             except Exception as e:
-                print(f"[sync_project_folder] concept {project_id}: {e}")
+                log.exception("[sync_project_folder] concept %s", project_id)
             return redirect(url_for("concept", project_id=project_id))
 
     key_points = json.loads(concept_obj.get("key_points") or "[]")
@@ -2370,7 +2377,7 @@ def scripts(project_id):
             try:
                 sync_project_folder(project_id)
             except Exception as e:
-                print(f"[sync_project_folder] scripts {project_id}: {e}")
+                log.exception("[sync_project_folder] scripts %s", project_id)
             return redirect(url_for("scripts", project_id=project_id))
 
     return render_template("scripts.html", project=project, profile=profile,
@@ -2475,7 +2482,7 @@ def scenes(project_id):
             try:
                 sync_project_folder(project_id)
             except Exception as e:
-                print(f"[sync_project_folder] scenes {project_id}: {e}")
+                log.exception("[sync_project_folder] scenes %s", project_id)
             return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
         elif action == "delete":
             scene_id = request.form.get("scene_id")
@@ -2567,7 +2574,7 @@ def metadata(project_id):
             try:
                 sync_project_folder(project_id)
             except Exception as e:
-                print(f"[sync_project_folder] metadata {project_id}: {e}")
+                log.exception("[sync_project_folder] metadata %s", project_id)
             return redirect(url_for("metadata", project_id=project_id))
 
     for m in meta_by_platform.values():
@@ -2661,7 +2668,7 @@ def thumbnails(project_id):
                 try:
                     sync_project_folder(project_id)
                 except Exception as e:
-                    print(f"[sync_project_folder] thumbnails {project_id}: {e}")
+                    log.exception("[sync_project_folder] thumbnails %s", project_id)
             return redirect(url_for("thumbnails", project_id=project_id))
 
     return render_template("thumbnails.html", project=project, profile=profile,
@@ -2697,7 +2704,7 @@ def qc(project_id):
         try:
             sync_project_folder(project_id)
         except Exception as e:
-            print(f"[sync_project_folder] qc {project_id}: {e}")
+            log.exception("[sync_project_folder] qc %s", project_id)
         if not issues:
             return redirect(url_for("qc", project_id=project_id, clean=1))
         return redirect(url_for("qc", project_id=project_id))
@@ -3457,14 +3464,14 @@ with app.app_context():
     init_db()
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print(f"  {CONFIG['app']['name']} — {CONFIG['app']['tagline']}")
-    print(f"  v{CONFIG['app']['version']}")
-    print("=" * 60)
-    print(f"  Base de datos: {DB_PATH}")
-    print(f"  Exportaciones: {PROJECTS_DIR}")
-    print(f"  LLM provider: {CONFIG['llm']['provider']}")
-    print("=" * 60)
+    log.info("=" * 60)
+    log.info("  %s — %s", CONFIG["app"]["name"], CONFIG["app"]["tagline"])
+    log.info("  v%s", CONFIG["app"]["version"])
+    log.info("=" * 60)
+    log.info("  Base de datos: %s", DB_PATH)
+    log.info("  Exportaciones: %s", PROJECTS_DIR)
+    log.info("  LLM provider: %s", CONFIG["llm"]["provider"])
+    log.info("=" * 60)
 
     # Permitir elegir servidor con variable de entorno:
     #   python app.py              -> dev (Flask/Werkzeug, con debug + autoreload)
@@ -3476,18 +3483,18 @@ if __name__ == "__main__":
         try:
             from waitress import serve
         except ImportError:
-            print("  ERROR: waitress no instalado. Ejecuta: pip install waitress")
+            log.error("waitress no instalado. Ejecuta: pip install waitress")
             sys.exit(1)
         host = os.environ.get("TST_HOST", "0.0.0.0")
         port = int(os.environ.get("TST_PORT", "5000"))
         threads = int(os.environ.get("TST_THREADS", "4"))
-        print(f"  Servidor: Waitress (producción) · {host}:{port} · {threads} hilos")
-        print(f"  Abre http://localhost:{port} en tu navegador")
-        print("=" * 60)
+        log.info("  Servidor: Waitress (producción) · %s:%s · %s hilos", host, port, threads)
+        log.info("  Abre http://localhost:%s en tu navegador", port)
+        log.info("=" * 60)
         serve(app, host=host, port=port, threads=threads)
     else:
-        print("  Servidor: Flask dev (debug) — usa --prod o TST_SERVER=waitress")
-        print("             para entorno de producción.")
-        print("  Abre http://localhost:5000 en tu navegador")
-        print("=" * 60)
+        log.info("  Servidor: Flask dev (debug) — usa --prod o TST_SERVER=waitress")
+        log.info("             para entorno de producción.")
+        log.info("  Abre http://localhost:5000 en tu navegador")
+        log.info("=" * 60)
         app.run(host="0.0.0.0", port=5000, debug=True)
