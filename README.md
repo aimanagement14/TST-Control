@@ -1,5 +1,7 @@
 # Todo Sobre Todo — Centro de producción de contenido
 
+![CI](https://github.com/aimanagement14/TST-Control/actions/workflows/ci.yml/badge.svg)
+
 Herramienta local para **planear, investigar y preparar todo el contenido**
 antes de pasar a producción audiovisual.
 
