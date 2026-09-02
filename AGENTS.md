@@ -47,8 +47,14 @@ Guía para agentes de IA que trabajan en este proyecto.
   el editor de grafo del perfil cambia el comportamiento de todos sus
   proyectos.
 - QC engine: `error` bloquea la transición a `ready`; `warning` e `info` no.
-- Exportación a ZIP en `projects/<safe_name>_<id>.zip` con contrato fijo
-  (`00_RESUMEN.md`, `01_investigacion.md`, …, `08_paquete_completo.json`).
+- La carpeta del proyecto en `projects/<safe_name>_<id>/` se sincroniza
+  automáticamente con `sync_project_folder()` cada vez que se crea el
+  proyecto o se guarda cualquier etapa (research, concept, scripts, scenes,
+  metadata, thumbnails, qc). El contrato de archivos es fijo:
+  `00_RESUMEN.md`, `01_investigacion.md`, …, `08_paquete_completo.json`.
+- El ZIP en `projects/<safe_name>_<id>.zip` es opcional: solo se genera
+  bajo demanda desde `POST /projects/<id>/export action=zip`. Borrar un
+  proyecto elimina también su carpeta.
 
 ## Frontend
 

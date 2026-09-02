@@ -4,11 +4,18 @@
 {% block title %}Exportar · {{ project.name }}{% endblock %}
 
 {% block content %}
-{% call ui.stage_head(project, '08', 'Exportar',
-        'El proyecto empaquetado en Markdown y JSON, listo para tu pipeline de producción.') %}
-<form method="post">
-    <button class="btn btn-primary btn-lg">Generar paquete ZIP</button>
-</form>
+{% call ui.stage_head(project, '08', 'Carpeta del proyecto',
+        'Todo se sincroniza automáticamente en projects/' ~ folder.name ~ '/. El ZIP es opcional, solo si quieres llevártelo a otro lado.') %}
+<div class="actions">
+    <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="resync">
+        <button class="btn btn-ghost">Re-sincronizar carpeta</button>
+    </form>
+    <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="zip">
+        <button class="btn btn-primary">Descargar ZIP (opcional)</button>
+    </form>
+</div>
 {% endcall %}
 
 {% if qc_errors %}
@@ -24,28 +31,19 @@
 <div class="work">
     <div class="panel">
         <div class="panel-head">
-            <h3>Contenido del paquete</h3>
-            <span class="chip">{{ project.name }}.zip</span>
+            <h3>Archivos en la carpeta</h3>
+            <span class="chip mono">{{ folder_files|length }} ítems</span>
         </div>
-        <ul class="data-list">
-            <li><span><code>00_RESUMEN.md</code> — tema, perfil y estado</span><b>siempre</b></li>
-            <li><span><code>01_investigacion.md</code> — investigación y fuentes</span>
-                <b>{% if has_research %}incluido{% else %}vacío{% endif %}</b></li>
-            <li><span><code>02_concepto.md</code> — ángulo, tesis y puntos clave</span>
-                <b>{% if has_concept %}incluido{% else %}vacío{% endif %}</b></li>
-            <li><span><code>03_guiones/</code> — versiones de 5 y 1 minuto</span>
-                <b>{{ scripts|length }}</b></li>
-            <li><span><code>04_escenas/escenas.md</code> — texto de audio e imagen por escena</span>
-                <b>{{ scenes|length }}</b></li>
-            <li><span><code>05_metadata/</code> — una ficha por plataforma</span>
-                <b>{{ metadata|length }}</b></li>
-            <li><span><code>06_thumbnails/</code> — prompts visuales de miniatura por guion</span>
-                <b>{{ thumbnails|length }}</b></li>
-            <li><span><code>07_prompts_usados.md</code> — prompts con los que se generó todo</span>
-                <b>siempre</b></li>
-            <li><span><code>08_paquete_completo.json</code> — todo en JSON</span><b>siempre</b></li>
+        <p class="hint mt-1">
+            <code>projects/{{ folder.name }}/</code>
+        </p>
+        <ul class="data-list mt-2">
+            {% for name in folder_files %}
+            <li><code>{{ name }}</code></li>
+            {% else %}
+            <li><span class="hint">Carpeta vacía (ejecuta Re-sincronizar)</span></li>
+            {% endfor %}
         </ul>
-        <p class="hint mt-2">Al generarlo, el ZIP se descarga y queda una copia en <code>projects/</code>.</p>
     </div>
 
     <aside class="work-aside">
@@ -57,15 +55,16 @@
                 <li><span>Guiones</span><b>{{ scripts|length }}</b></li>
                 <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
                 <li><span>Plataformas</span><b>{{ metadata|length }}</b></li>
-            <li><span>Miniaturas</span><b>{{ thumbnails|length }}</b></li>
+                <li><span>Miniaturas</span><b>{{ thumbnails|length }}</b></li>
             </ul>
         </div>
         <div class="panel">
-            <h4>Destino</h4>
-            <p class="hint mt-1">
-                El nombre del archivo se genera a partir del nombre del proyecto.
-                Si vuelves a exportar, se sobrescribe la copia anterior.
-            </p>
+            <h4>Cómo funciona</h4>
+            <ul class="bullets small">
+                <li>La carpeta se reescribe sola al guardar cada etapa.</li>
+                <li>El ZIP solo se genera cuando pulsas "Descargar ZIP".</li>
+                <li>Si borras el proyecto, su carpeta se borra también.</li>
+            </ul>
         </div>
     </aside>
 </div>

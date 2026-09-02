@@ -560,6 +560,206 @@ def test_export_creates_zip(tmp_path):
         app.PROJECTS_DIR = original
 
 
+def test_new_project_creates_folder(tmp_path):
+    """Al crear un proyecto, sync_project_folder deja 00_RESUMEN.md en disco."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post(
+            "/projects/new",
+            data={"name": "Carpeta auto", "topic": "verifico la sincronización"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 302
+        with app.get_db() as conn:
+            new_id = conn.execute(
+                "SELECT id FROM projects WHERE name='Carpeta auto'"
+            ).fetchone()["id"]
+        folder = app.safe_project_dir(new_id, "Carpeta auto")
+        assert folder.exists(), f"carpeta {folder} no se creó"
+        resumen = (folder / "00_RESUMEN.md").read_text(encoding="utf-8")
+        assert "Carpeta auto" in resumen
+        assert "verifico la sincronización" in resumen
+        print("  ✓ crear proyecto sincroniza la carpeta con 00_RESUMEN.md")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_research_save_syncs_folder(tmp_path):
+    """Guardar investigación reescribe 01_investigacion.md en la carpeta."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+            VALUES (1, 'Sync Test', 'Topic', 'research', '2025-01-01', '2025-01-01')
+        """)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post(
+            "/projects/1/research",
+            data={
+                "action": "save",
+                "content": "## RESUMEN\n\nTexto inicial.\n\n## FUENTES\n- http://a\n- http://b",
+            },
+            follow_redirects=True,
+        )
+        assert r.status_code == 200
+        folder = app.safe_project_dir(1, "Sync Test")
+        inv = (folder / "01_investigacion.md").read_text(encoding="utf-8")
+        assert "Texto inicial" in inv
+        assert "http://a" in inv
+        # Re-save con cambios: el archivo se reescribe
+        r = c.post(
+            "/projects/1/research",
+            data={
+                "action": "save",
+                "content": "## RESUMEN\n\nTexto actualizado.",
+            },
+            follow_redirects=True,
+        )
+        inv = (folder / "01_investigacion.md").read_text(encoding="utf-8")
+        assert "Texto actualizado" in inv
+        assert "Texto inicial" not in inv
+        print("  ✓ guardar research re-sincroniza 01_investigacion.md")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_metadata_save_syncs_folder(tmp_path):
+    """Guardar metadata crea 05_metadata/metadata_<platform>.md en la carpeta."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+            VALUES (1, 'Meta Test', 'Topic', 'metadata', '2025-01-01', '2025-01-01')
+        """)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post(
+            "/projects/1/metadata",
+            data={
+                "action": "save",
+                "platform": "youtube_long",
+                "script_id": "",
+                "text": "## TITULOS (5 opciones)\n1. Uno\n2. Dos\n3. Tres\n4. Cuatro\n5. Cinco\n\n## DESCRIPCION\ndescripción de prueba con suficiente extensión para validar el archivo",
+            },
+            follow_redirects=True,
+        )
+        assert r.status_code == 200
+        folder = app.safe_project_dir(1, "Meta Test")
+        meta = (folder / "05_metadata" / "metadata_youtube_long.md").read_text(
+            encoding="utf-8"
+        )
+        assert "Uno" in meta
+        assert "descripción de prueba" in meta
+        print("  ✓ guardar metadata re-sincroniza 05_metadata/")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_export_get_renders_folder(tmp_path):
+    """GET /export muestra archivos de la carpeta sin crear ZIP."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+            VALUES (1, 'Folder Test', 'Topic', 'ready', '2025-01-01', '2025-01-01')
+        """)
+        conn.execute("""
+            INSERT INTO research (project_id, content, sources, updated_at)
+            VALUES (1, 'investigación', '["s1","s2","s3","s4","s5","s6"]', '2025-01-01')
+        """)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.get("/projects/1/export")
+        assert r.status_code == 200
+        body = r.data.decode("utf-8")
+        assert "Re-sincronizar carpeta" in body
+        assert "Descargar ZIP" in body
+        assert "00_RESUMEN.md" in body
+        assert "01_investigacion.md" in body
+        # La carpeta debe existir tras el GET (sync perezosa)
+        folder = app.safe_project_dir(1, "Folder Test")
+        assert folder.exists()
+        # No debe haberse creado un ZIP sin acción explícita
+        assert not (test_projects / "Folder_Test_1.zip").exists()
+        print("  ✓ GET /export lista la carpeta sin generar ZIP")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_export_resync_action(tmp_path):
+    """POST /export action=resync regenera la carpeta y redirige."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+            VALUES (1, 'Resync Test', 'Topic', 'ready', '2025-01-01', '2025-01-01')
+        """)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post("/projects/1/export",
+                    data={"action": "resync"},
+                    follow_redirects=False)
+        assert r.status_code == 302
+        assert "resync" not in r.headers.get("Location", "").lower() or \
+               "export" in r.headers.get("Location", "")
+        folder = app.safe_project_dir(1, "Resync Test")
+        assert (folder / "00_RESUMEN.md").exists()
+        assert (folder / "08_paquete_completo.json").exists()
+        print("  ✓ POST /export action=resync reescribe la carpeta")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_delete_project_removes_folder(tmp_path):
+    """Borrar el proyecto elimina la carpeta en disco."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+            VALUES (1, 'Doomed', 'Topic', 'research', '2025-01-01', '2025-01-01')
+        """)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        app.sync_project_folder(1)
+        folder = app.safe_project_dir(1, "Doomed")
+        assert folder.exists()
+        c = app.app.test_client()
+        r = c.post("/projects/1/delete", follow_redirects=False)
+        assert r.status_code == 302
+        assert not folder.exists(), "la carpeta debe haberse borrado"
+        with app.get_db() as conn:
+            row = conn.execute("SELECT 1 FROM projects WHERE id=1").fetchone()
+        assert row is None
+        print("  ✓ borrar proyecto elimina la carpeta del proyecto")
+    finally:
+        app.PROJECTS_DIR = original
+
+
 # ==========================================================================
 # Tests de prompts por perfil (graph foundation)
 # ==========================================================================
@@ -976,6 +1176,26 @@ def main():
     print("\n=== TESTS DE EXPORTACIÓN ===")
     with tempfile.TemporaryDirectory() as tmp:
         test_export_creates_zip(Path(tmp))
+        gc.collect()
+
+    print("\n=== TESTS DE SINCRONIZACIÓN DE CARPETA ===")
+    with tempfile.TemporaryDirectory() as tmp:
+        test_new_project_creates_folder(Path(tmp))
+        gc.collect()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_research_save_syncs_folder(Path(tmp))
+        gc.collect()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_metadata_save_syncs_folder(Path(tmp))
+        gc.collect()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_export_get_renders_folder(Path(tmp))
+        gc.collect()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_export_resync_action(Path(tmp))
+        gc.collect()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_delete_project_removes_folder(Path(tmp))
         gc.collect()
 
     print("\n=== TESTS DE PROMPTS POR PERFIL ===")
