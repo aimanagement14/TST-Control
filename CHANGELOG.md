@@ -9,6 +9,7 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 
+- `LICENSE` MIT en la raíz (recomendación de `devkit audit`).
 - Logger estructurado `tst` (`logging.basicConfig` con nivel
   configurable vía `TST_LOG_LEVEL`). Los prints del bloque `__main__`
   migran a `log.info` / `log.error`, y los prints de error en
@@ -33,6 +34,18 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Changed
 
+- **Inversión de layout** (sustituye a la decisión previa en este
+  mismo `[Unreleased]`): `examples/` ya no guarda los proyectos
+  reales del usuario. Ahora contiene solo la **referencia canónica
+  del pipeline** (`Verificacion_pipeline_2/` + `.zip`), snapshot del
+  proyecto sintético que `verify_project.py` regenera cada vez. Los
+  proyectos reales (`Todo_sobre_los_Fosiles_1/`,
+  `Todo_sobre_los_arboles_gigantes_9/`) vuelven a `projects/`, que
+  pasa a estar **versionado**. La salida runtime de `verify_project.py`
+  (`projects/Verificacion_pipeline_2*`) queda cubierta por `.gitignore`
+  para no contaminar `git status`. `AGENTS.md`, `README.md`,
+  `docs/ARCHITECTURE.md` y `projects/.gitkeep` reflejan la nueva
+  semántica.
 - `app.secret_key` deja de leerse de `config.json` (que ya no la
   contiene). Ahora se lee de la variable de entorno
   `FLASK_SECRET_KEY`, con fallback a `config.json` solo para dev.

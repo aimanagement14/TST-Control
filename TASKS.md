@@ -132,15 +132,31 @@ publicarse una versión.
 
 ## Cerradas (vista resumida)
 
+### Auditoría 2026-09-02 — Inversión de layout
+
+- [x] T-LAYOUT-2 — Inversión de T-LAYOUT-1 por preferencia del usuario:
+  los proyectos reales (`Todo_sobre_los_Fosiles_1/`,
+  `Todo_sobre_los_arboles_gigantes_9/`) vuelven a `projects/`, que
+  pasa a estar versionado. `examples/` queda con `Verificacion_pipeline_2/`
+  (más su `.zip`) como única referencia canónica del pipeline.
+- [x] T-CHORE-1 — `.gitignore` cubre `projects/Verificacion_pipeline_*/`
+  y `projects/Verificacion_pipeline_*.zip` para que la salida runtime
+  de `verify_project.py` no contamine `git status`. `projects/.gitkeep`
+  reescrito para documentar la nueva semántica.
+- [x] T-DOC-4 — `AGENTS.md`, `README.md` y `docs/ARCHITECTURE.md`
+  alineados: `projects/` versionable con proyectos del usuario;
+  `examples/` solo la referencia del pipeline.
+- [x] Validación: `python test_core.py` y `python verify_project.py`
+  verdes tras la inversión.
+
 ### Auditoría 2026-09-02
 
 - [x] T-DOC-1 — `AGENTS.md` actualizado para reflejar la extracción de
   `services/` (T2.1) y `blueprints/` (T2.2) en lugar de declarar el
   monolito como única capa.
-- [x] T-LAYOUT-1 — Proyectos huérfanos versionados en `projects/`
-  (`Todo_sobre_los_arboles_gigantes_9/`, `Verificacion_pipeline_2/` y
-  su `.zip`) movidos a `examples/` con `git mv`. `projects/` queda
-  con `.gitkeep` exclusivamente.
+- [x] T-LAYOUT-1 — Decisión inicial de mover Fosiles/Arboles/
+  Verificacion_pipeline_2 fuera de `projects/`. Invertido
+  inmediatamente después por T-LAYOUT-2 (ver bloque anterior).
 - [x] T-DOC-2 — `README.md` lista `services/` y `blueprints/` en el
   árbol del proyecto, junto a las tres muestras oficiales en
   `examples/` (Fosiles, Arboles, Pipeline).
