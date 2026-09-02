@@ -40,3 +40,7 @@ scripts/setup.ps1
 # Logs del servidor de desarrollo (Flask dev / waitress)
 *.log
 !scripts/setup.ps1
+
+# Assets locales generados por la app (uploads de usuario).
+# El directorio no existe aún; se anticipa para evitar commits accidentales.
+static/uploads/
