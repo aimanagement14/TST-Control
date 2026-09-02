@@ -147,7 +147,7 @@ Listo para conectar con tu pipeline de producción.
 
 `verify_project.py` ejecuta el flujo completo contra el test client de Flask
 utilizando datos simulados del LLM. Crea un proyecto sintético con
-`PROJECT_ID=2` si no existe, pasa por las 7 etapas, ejecuta el control de
+`PROJECT_ID=2` si no existe, pasa por las 8 etapas, ejecuta el control de
 calidad y genera el ZIP.
 
 ```bash

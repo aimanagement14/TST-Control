@@ -25,14 +25,14 @@ Lo que un vecino no podría copiar honestamente: **un pipeline completo de prepr
 - Flujo de un solo autor en Windows: una persona, una máquina, un proceso Flask local (`http://localhost:5000`).
 - Modo LLM manual por defecto: la herramienta genera los prompts SYS + USER estructurados; el usuario los pega en ChatGPT / Claude / Gemini y devuelve la respuesta, que se parsea automáticamente. Sin clave de API, sin coste, sin telemetría.
 - Modo LLM API opcional: cualquier endpoint OpenAI-compatible (MiniMax text API, Azure OpenAI, Ollama local, LM Studio, servidor custom) configurable por presets.
-- Cada proyecto recorre las 7 etapas del pipeline; los prompts viven a nivel de **perfil**, no de proyecto, y se editan en un editor visual de grafo (React Flow v12 vía importmap, sin build step).
+- Cada proyecto recorre las 8 etapas del pipeline; los prompts viven a nivel de **perfil**, no de proyecto, y se editan en un editor visual de grafo (React Flow v12 vía importmap, sin build step).
 - Runner por proyecto: ejecución nodo a nodo sobre el mismo grafo del perfil, con estados `idle / running / ok / error`.
 - Cada tema produce **dos formatos de vídeo**: documental 5 min (YouTube) + corto 1 min (Shorts / Reels / TikTok), cada uno con su guion, metadata y miniatura.
 - La unidad de entrega al pipeline aguas abajo es el **ZIP exportado** (`projects/<nombre>.zip`), con un Markdown por sección + `paquete_completo.json`.
 
 ## Capabilities and Constraints
 
-- Pipeline de 7 etapas: investigación → concepto → guion 5 min → guion 1 min → escenas → metadata → miniaturas → control de calidad → exportar.
+- Pipeline de 8 etapas: investigación → concepto → guiones (5 min + 1 min) → escenas → metadata → miniaturas → control de calidad → exportar.
 - Prompts SYS + USER persistidos por perfil (`profile_prompts`), leídos vía `resolve_stage_prompt()` con fallback a `config.json`.
 - Editor visual de grafo por perfil: 9 nodos fijos pre-creados (uno por etapa del pipeline) + nodos custom con `{{ inputs.<key> }}` para encadenar outputs previos.
 - Runner por proyecto con persistencia de cada ejecución en `node_executions` (output + estado + duración).
