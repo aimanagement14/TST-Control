@@ -44,6 +44,8 @@ from services.parsers import (
 from services.llm import call_llm, _manual_fallback, llm_output_is_manual
 from services.qc import run_qc, save_qc_issues
 
+from dotenv import load_dotenv
+
 logging.basicConfig(
     level=os.environ.get("TST_LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -60,6 +62,8 @@ DB_PATH = BASE_DIR / "workflow.db"
 PROJECTS_DIR = BASE_DIR / "projects"
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
+
+load_dotenv(BASE_DIR / ".env", override=False)
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     CONFIG = json.load(f)

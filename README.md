@@ -26,20 +26,23 @@ Sin ORM, sin microservicios, sin 47 capas de abstracción.
 ## Instalación
 
 ```bash
-# 1. Dependencias (Flask + waitress + transitivas, versiones pinned)
+# 1. Dependencias (Flask + waitress + python-dotenv, versiones pinned)
 python3 -m pip install -r requirements.txt
 
-# 2. Generar y exportar la clave secreta de Flask (obligatorio)
-#    PowerShell:
-$env:FLASK_SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
-#    bash / WSL:
-#    export FLASK_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
-#    Si no defines la variable, app.py falla al arrancar con un RuntimeError claro.
+# 2. Crear tu .env local a partir de la plantilla
+cp .env.example .env          # bash / WSL
+# Copy-Item .env.example .env # PowerShell
 
-# 3. Arrancar
+# 3. Editar .env y rellenar FLASK_SECRET_KEY (obligatorio).
+#    Genera una clave con:
+#    python -c "import secrets; print(secrets.token_hex(32))"
+#    Si la dejas vacía, app.py falla al arrancar con un RuntimeError claro.
+#    python-dotenv carga .env automáticamente al arrancar la app.
+
+# 4. Arrancar
 python3 app.py
 
-# 4. Abrir
+# 5. Abrir
 # http://localhost:5000
 ```
 

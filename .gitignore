@@ -34,12 +34,13 @@ Thumbs.db
 graph-editor-*.png
 project-run-*.png
 
-# Personal setup helper (not part of the shared codebase)
-scripts/setup.ps1
+# Variables de entorno locales — nunca commitear secretos
+.env
+.env.local
+.env.*.local
 
 # Logs del servidor de desarrollo (Flask dev / waitress)
 *.log
-!scripts/setup.ps1
 
 # Assets locales generados por la app (uploads de usuario).
 # El directorio no existe aún; se anticipa para evitar commits accidentales.
