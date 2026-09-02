@@ -23,7 +23,7 @@ Sin ORM, sin microservicios, sin 47 capas de abstracción.
 ## Instalación
 
 ```bash
-# 1. Dependencias (solo Flask)
+# 1. Dependencias (Flask + waitress + transitivas, versiones pinned)
 python3 -m pip install -r requirements.txt
 
 # 2. Generar y exportar la clave secreta de Flask (obligatorio)
@@ -38,6 +38,18 @@ python3 app.py
 
 # 4. Abrir
 # http://localhost:5000
+```
+
+### Cómo regenerar el lockfile
+
+`requirements.txt` es el lockfile con versiones pinned (`==`).
+`requirements.in` contiene las specs de alto nivel (`flask>=2.2`,
+`waitress>=3.0`). Para regenerar el lock:
+
+```bash
+python -m pip install pip-tools
+python -m piptools compile requirements.in --output-file requirements.lock --no-header --no-annotate
+mv requirements.lock requirements.txt
 ```
 
 ## Flujo
