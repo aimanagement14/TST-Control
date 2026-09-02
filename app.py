@@ -2963,6 +2963,49 @@ def profiles():
             with get_db() as conn:
                 conn.execute("UPDATE profiles SET is_default=0")
                 conn.execute("UPDATE profiles SET is_default=1 WHERE id=?", (pid,))
+        elif action == "update":
+            pid = request.form.get("profile_id")
+            name = request.form.get("name", "").strip()
+            if not pid:
+                flash("Falta el perfil a actualizar", "error")
+                return redirect(url_for("profiles"))
+            if not name:
+                flash("El nombre del perfil es obligatorio", "error")
+                return redirect(url_for("profiles"))
+            platforms = request.form.getlist("platforms")
+            make_default = bool(request.form.get("is_default"))
+            with get_db() as conn:
+                if make_default:
+                    conn.execute("UPDATE profiles SET is_default=0")
+                conn.execute("""
+                    UPDATE profiles SET
+                        name = ?,
+                        content_type = ?,
+                        audience = ?,
+                        tone = ?,
+                        style = ?,
+                        mystery_level = ?,
+                        drama_level = ?,
+                        narration_speed = ?,
+                        platforms = ?,
+                        notes = ?,
+                        is_default = ?
+                    WHERE id = ?
+                """, (
+                    name,
+                    request.form.get("content_type", "").strip(),
+                    request.form.get("audience", "").strip(),
+                    request.form.get("tone", "").strip(),
+                    request.form.get("style", "").strip(),
+                    int(request.form.get("mystery_level", 5)),
+                    int(request.form.get("drama_level", 5)),
+                    int(request.form.get("narration_speed", 150)),
+                    json.dumps(platforms),
+                    request.form.get("notes", "").strip(),
+                    1 if make_default else 0,
+                    pid,
+                ))
+            flash("Perfil actualizado", "ok")
         elif action == "delete":
             pid = request.form.get("profile_id")
             with get_db() as conn:

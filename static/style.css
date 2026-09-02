@@ -584,6 +584,29 @@ select { appearance: none; background-image: none; cursor: pointer; }
     min-width: 42px; text-align: right;
 }
 
+/* ===== Perfiles: edición inline ===== */
+.title-input {
+    background: transparent; border: 1px solid transparent; color: var(--paper);
+    font: inherit; font-weight: 600; padding: 4px 6px; border-radius: 6px;
+    margin: -4px -6px; min-width: 220px;
+}
+.title-input:hover, .title-input:focus {
+    background: rgba(255, 255, 255, .04);
+    border-color: rgba(255, 255, 255, .12);
+    outline: none;
+}
+.profile-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 16px;
+}
+.profile-grid .field { margin-bottom: 0; }
+.profile-footer {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+    gap: 12px; padding-top: 12px; border-top: 1px dashed rgba(255, 255, 255, .08);
+}
+.profile-footer .checks { margin-bottom: 0; }
+.profile-footer .hint { margin: 0; }
+
 /* ===== Medidor de especificación (contadores en vivo) ===== */
 .spec {
     display: flex; flex-wrap: wrap; gap: 6px 16px;

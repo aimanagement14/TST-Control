@@ -595,6 +595,117 @@ def test_save_profile_prompt_upsert(tmp_path):
     print("  ✓ save_profile_prompt UPSERT y respeta profile_id=None")
 
 
+def test_profiles_page_renders(tmp_path):
+    """GET /profiles renderiza el perfil por defecto y el formulario de creación."""
+    _setup_qc_db(tmp_path)
+    client = app.app.test_client()
+    r = client.get("/profiles")
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    assert "Perfiles de contenido" in body
+    assert 'value="Todo Sobre Todo / Misterio"' in body
+    assert 'value="create"' in body
+    assert 'value="update"' in body
+    print("  ✓ /profiles renderiza panel editable del perfil por defecto")
+
+
+def test_profiles_update_default(tmp_path):
+    """POST /profiles action=update modifica el perfil por defecto."""
+    _setup_qc_db(tmp_path)
+    client = app.app.test_client()
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "update",
+            "profile_id": "1",
+            "name": "TST / Misterio v2",
+            "content_type": "Documental oscuro",
+            "audience": "Fans de misterios 30-50",
+            "tone": "Críptico, reflexivo",
+            "style": "Cinematográfico, friolento",
+            "mystery_level": "9",
+            "drama_level": "7",
+            "narration_speed": "140",
+            "platforms": ["youtube_long", "facebook_long", "youtube_short", "reels_short"],
+            "notes": "Perfil actualizado desde test",
+            "is_default": "on",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    with app.get_db() as conn:
+        row = dict(conn.execute("SELECT * FROM profiles WHERE id=1").fetchone())
+    assert row["name"] == "TST / Misterio v2"
+    assert row["mystery_level"] == 9
+    assert row["drama_level"] == 7
+    assert row["narration_speed"] == 140
+    assert row["tone"] == "Críptico, reflexivo"
+    assert row["is_default"] == 1
+    platforms = json.loads(row["platforms"] or "[]")
+    assert "youtube_long" in platforms
+    assert "facebook_long" in platforms
+    print("  ✓ /profiles action=update modifica el perfil por defecto")
+
+
+def test_profiles_update_changes_default(tmp_path):
+    """Marcar otro perfil como default desmarca el anterior."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute("""
+            INSERT INTO profiles (name, is_default, created_at)
+            VALUES ('Alternativo', 0, '2025-01-01')
+        """)
+        alt_id = conn.execute(
+            "SELECT id FROM profiles WHERE name='Alternativo'"
+        ).fetchone()["id"]
+    client = app.app.test_client()
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "update",
+            "profile_id": str(alt_id),
+            "name": "Alternativo",
+            "mystery_level": "5",
+            "drama_level": "5",
+            "narration_speed": "150",
+            "is_default": "on",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    with app.get_db() as conn:
+        rows = conn.execute("SELECT id, is_default FROM profiles ORDER BY id").fetchall()
+    flags = {r["id"]: r["is_default"] for r in rows}
+    assert flags[1] == 0, "el perfil 1 ya no debe ser default"
+    assert flags[alt_id] == 1, "el nuevo perfil debe ser default"
+    print("  ✓ /profiles action=update transfiere la marca de default")
+
+
+def test_profiles_update_rejects_empty_name(tmp_path):
+    """POST con name vacío no debe modificar el perfil."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        before = dict(conn.execute("SELECT * FROM profiles WHERE id=1").fetchone())
+    client = app.app.test_client()
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "update",
+            "profile_id": "1",
+            "name": "",
+            "mystery_level": "1",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    with app.get_db() as conn:
+        after = dict(conn.execute("SELECT * FROM profiles WHERE id=1").fetchone())
+    assert after["name"] == before["name"], "el nombre no debe haber cambiado"
+    assert after["mystery_level"] == before["mystery_level"]
+    assert b"obligatorio" in r.data
+    print("  ✓ /profiles action=update rechaza nombre vacío")
+
+
 def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
     """init_db() migra filas de stage_prompts y elimina la tabla legacy."""
     db_path = tmp_path / "test.db"
@@ -874,6 +985,12 @@ def main():
                  "save_profile_prompt_upsert")
     _run_qc_test(test_migration_copies_stage_prompts_to_profile_prompts,
                  "migration_copies_stage_prompts_to_profile_prompts")
+
+    print("\n=== TESTS DE EDICIÓN DE PERFILES ===")
+    _run_qc_test(test_profiles_page_renders, "profiles_page_renders")
+    _run_qc_test(test_profiles_update_default, "profiles_update_default")
+    _run_qc_test(test_profiles_update_changes_default, "profiles_update_changes_default")
+    _run_qc_test(test_profiles_update_rejects_empty_name, "profiles_update_rejects_empty_name")
 
     print("\n=== TESTS DE GRAPH CRUD ===")
     _run_qc_test(test_get_or_create_fixed_graph_nodes,
