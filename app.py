@@ -79,6 +79,14 @@ app.config["JSON_AS_ASCII"] = False
 # True en dev (autoreload al editar plantillas), False en prod (Waitress)
 # para evitar el coste del filesystem check en cada render.
 
+# Blueprints (PoC monolito — T2.2). Ver blueprints/graph.py y
+# blueprints/runner.py. Los imports se hacen aqui para que los
+# modulos blueprints puedan importar desde app sin ciclos.
+from blueprints.graph import graph_bp  # noqa: E402
+from blueprints.runner import runner_bp  # noqa: E402
+app.register_blueprint(graph_bp)
+app.register_blueprint(runner_bp)
+
 
 @app.route("/favicon.ico")
 def favicon():
@@ -2630,177 +2638,9 @@ def settings():
 
 # --- Graph (editor y runner) -------------------------------------------------
 
-@app.route("/profiles/<int:profile_id>/graph", methods=["GET"])
-def view_profile_graph(profile_id: int):
-    profile = get_profile(profile_id)
-    if not profile:
-        abort(404)
-    get_or_create_fixed_graph_nodes(profile_id)
-    nodes_rows = fetch_graph_nodes(profile_id)
-    graph_data = {
-        "mode": "editor",
-        "profileId": profile["id"],
-        "profileName": profile["name"],
-        "saveUrl": url_for("save_graph_node_route", profile_id=profile["id"]),
-        "deleteUrl": url_for("delete_graph_node_route", profile_id=profile["id"]),
-        "layoutUrl": url_for("save_graph_layout", profile_id=profile["id"]),
-        "nodes": [
-            {
-                "id": n["node_key"],
-                "key": n["node_key"],
-                "label": n["label"] or n["node_key"],
-                "sysPrompt": n["sys_prompt"] or "",
-                "userPrompt": n["user_prompt"] or "",
-                "position": {"x": n["position_x"], "y": n["position_y"]},
-                "isFixed": bool(n["is_fixed"]),
-                "inputs": json.loads(n["inputs_json"] or "[]"),
-                "status": "idle",
-            }
-            for n in nodes_rows
-        ],
-        "edges": fetch_graph_edges_as_eedges(profile_id),
-    }
-    return render_template("profile_graph.html", profile=profile,
-                           graph_data=graph_data)
-
-
-@app.route("/profiles/<int:profile_id>/graph/save-node", methods=["POST"])
-def save_graph_node_route(profile_id: int):
-    if not get_profile(profile_id):
-        abort(404)
-    body = request.get_json(silent=True) or {}
-    node_key = body.get("node_key")
-    if not node_key:
-        abort(400)
-    label = (body.get("label") or node_key) or ""
-    sys_prompt = body.get("sys_prompt") or ""
-    user_prompt = body.get("user_prompt") or ""
-    inputs = body.get("inputs") or []
-    if not isinstance(inputs, list):
-        abort(400)
-    pos = body.get("position") or {}
-    is_fixed = bool(body.get("is_fixed", node_key in KNOWN_FIXED_NODE_KEYS))
-    node = save_graph_node(
-        profile_id, str(node_key), str(label), str(sys_prompt),
-        str(user_prompt),
-        json.dumps(inputs, ensure_ascii=False),
-        float(pos.get("x", 0) or 0),
-        float(pos.get("y", 0) or 0),
-        is_fixed,
-    )
-    return jsonify({"ok": True, "node": node})
-
-
-@app.route("/profiles/<int:profile_id>/graph/delete-node", methods=["POST"])
-def delete_graph_node_route(profile_id: int):
-    if not get_profile(profile_id):
-        abort(404)
-    body = request.get_json(silent=True) or {}
-    node_key = body.get("node_key")
-    if not node_key:
-        abort(400)
-    deleted = delete_graph_node(profile_id, str(node_key))
-    return jsonify({"ok": True, "deleted": deleted})
-
-
-@app.route("/profiles/<int:profile_id>/graph/layout", methods=["POST"])
-def save_graph_layout(profile_id: int):
-    if not get_profile(profile_id):
-        abort(404)
-    body = request.get_json(silent=True) or {}
-    nodes_data = body.get("nodes") or []
-    if not isinstance(nodes_data, list):
-        abort(400)
-    updated = update_graph_layout(profile_id, nodes_data)
-    return jsonify({"ok": True, "updated": updated})
-
-
-@app.route("/projects/<int:project_id>/run", methods=["GET"])
-def view_project_run(project_id: int):
-    project = fetch_project_or_404(project_id)
-    profile = get_profile(project["profile_id"]) or get_default_profile()
-    if not profile:
-        abort(404)
-    get_or_create_fixed_graph_nodes(profile["id"])
-    nodes_rows = fetch_graph_nodes(profile["id"])
-    with get_db() as conn:
-        exec_rows = [dict(r) for r in conn.execute(
-            "SELECT node_key, output, status, duration_ms, created_at "
-            "FROM node_executions WHERE project_id=? ORDER BY id DESC",
-            (project_id,),
-        ).fetchall()]
-    latest_by_node: dict[str, dict] = {}
-    for r in exec_rows:
-        latest_by_node.setdefault(r["node_key"], r)
-    graph_data = {
-        "mode": "runner",
-        "profileId": profile["id"],
-        "profileName": profile["name"],
-        "projectId": project["id"],
-        "projectName": project["name"],
-        "executeUrl": url_for("execute_graph_node_route",
-                              project_id=project["id"]),
-        "resetUrl": url_for("reset_graph_node_route",
-                            project_id=project["id"]),
-        "nodes": [
-            {
-                "id": n["node_key"],
-                "key": n["node_key"],
-                "label": n["label"] or n["node_key"],
-                "sysPrompt": n["sys_prompt"] or "",
-                "userPrompt": n["user_prompt"] or "",
-                "position": {"x": n["position_x"], "y": n["position_y"]},
-                "isFixed": bool(n["is_fixed"]),
-                "inputs": json.loads(n["inputs_json"] or "[]"),
-                "status": (
-                    latest_by_node[n["node_key"]]["status"]
-                    if n["node_key"] in latest_by_node else "idle"
-                ),
-                "lastOutput": (
-                    latest_by_node[n["node_key"]]["output"]
-                    if n["node_key"] in latest_by_node else ""
-                ),
-                "durationMs": (
-                    latest_by_node[n["node_key"]]["duration_ms"]
-                    if n["node_key"] in latest_by_node else None
-                ),
-                "lastRunAt": (
-                    latest_by_node[n["node_key"]]["created_at"]
-                    if n["node_key"] in latest_by_node else None
-                ),
-            }
-            for n in nodes_rows
-        ],
-        "edges": fetch_graph_edges_as_eedges(profile["id"]),
-    }
-    return render_template("project_run.html", project=project,
-                           profile=profile, graph_data=graph_data)
-
-
-@app.route("/projects/<int:project_id>/run/execute", methods=["POST"])
-def execute_graph_node_route(project_id: int):
-    fetch_project_or_404(project_id)
-    body = request.get_json(silent=True) or {}
-    node_key = body.get("node_key")
-    if not node_key:
-        abort(400)
-    result = execute_graph_node(project_id, str(node_key))
-    return jsonify(result)
-
-
-@app.route("/projects/<int:project_id>/run/reset-node", methods=["POST"])
-def reset_graph_node_route(project_id: int):
-    fetch_project_or_404(project_id)
-    body = request.get_json(silent=True) or {}
-    node_key = body.get("node_key")
-    if not node_key:
-        abort(400)
-    with get_db() as conn:
-        cur = conn.execute(
-            "DELETE FROM node_executions WHERE project_id=? AND node_key=?",
-            (project_id, str(node_key)),
-        )
-    return jsonify({"ok": True, "deleted": cur.rowcount})
+# Las 7 rutas del editor de grafo y del runner viven ahora en
+# blueprints/graph.py y blueprints/runner.py (T2.2). Aqui solo se
+# conserva el grueso de las rutas del monolito.
 
 
 # ---------------------------------------------------------------------------
