@@ -26,6 +26,19 @@ publicarse una versión.
   `test_core.py` y `verify_project.py` en Python 3.13 sobre
   `push` y `pull_request` a `main`. Badge en `README.md`.
 
+### Sprint auditoría 2026-09 (Phase 2 — Extracción del monolito, PoC)
+
+- [x] T2.1 — Carpeta `services/`: parsers puros, `call_llm` y QC
+  (`services/parsers.py`, `services/llm.py`, `services/qc.py`).
+  `app.py` re-exporta los símbolos para preservar la API.
+- [x] T2.2 — Blueprints `blueprints/graph.py` (`graph_bp`) y
+  `blueprints/runner.py` (`runner_bp`) con las 4 + 3 rutas
+  aisladas. Local imports en handlers para romper ciclos.
+- [x] T2.3 — ADR-010 (`docs/DECISIONS.md`) documenta la PoC
+  con contexto, decisión, consecuencias y reversibilidad
+  explícita. `docs/ARCHITECTURE.md` actualizado con el diagrama
+  y la tabla de módulos.
+
 - [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
   tienen escenas solo para el guion largo. La etapa Escenas ahora
   exige ambos sets antes de marcarse como lista.

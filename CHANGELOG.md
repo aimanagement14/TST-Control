@@ -22,6 +22,14 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 - Workflow de CI (`.github/workflows/ci.yml`): corre `test_core.py`
   y `verify_project.py` en Python 3.13 sobre `push` y
   `pull_request` a `main`. Badge en `README.md`.
+- `services/` con parsers puros, llamadas LLM y QC. Extraído del
+  monolito como PoC (ADR-010). `app.py` re-exporta los símbolos
+  para preservar la API existente.
+- `blueprints/graph.py` (`graph_bp`) y `blueprints/runner.py`
+  (`runner_bp`) con las 7 rutas aisladas del editor de grafo y del
+  runner. Endpoints con prefijo del blueprint (`graph.*`,
+  `runner.*`). Local imports en handlers para romper ciclos con
+  `app.py`.
 
 ### Changed
 
