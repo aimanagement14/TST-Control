@@ -15,7 +15,10 @@ dentro de `call_llm`.
 from __future__ import annotations
 
 import json
+import logging
 import urllib.request
+
+log = logging.getLogger(__name__)
 
 
 def _manual_fallback(sys_prompt: str, user_msg: str, reason: str = "") -> str:
@@ -101,6 +104,7 @@ def call_llm(sys_prompt: str, user_msg: str) -> str:
                 payload = json.loads(r.read().decode("utf-8"))
                 return payload["choices"][0]["message"]["content"]
         except Exception as e:
+            log.exception("call_llm falló contra proveedor %s", provider)
             return _manual_fallback(sys_prompt, user_msg, f"ERROR LLM ({provider}): {e}")
 
     if provider == "anthropic":
@@ -144,8 +148,10 @@ def call_llm(sys_prompt: str, user_msg: str) -> str:
                     payload = json.loads(r.read().decode("utf-8"))
                     return payload["content"][0]["text"]
             except Exception as e:
+                log.exception("call_llm falló contra Anthropic REST")
                 return _manual_fallback(sys_prompt, user_msg, f"ERROR Anthropic: {e}")
         except Exception as e:
+            log.exception("call_llm falló contra Anthropic SDK")
             return _manual_fallback(sys_prompt, user_msg, f"ERROR Anthropic: {e}")
 
     return _manual_fallback(sys_prompt, user_msg, f"Proveedor desconocido: {provider}")

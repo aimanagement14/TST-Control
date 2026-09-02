@@ -316,7 +316,9 @@ def close_db(exception=None):
             try:
                 db.rollback()
             except Exception:
-                pass
+                # Rollback puede fallar si la conexión ya está rota; el
+                # teardown no tiene más remedio que seguir y cerrar.
+                log.warning("rollback falló en teardown: %s", db)
         db.close()
 
 
@@ -610,7 +612,10 @@ def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
     for r in rows:
         try:
             inputs = json.loads(r["inputs_json"] or "[]")
-        except Exception:
+        except Exception as e:
+            # expected: inputs_json puede contener datos legacy malformados;
+            # caemos a lista vacía y el grafo sigue funcionando.
+            log.debug("inputs_json malformado en nodo %s: %s", r.get("node_key"), e)
             inputs = []
         if not isinstance(inputs, list):
             inputs = []
@@ -722,7 +727,11 @@ def _interpolate_inputs(template: str, project_id: int,
                 f"ORDER BY id DESC",
                 (project_id, *inputs),
             ).fetchall()
-        except Exception:
+        except Exception as e:
+            # Si la consulta falla (p.ej. proyecto borrado entre
+            # requests), seguimos con el template sin interpolar.
+            log.warning("_interpolate_inputs: no se pudo leer node_executions para project=%s inputs=%s: %s",
+                        project_id, inputs, e)
             rows = []
     latest: dict[str, str] = {}
     for r in rows:
@@ -856,11 +865,15 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                 for sc in parsed:
                     try:
                         scene_num = int(sc.get("scene_number", 0) or 0)
-                    except Exception:
+                    except (TypeError, ValueError) as e:
+                        # expected: scene_number puede venir no numerico del LLM;
+                        # caemos a 0 y el INSERT posterior lo reordena.
+                        log.debug("scene_number no numerico en escena: %s", e)
                         scene_num = 0
                     try:
                         dur = int(sc.get("duration_seconds", 0) or 0)
-                    except Exception:
+                    except (TypeError, ValueError) as e:
+                        log.debug("duration_seconds no numerico en escena: %s", e)
                         dur = 0
                     if not dur and total_words > 0:
                         w = count_words(sc.get("narration_segment", ""))
@@ -1057,7 +1070,10 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
             template = node_row.get("user_prompt") or ""
             try:
                 inputs = json.loads(node_row.get("inputs_json") or "[]")
-            except Exception:
+            except Exception as e:
+                # expected: inputs_json puede contener datos malformados;
+                # caemos a lista vacía y la ejecucion sigue sin inputs.
+                log.debug("inputs_json malformado en nodo custom: %s", e)
                 inputs = []
             if not isinstance(inputs, list):
                 inputs = []
@@ -1081,6 +1097,7 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
             "node_executions": dict(last) if last else {},
         }
     except Exception as e:
+        log.exception("execute_graph_node falló project=%s node=%s", project_id, node_key)
         msg = str(e)[:4096]
         try:
             with get_db() as conn:
@@ -1089,8 +1106,10 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
                         (project_id, node_key, output, status, created_at)
                     VALUES (?, ?, ?, 'error', ?)
                 """, (project_id, node_key, msg, now_iso()))
-        except Exception:
-            pass
+        except Exception as persist_err:
+            # No podemos hacer mucho más; logueamos y devolvemos el
+            # error original al caller para que lo muestre al usuario.
+            log.error("no se pudo persistir el error en node_executions: %s", persist_err)
         return {"ok": False, "status": "error", "error": str(e)[:500]}
 
 
@@ -1432,8 +1451,10 @@ def build_script_prompt(project, profile, research, concept, script_type):
             key_points = json.loads(key_points)
             if isinstance(key_points, list):
                 key_points = "\n".join(f"- {p}" for p in key_points)
-        except Exception:
-            pass
+        except Exception as e:
+            # expected: key_points puede venir como string ya formateado;
+            # el json.loads falla y caemos al string original.
+            log.debug("key_points no es JSON, se usa como string: %s", e)
 
     user_msg = (
         f"Tema: {project['topic']}\n"
@@ -1487,7 +1508,10 @@ def build_metadata_prompt(project, profile, script, platform):
     if platforms_raw:
         try:
             platforms_list = json.loads(platforms_raw)
-        except Exception:
+        except Exception as e:
+            # expected: platforms puede ser un string legacy separado
+            # por comas en vez de un JSON array; caemos a lista de uno.
+            log.debug("platforms no es JSON, se trata como string: %s", e)
             platforms_list = [platforms_raw]
     platforms_txt = ", ".join(platforms_list) if platforms_list else "no definidas"
     user_msg = (
@@ -1852,11 +1876,14 @@ def scenes(project_id):
                     for sc in parsed:
                         try:
                             scene_num = int(sc.get("scene_number", 0))
-                        except Exception:
+                        except (TypeError, ValueError) as e:
+                            # expected: scene_number puede no ser numerico.
+                            log.debug("scene_number no numerico: %s", e)
                             scene_num = 0
                         try:
                             dur = int(sc.get("duration_seconds", 0))
-                        except Exception:
+                        except (TypeError, ValueError) as e:
+                            log.debug("duration_seconds no numerico: %s", e)
                             dur = 0
                         image_prompt = (
                             sc.get("image_prompt")
@@ -2564,7 +2591,10 @@ def profiles():
     for p in profiles_list:
         try:
             p["platforms_list"] = json.loads(p.get("platforms") or "[]")
-        except Exception:
+        except Exception as e:
+            # expected: platforms puede ser un string legacy; caemos a
+            # lista vacía y el formulario se renderiza sin opciones.
+            log.debug("platforms no parseable en perfil %s: %s", p.get("id"), e)
             p["platforms_list"] = []
     return render_template("profiles.html", profiles=profiles_list, config=CONFIG)
 

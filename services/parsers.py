@@ -25,8 +25,13 @@ Más dos helpers de utilidad para QC: `count_words` y
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import cast
+
+# Logger del modulo: usa el namespace 'tst.services.parsers' para que
+# el basicConfig del arranque (T0.4) lo canalice por el handler global.
+log = logging.getLogger(__name__)
 
 
 def count_words(text: str | None) -> int:
@@ -228,13 +233,16 @@ def parse_scenes_json(text: str) -> list[dict] | None:
         data = json.loads(candidate)
         if isinstance(data, list):
             return data
-    except Exception:
-        pass
+    except Exception as e:
+        # expected: el candidato entre [ y ] no es JSON valido. Caemos
+        # al siguiente intento (bloque markdown). El parser es best-effort.
+        log.debug("parse_scenes_json: candidato [..] no es JSON valido: %s", e)
     m = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, flags=re.DOTALL)
     if m:
         try:
             return json.loads(m.group(1))
-        except Exception:
+        except Exception as e:
+            log.debug("parse_scenes_json: bloque markdown no es JSON valido: %s", e)
             return None
     return None
 
@@ -294,14 +302,15 @@ def parse_prompt_json(text: str) -> dict | None:
     if m:
         try:
             return json.loads(m.group(1))
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("parse_prompt_json: bloque markdown no es JSON valido: %s", e)
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end > start:
         try:
             return json.loads(text[start:end + 1])
-        except Exception:
+        except Exception as e:
+            log.debug("parse_prompt_json: candidato {..} no es JSON valido: %s", e)
             return None
     return None
 
