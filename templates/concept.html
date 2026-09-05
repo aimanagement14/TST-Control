@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'concept' %}
+{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Concepto · {{ project.name }}{% endblock %}
 
 {% set concept_md %}## ÁNGULO
@@ -34,7 +35,7 @@
         {{ ui.prompt_editor(
             sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
             user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
-            saved_prompt) }}
+            saved_prompt, graph_url=graph_url) }}
         {% else %}
         <div class="empty-inline">
             <p>El prompt de concepto parte de la investigación guardada. Genéralo y llévalo a tu LLM.</p>

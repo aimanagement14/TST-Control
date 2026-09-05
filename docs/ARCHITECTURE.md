@@ -71,7 +71,7 @@ y `blueprints/`. Conserva internamente:
 | LLM client | Re-exporta `call_llm`, `_manual_fallback`, `llm_output_is_manual` desde `services.llm` (T2.1). |
 | Parsers | Re-exporta `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail` desde `services.parsers` (T2.1). |
 | QC | Re-exporta `run_qc` y `save_qc_issues` desde `services.qc` (T2.1). |
-| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 9 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), helpers de persistencia. Las rutas HTTP viven ahora en `blueprints/graph.py`. |
+| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 10 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), helpers de persistencia. Las rutas HTTP viven ahora en `blueprints/graph.py`. |
 | Runner | Lógica de `execute_graph_node` y helpers. Las rutas HTTP viven en `blueprints/runner.py`. |
 | Rutas | Vistas por etapa, dashboard, perfiles (excepto graph), settings y export. |
 | Contexto plantilla | Inyecta `app_name`, `app_tagline`, `app_version` en cada render. |
@@ -158,7 +158,7 @@ de perfil en `profile_prompts` (`UNIQUE(profile_id, stage)`) y se
 resuelven con `resolve_stage_prompt()` buscando primero ahí y haciendo
 fallback a `config.json`. El grafo visual persiste en
 `profile_graph_nodes` (`UNIQUE(profile_id, node_key)`,
-`is_fixed` distingue los 9 nodos pre-creados de los custom) y
+`is_fixed` distingue los 10 nodos pre-creados de los custom) y
 `node_executions` registra cada ejecución por proyecto con su
 output, estado y duración.
 
@@ -189,10 +189,10 @@ duplicados.
 Dos páginas nuevas extienden el flujo clásico sin romperlo.
 
 `/profiles/<id>/graph` — Editor visual (estilo n8n) donde cada nodo es
-una de las nueve etapas del pipeline (`research`, `concept`,
-`script_long`, `script_short`, `scenes`, `metadata_youtube`,
-`metadata_shorts`, `thumbnail_long`, `thumbnail_short`) más los nodos
-custom que el usuario añada. Cada nodo expone sus prompts SYS y USER,
+uno de los diez nodos fijos del pipeline (`research`, `concept`,
+`script_long`, `script_short`, `scenes`, `scenes_short`,
+`metadata_youtube`, `metadata_shorts`, `thumbnail_long`,
+`thumbnail_short`) más los nodos custom que el usuario añada. Cada nodo expone sus prompts SYS y USER,
 un nombre editable y conexiones hacia otros nodos (los custom pueden
 recibir como contexto el output de cualquier nodo previo). El grafo
 carga `@xyflow/react` por importmap, persiste posiciones con un debounce

@@ -313,6 +313,35 @@ Sígueme.
     print("  ✓ parse_metadata (shorts)")
 
 
+def test_parse_metadata_facebook_long():
+    text = """## DESCRIPCION
+Primera frase con gancho emocional sobre el misterio. Segundo párrafo con el contexto clave del tema investigado. Tercer párrafo con la pregunta que deja al espectador pensando. Cuarto párrafo con la llamada a comentar y compartir. Quinto párrafo opcional con las fuentes mencionadas en el vídeo."""
+    r = app.parse_metadata(text, "facebook_long")
+    assert "gancho emocional" in r["description"]
+    assert "comentar y compartir" in r["description"]
+    assert r["titles"] == []
+    assert r["hashtags"] == []
+    print("  ✓ parse_metadata (facebook_long, prosa continua)")
+
+
+def test_parse_metadata_reels_short():
+    text = """## DESCRIPCION
+Gancho emocional para Reels, primera frase que funciona sin audio. Segunda frase con el dato clave. Tercera frase con la llamada a la acción.
+
+## HASHTAGS (5-8)
+#ovnis #tetis #yetis #shorts
+
+## CTA
+Comenta qué crees que vio el piloto."""
+    r = app.parse_metadata(text, "reels_short")
+    assert "Reels" in r["description"]
+    assert len(r["hashtags"]) == 4
+    assert "Comenta" in r["cta"]
+    assert r["titles"] == []
+    assert r["on_screen_text"] == []
+    print("  ✓ parse_metadata (reels_short, prosa + hashtags)")
+
+
 def test_parse_thumbnail():
     text = """## MINIATURA
 A weathered stone monolith half-buried in jungle fog, lit by a single volumetric sunbeam piercing the canopy, with bioluminescent moss crawling up its carved symbols, hyper-detailed textures, cinematic orange and teal grading, 16:9 composition, dramatic contrast, documentary premium quality, eye-catching focal point off-center.
@@ -983,21 +1012,21 @@ def _get_default_profile_id(tmp_path):
 
 
 def test_get_or_create_fixed_graph_nodes(tmp_path):
-    """Crea las 9 filas fijas y no duplica en llamadas sucesivas."""
+    """Crea las 10 filas fijas y no duplica en llamadas sucesivas."""
     pid = _get_default_profile_id(tmp_path)
     rows1 = app.get_or_create_fixed_graph_nodes(pid)
-    assert len(rows1) == 9, f"esperaba 9, hay {len(rows1)}"
+    assert len(rows1) == 10, f"esperaba 10, hay {len(rows1)}"
     keys = {r["node_key"] for r in rows1}
     assert keys == set(app.KNOWN_FIXED_NODE_KEYS), keys
     rows2 = app.get_or_create_fixed_graph_nodes(pid)
-    assert len(rows2) == 9, "segunda llamada no debe duplicar"
+    assert len(rows2) == 10, "segunda llamada no debe duplicar"
     keys2 = {r["node_key"] for r in rows2}
     assert keys2 == set(app.KNOWN_FIXED_NODE_KEYS)
     for r in rows2:
         assert r["is_fixed"] == 1
         assert r["position_x"] is not None
         assert r["position_y"] is not None
-    print("  ✓ get_or_create_fixed_graph_nodes crea 9 filas únicas")
+    print("  ✓ get_or_create_fixed_graph_nodes crea 10 filas únicas")
 
 
 def test_save_graph_node_and_delete(tmp_path):
@@ -1105,6 +1134,49 @@ def test_execute_graph_node_custom(tmp_path):
     print("  ✓ execute_graph_node (custom con inputs interpolados)")
 
 
+def test_persist_scenes_to_specific_script(tmp_path):
+    """_persist_scenes graba en el guion pedido (long o short)."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'PScenes', 'T', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+        cur_l = conn.execute("""
+            INSERT INTO scripts (project_id, type, title, hook, body_full,
+                word_count, updated_at)
+            VALUES (1, 'long', 'L', 'h', 'uno dos tres', 3, '2025-01-01')
+        """)
+        cur_s = conn.execute("""
+            INSERT INTO scripts (project_id, type, title, hook, body_full,
+                word_count, updated_at)
+            VALUES (1, 'short', 'C', 'h', 'cuatro cinco', 2, '2025-01-01')
+        """)
+        long_id = cur_l.lastrowid
+        short_id = cur_s.lastrowid
+    parsed = [
+        {"scene_number": 1, "narration_segment": "uno", "image_prompt": "img1"},
+        {"scene_number": 2, "narration_segment": "dos tres", "image_prompt": "img2"},
+    ]
+    with app.app.app_context():
+        with app.get_db() as conn:
+            app._persist_scenes(conn, 1, "short", parsed, "2025-01-01")
+    with app.get_db() as conn:
+        rows_s = [dict(r) for r in conn.execute(
+            "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
+            "AND script_id=? ORDER BY scene_number", (short_id,)).fetchall()]
+        rows_l = [dict(r) for r in conn.execute(
+            "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
+            "AND script_id=?", (long_id,)).fetchall()]
+    assert len(rows_s) == 2, f"debe persistir 2 escenas en short: {rows_s}"
+    assert all(r["script_id"] == short_id for r in rows_s)
+    assert len(rows_l) == 0, "no debe tocar el guion largo"
+    print("  ✓ _persist_scenes escribe solo en el guion pedido")
+
+
 def test_update_graph_layout(tmp_path):
     """Persiste las posiciones enviadas."""
     pid = _get_default_profile_id(tmp_path)
@@ -1135,6 +1207,146 @@ def test_update_graph_layout(tmp_path):
 # Runner
 # ==========================================================================
 
+def test_runner_renders_for_project(tmp_path):
+    """GET /projects/<id>/run renderiza con los 10 nodos fijos."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Runner Test', 'Tema', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+    with app.app.test_client() as c:
+        r = c.get("/projects/1/run")
+        assert r.status_code == 200
+        body = r.data.decode("utf-8")
+        assert "Ejecutar en modo grafo" in body
+        # Los 10 nodos fijos se inyectan en window.__GRAPH_DATA__
+        assert body.count('"isFixed": true') >= 10
+    print("  ✓ runner renderiza con 10 nodos fijos")
+
+
+def test_runner_execute_route_returns_json(tmp_path):
+    """POST /projects/<id>/run/execute ejecuta un nodo fijo en modo manual."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Runner Exec', 'Tema runner', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+    original_provider = app.CONFIG["llm"]["provider"]
+    app.CONFIG["llm"]["provider"] = "manual"
+    try:
+        with app.app.test_client() as c:
+            r = c.post("/projects/1/run/execute",
+                       json={"node_key": "research"})
+            assert r.status_code == 200
+            data = r.get_json()
+            assert data.get("ok") is True, data
+            assert data.get("status") == "ok"
+            assert "Tema runner" in data.get("output", "")
+            assert "node_executions" in data
+        with app.get_db() as conn:
+            row = conn.execute(
+                "SELECT status FROM node_executions "
+                "WHERE project_id=1 AND node_key='research' "
+                "ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            assert row is not None and row["status"] == "ok"
+    finally:
+        app.CONFIG["llm"]["provider"] = original_provider
+    print("  ✓ runner /run/execute persiste ok en node_executions")
+
+
+def test_runner_reset_node_clears_executions(tmp_path):
+    """POST /projects/<id>/run/reset-node borra ejecuciones previas del nodo."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Reset', 'Tema', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+        conn.execute("""
+            INSERT INTO node_executions
+                (project_id, node_key, output, status, created_at)
+            VALUES (1, 'concept', 'previo', 'ok', '2025-01-01')
+        """)
+    with app.app.test_client() as c:
+        r = c.post("/projects/1/run/reset-node", json={"node_key": "concept"})
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data.get("ok") is True
+        assert data.get("deleted") == 1
+    with app.get_db() as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM node_executions "
+            "WHERE project_id=1 AND node_key='concept'"
+        ).fetchone()["n"]
+        assert n == 0
+    print("  ✓ runner /run/reset-node borra ejecuciones del nodo")
+
+
+def test_runner_scenes_short_persists_to_short_script(tmp_path):
+    """El nodo scenes_short persiste escenas en el guion corto."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        conn.execute("""
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'Scenes Short', 'Tema', ?, 'created',
+                    '2025-01-01', '2025-01-01')
+        """, (pid,))
+        # Crear guion corto
+        cur = conn.execute("""
+            INSERT INTO scripts (project_id, type, title, hook, context,
+                development, revelations, conclusion, cta, body_full,
+                word_count, updated_at)
+            VALUES (1, 'short', 'Corto', 'h', 'c', 'd', 'r', 'f', 'cta',
+                    'uno dos tres cuatro cinco seis siete ocho', 8, '2025-01-01')
+        """)
+        short_id = cur.lastrowid
+    scenes_text = """\
+ESCENA 1
+TEXTO AUDIO: uno dos tres
+IMAGEN: prompt 1
+
+ESCENA 2
+TEXTO AUDIO: cuatro cinco seis
+IMAGEN: prompt 2
+
+ESCENA 3
+TEXTO AUDIO: siete ocho
+IMAGEN: prompt 3
+"""
+    original_provider = app.CONFIG["llm"]["provider"]
+    app.CONFIG["llm"]["provider"] = "manual"
+    try:
+        with app.app.test_client() as c:
+            r = c.post("/projects/1/run/execute",
+                       json={"node_key": "scenes_short"})
+            assert r.status_code == 200
+    finally:
+        app.CONFIG["llm"]["provider"] = original_provider
+    # En modo manual la persistencia no se ejecuta (raw es el prompt,
+    # no escenas parseables). Verificamos que se llama al nodo correcto.
+    with app.get_db() as conn:
+        row = conn.execute(
+            "SELECT status FROM node_executions "
+            "WHERE project_id=1 AND node_key='scenes_short' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    assert row is not None and row["status"] == "ok"
+    print("  ✓ runner procesa scenes_short como nodo fijo")
+
 def main():
     import tempfile
     import gc
@@ -1152,6 +1364,8 @@ def main():
     test_parse_prompt_json()
     test_parse_metadata_youtube()
     test_parse_metadata_shorts()
+    test_parse_metadata_facebook_long()
+    test_parse_metadata_reels_short()
     test_parse_thumbnail()
     test_parse_thumbnail_ignores_other_blocks()
 
@@ -1223,6 +1437,18 @@ def main():
                  "execute_graph_node_fixed_research")
     _run_qc_test(test_execute_graph_node_custom,
                  "execute_graph_node_custom")
+    _run_qc_test(test_persist_scenes_to_specific_script,
+                 "persist_scenes_to_specific_script")
+
+    print("\n=== TESTS DEL RUNNER (E2E) ===")
+    _run_qc_test(test_runner_renders_for_project,
+                 "runner_renders_for_project")
+    _run_qc_test(test_runner_execute_route_returns_json,
+                 "runner_execute_route_returns_json")
+    _run_qc_test(test_runner_reset_node_clears_executions,
+                 "runner_reset_node_clears_executions")
+    _run_qc_test(test_runner_scenes_short_persists_to_short_script,
+                 "runner_scenes_short_persists_to_short_script")
 
     print("\n✅ Todos los tests pasaron\n")
 

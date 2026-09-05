@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'metadata' %}
+{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Metadata · {{ project.name }}{% endblock %}
 
 {% macro meta_panel(platform, label, lede, default_script_type, saved) %}
@@ -39,22 +40,13 @@
     {% if is_active or saved %}
     <details class="fold" data-prompt {% if is_active %}open{% endif %}>
         <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
-        <form method="post">
-            <input type="hidden" name="action" value="save_prompt">
-            <input type="hidden" name="platform" value="{{ platform }}">
-            <label class="field">
-                <span class="label">Instrucciones del sistema</span>
-                <textarea name="sys_prompt" rows="4">{{ sys_prompt if is_active else (saved.sys_prompt if saved else '') }}</textarea>
-            </label>
-            <label class="field">
-                <span class="label">Petición</span>
-                <textarea name="user_prompt" rows="8">{{ user_prompt if is_active else (saved.user_prompt if saved else '') }}</textarea>
-            </label>
-            <div class="actions">
-                <button type="button" class="btn btn-sm" data-copy-button>Copiar prompt</button>
-                <button type="submit" class="btn btn-ghost btn-sm">Guardar cambios</button>
-            </div>
-        </form>
+        {{ ui.prompt_editor(
+            sys_prompt if is_active else (saved.sys_prompt if saved else ''),
+            user_prompt if is_active else (saved.user_prompt if saved else ''),
+            saved,
+            hidden={'platform': platform},
+            title='Prompt de metadata',
+            graph_url=graph_url) }}
     </details>
     {% endif %}
 

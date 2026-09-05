@@ -15,34 +15,35 @@
 {% endmacro %}
 
 
-{% macro prompt_editor(sys_value, user_value, saved, hidden={}, title='Prompt') %}
+{% macro prompt_editor(sys_value, user_value, saved, hidden={}, title='Prompt', graph_url=none) %}
 <div class="panel" data-prompt>
     <div class="panel-head">
         <h3>{{ title }}</h3>
-        {% if saved %}
-        <span class="chip chip-done">Guardado{% if saved is mapping and saved.updated_at %} &middot; {{ saved.updated_at[11:16] }}{% endif %}</span>
-        {% else %}
-        <span class="chip">Sin guardar</span>
-        {% endif %}
-    </div>
-    <form method="post">
-        <input type="hidden" name="action" value="save_prompt">
-        {% for key, value in hidden.items() %}
-        <input type="hidden" name="{{ key }}" value="{{ value }}">
-        {% endfor %}
-        <label class="field">
-            <span class="label">Instrucciones del sistema</span>
-            <textarea name="sys_prompt" rows="5">{{ sys_value }}</textarea>
-        </label>
-        <label class="field">
-            <span class="label">Petición</span>
-            <textarea name="user_prompt" rows="9">{{ user_value }}</textarea>
-        </label>
-        <div class="actions">
-            <button type="button" class="btn" data-copy-button>Copiar prompt</button>
-            <button type="submit" class="btn btn-ghost">Guardar cambios</button>
+        <div class="actions tight">
+            {% if saved %}
+            <span class="chip chip-done">Guardado{% if saved is mapping and saved.updated_at %} &middot; {{ saved.updated_at[11:16] }}{% endif %}</span>
+            {% else %}
+            <span class="chip">Sin guardar</span>
+            {% endif %}
+            {% if graph_url %}
+            <a class="btn btn-ghost btn-sm" href="{{ graph_url }}">Editar en el grafo</a>
+            {% endif %}
         </div>
-    </form>
+    </div>
+    {% for key, value in hidden.items() %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <label class="field">
+        <span class="label">Instrucciones del sistema</span>
+        <textarea name="sys_prompt" rows="5" readonly>{{ sys_value }}</textarea>
+    </label>
+    <label class="field">
+        <span class="label">Petición</span>
+        <textarea name="user_prompt" rows="9" readonly>{{ user_value }}</textarea>
+    </label>
+    <div class="actions">
+        <button type="button" class="btn" data-copy-button>Copiar prompt</button>
+    </div>
 </div>
 {% endmacro %}
 

@@ -7,7 +7,44 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bug crítico**: las páginas por etapa (research, concept, scripts,
+  scenes, metadata, thumbnails) emitían un form con `action=save_prompt`
+  que ningún handler en `app.py` procesaba. Resultado: cualquier edición
+  en el editor de prompts de las páginas se perdía silenciosamente al
+  pulsar "Guardar cambios". El editor de grafo por perfil
+  (`/profiles/<id>/graph`) es la única vía para editar prompts (ADR
+  2026-09-01), por lo que el botón se sustituye por un enlace
+  "Editar en el grafo" en `_macros.html:prompt_editor` y los form inline
+  de `scripts.html`, `metadata.html`, `thumbnails.html` se refactorizan
+  para usar la macro. Las textareas pasan a `readonly` para evitar
+  ediciones accidentales que se perderían.
+
+- **Asimetría del runner**: el runner de grafo sólo persistía escenas
+  para el guion largo. Se añade el nodo fijo `scenes_short` (paralelo a
+  `scenes`) con su prompt builder, helper `_persist_scenes()` reutilizado
+  por ambos, posición default y arista `script_short → scenes_short`. La
+  etapa Escenas cubre ahora ambos guiones desde el runner.
+
+- Tabla legacy `prompts` (de la etapa "Prompts visuales" eliminada en
+  2026-08-29) anotada en `SCHEMA` con un comment explicando que no se
+  escribe y por qué `qc.py` aún la lee.
+
 ### Added
+
+- Tests E2E del runner vía `app.test_client()` (`test_runner_renders_for_project`,
+  `test_runner_execute_route_returns_json`,
+  `test_runner_reset_node_clears_executions`,
+  `test_runner_scenes_short_persists_to_short_script`) que cubren el
+  ciclo `idle → running → ok` y el render con los 10 nodos fijos.
+
+- Tests para `parse_metadata` con las plataformas nuevas
+  `metadata_facebook_long` (prosa continua, sin listas) y
+  `metadata_reels_short` (descripción + hashtags + CTA).
+
+- Test unitario `_persist_scenes` que verifica que escribe solo en el
+  guion pedido.
 
 - `LICENSE` MIT en la raíz (recomendación de `devkit audit`).
 - Logger estructurado `tst` (`logging.basicConfig` con nivel

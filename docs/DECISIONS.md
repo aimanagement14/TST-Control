@@ -310,3 +310,47 @@ que evita tocar `test_core.py` ni `verify_project.py`).
   doble fuente de verdad) supera el beneficio, ADR-001 sigue
   vigente y se documenta aquí que "monolito confirmado para este
   proyecto".
+
+## 2026-09-05 — Nodo fijo `scenes_short` y limpieza del UI de prompts
+
+**Contexto:** Tras la auditoría del proyecto el 2026-09-05 se
+detectaron dos issues residuales del sprint 2026-09: (1) las páginas
+por etapa (research, concept, scripts, scenes, metadata, thumbnails)
+emitían un form con `action=save_prompt` que ningún handler en
+`app.py` procesaba desde la eliminación de la persistencia por
+proyecto en favor de los prompts por perfil; (2) el runner de grafo
+sólo cubría escenas del guion largo (`scenes`) pero la etapa Escenas
+del QC exige ambos guiones, dejando al guion corto sin atajo desde
+el runner.
+
+**Decisión:**
+- Sustituir el form roto por un enlace "Editar en el grafo" que
+  apunta a `/profiles/<id>/graph` desde `_macros.html:prompt_editor`
+  y refactorizar los forms inline de `scripts.html`, `metadata.html`
+  y `thumbnails.html` para usar la macro. Las textareas pasan a
+  `readonly` para evitar ediciones accidentales que se perderían.
+- Añadir `scenes_short` como 10º nodo fijo del grafo (paralelo a
+  `scenes`), con su builder, posición default y arista
+  `script_short → scenes_short`. La lógica de persistencia se extrae
+  a un helper `_persist_scenes(conn, project_id, script_type, ...)`
+  reutilizado por ambos. `resolve_stage_prompt` añade el alias
+  `scenes_short → scenes` para reusar los prompts SYS/USER del guion
+  largo (mismo contrato, distinto target de persistencia).
+
+**Consecuencias:**
+- El editor de grafo pasa de 9 a 10 nodos fijos. La afirmación
+  "nueve etapas fijas" en `docs/ARCHITECTURE.md` se actualiza.
+- `_persist_scenes` queda listo para nuevos tipos de guion (no
+  rompe el contrato actual).
+- Los tests `test_get_or_create_fixed_graph_nodes` se actualiza de
+  9 a 10 filas esperadas.
+- La asimetría páginas-clásicas vs. runner se cierra: las páginas
+  `/scenes` ya soportaban guion corto; ahora el runner también.
+- Tests E2E del runner vía `test_client()` cierran la tarea
+  pendiente del sprint 2026-09: cubren el ciclo `idle → running → ok`
+  en `node_executions` para los 10 nodos fijos.
+
+**Reversibilidad:**
+- `git revert` de los commits asociados restaura los 9 nodos y el
+  form inline roto (que volvería a fallar como antes, sin regresión
+  funcional).

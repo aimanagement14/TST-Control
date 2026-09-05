@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'scripts' %}
+{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Guiones · {{ project.name }}{% endblock %}
 
 {% set wpm = (profile.narration_speed if profile else 0) or qc_checks.default_wpm %}
 
 {% macro script_section(stype, num, label, lede, script, saved, sys_value, user_value,
-                        is_open, min_words, max_words) %}
+                        is_open, min_words, max_words, graph_url=none) %}
 {% set words = (script.word_count if script else 0) or 0 %}
 {% set state = '' if not words else ('is-over' if words > max_words else ('is-warn' if words < min_words else 'is-ok')) %}
 {% set is_short = (stype == 'short') %}
@@ -43,22 +44,10 @@
     {% if saved or sys_value %}
     <details class="fold" data-prompt {% if is_open %}open{% endif %}>
         <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
-        <form method="post">
-            <input type="hidden" name="action" value="save_prompt">
-            <input type="hidden" name="script_type" value="{{ stype }}">
-            <label class="field">
-                <span class="label">Instrucciones del sistema</span>
-                <textarea name="sys_prompt" rows="4">{{ sys_value }}</textarea>
-            </label>
-            <label class="field">
-                <span class="label">Petición</span>
-                <textarea name="user_prompt" rows="8">{{ user_value }}</textarea>
-            </label>
-            <div class="actions">
-                <button type="button" class="btn btn-sm" data-copy-button>Copiar prompt</button>
-                <button type="submit" class="btn btn-ghost btn-sm">Guardar cambios</button>
-            </div>
-        </form>
+        {{ ui.prompt_editor(sys_value, user_value, saved,
+                            hidden={'script_type': stype},
+                            title='Prompt del guion ' ~ ('5 min' if stype == 'long' else '1 min'),
+                            graph_url=graph_url) }}
     </details>
     {% endif %}
 
@@ -133,7 +122,7 @@
     sys_prompt if gen_type == 'long' else (saved_long.sys_prompt if saved_long else ''),
     user_prompt if gen_type == 'long' else (saved_long.user_prompt if saved_long else ''),
     gen_type == 'long',
-    qc_checks.min_words_long, qc_checks.max_words_long) }}
+    qc_checks.min_words_long, qc_checks.max_words_long, graph_url) }}
 
 {{ script_section('short', '04', 'Guion 1 min',
     'Formato vertical: el hook entra en los primeros cinco segundos y el remate deja pensando.',
@@ -141,5 +130,5 @@
     sys_prompt if gen_type == 'short' else (saved_short.sys_prompt if saved_short else ''),
     user_prompt if gen_type == 'short' else (saved_short.user_prompt if saved_short else ''),
     gen_type == 'short',
-    qc_checks.min_words_short, qc_checks.max_words_short) }}
+    qc_checks.min_words_short, qc_checks.max_words_short, graph_url) }}
 {% endblock %}

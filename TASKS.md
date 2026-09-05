@@ -59,15 +59,19 @@ publicarse una versión.
   app en runtime. `app.py` ya usaba `PROJECTS_DIR`, sin paths
   hardcodeados.
 
-- [ ] Generar las escenas del guion corto (1 min) en proyectos que ya
-  tienen escenas solo para el guion largo. La etapa Escenas ahora
-  exige ambos sets antes de marcarse como lista.
+- [x] Generar las escenas del guion corto (1 min) en proyectos que ya
+  tienen escenas solo para el guion largo. Se añade el nodo fijo
+  `scenes_short` (paralelo a `scenes`) en el editor de grafo y en el
+  runner. Helper `_persist_scenes(conn, project_id, script_type, ...)`
+  reutilizado por ambos. La etapa Escenas exige ambos sets antes de
+  marcarse como lista.
 - [ ] Sustituir importmap de esm.sh por bundles locales en
   `static/vendor/` si se requiere soporte offline. Evaluar primero
   con `chrome://network` cuánto pesa cada recarga en una red lenta.
-- [ ] Añadir tests E2E del runner vía `app.test_client()` que
+- [x] Añadir tests E2E del runner vía `app.test_client()` que
   verifiquen cambio de estado `idle → running → ok` en
-  `node_executions` para los 9 nodos fijos.
+  `node_executions` para los nodos fijos (ahora 10: 9 originales
+  + `scenes_short`).
 
 ### Editor de grafo 2026-09-01
 

@@ -205,6 +205,10 @@ CREATE TABLE IF NOT EXISTS prompts (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
 );
+-- Tabla legacy de la etapa "Prompts visuales" (eliminada en 2026-08-29,
+-- ver ADR-006). Se conserva solo por compatibilidad del esquema y porque
+-- services/qc.py aun la lee; no recibe escrituras. El prompt visual vive
+-- ahora en scenes.visual_description.
 
 CREATE TABLE IF NOT EXISTS metadata_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -418,16 +422,19 @@ def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
     devuelve los strings canónicos. Si el stage no existe, devuelve ("", "")
     y registra un aviso por consola.
     """
+    # Aliases del runner: scenes_short reusa el prompt SYS/USER de scenes
+    # (mismo contrato, distinto target de persistencia).
+    stage_key = {"scenes_short": "scenes"}.get(stage, stage)
     if profile_id is not None:
         with get_db() as conn:
             row = conn.execute(
                 "SELECT sys_prompt, user_prompt FROM profile_prompts "
                 "WHERE profile_id=? AND stage=?",
-                (profile_id, stage),
+                (profile_id, stage_key),
             ).fetchone()
             if row:
                 return row["sys_prompt"], row["user_prompt"]
-    cfg = CONFIG.get("prompts", {}).get(stage)
+    cfg = CONFIG.get("prompts", {}).get(stage_key)
     if cfg:
         return cfg.get("system", ""), cfg.get("format", "")
     log.warning("[resolve_stage_prompt] stage '%s' no existe en CONFIG['prompts']", stage)
@@ -488,7 +495,8 @@ def get_default_prompts_from_config() -> dict[str, dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 KNOWN_FIXED_NODE_KEYS = [
-    "research", "concept", "script_long", "script_short", "scenes",
+    "research", "concept", "script_long", "script_short",
+    "scenes", "scenes_short",
     "metadata_youtube", "metadata_shorts", "thumbnail_long", "thumbnail_short",
 ]
 
@@ -497,7 +505,8 @@ DEFAULT_NODE_LABELS = {
     "concept": "Concepto",
     "script_long": "Guion 5 min",
     "script_short": "Guion 1 min",
-    "scenes": "Escenas",
+    "scenes": "Escenas 5 min",
+    "scenes_short": "Escenas 1 min",
     "metadata_youtube": "Metadata YouTube",
     "metadata_shorts": "Metadata Shorts",
     "thumbnail_long": "Miniatura 16:9",
@@ -509,7 +518,8 @@ DEFAULT_NODE_POSITIONS = {
     "concept": (280.0, 0.0),
     "script_long": (560.0, 0.0),
     "script_short": (560.0, 180.0),
-    "scenes": (840.0, 90.0),
+    "scenes": (840.0, 0.0),
+    "scenes_short": (840.0, 180.0),
     "metadata_youtube": (1120.0, 0.0),
     "metadata_shorts": (1120.0, 180.0),
     "thumbnail_long": (1400.0, 0.0),
@@ -521,7 +531,7 @@ DEFAULT_EDGES = [
     ("concept", "script_long"),
     ("concept", "script_short"),
     ("script_long", "scenes"),
-    ("script_short", "scenes"),
+    ("script_short", "scenes_short"),
     ("script_long", "metadata_youtube"),
     ("script_short", "metadata_shorts"),
     ("script_long", "thumbnail_long"),
@@ -756,6 +766,73 @@ def _truncate_to_bytes(text: str, limit: int) -> str:
     return encoded[:limit].decode("utf-8", "replace")
 
 
+def _persist_scenes(conn, project_id: int, script_type: str,
+                    parsed: list, now: str) -> None:
+    """Borra y reinserta las escenas del guion ``script_type`` del proyecto.
+
+    Reutilizado por el runner de grafo para los nodos fijos ``scenes``
+    (guion largo) y ``scenes_short`` (guion corto).
+    """
+    if not parsed:
+        return
+    target = conn.execute(
+        "SELECT id FROM scripts WHERE project_id=? AND type=?",
+        (project_id, script_type),
+    ).fetchone()
+    sid = target["id"] if target else None
+    if sid is None:
+        return
+    conn.execute(
+        "DELETE FROM scenes WHERE project_id=? AND script_id=?",
+        (project_id, sid),
+    )
+    wpm = 150
+    proj = conn.execute(
+        "SELECT profile_id FROM projects WHERE id=?",
+        (project_id,),
+    ).fetchone()
+    if proj and proj["profile_id"]:
+        prof = conn.execute(
+            "SELECT narration_speed FROM profiles WHERE id=?",
+            (proj["profile_id"],),
+        ).fetchone()
+        if prof and prof["narration_speed"]:
+            wpm = prof["narration_speed"]
+    total_words = sum(
+        count_words(sc.get("narration_segment", "")) for sc in parsed
+    )
+    for sc in parsed:
+        try:
+            scene_num = int(sc.get("scene_number", 0) or 0)
+        except (TypeError, ValueError) as e:
+            # expected: scene_number puede venir no numerico del LLM;
+            # caemos a 0 y el INSERT posterior lo reordena.
+            log.debug("scene_number no numerico en escena: %s", e)
+            scene_num = 0
+        try:
+            dur = int(sc.get("duration_seconds", 0) or 0)
+        except (TypeError, ValueError) as e:
+            log.debug("duration_seconds no numerico en escena: %s", e)
+            dur = 0
+        if not dur and total_words > 0:
+            w = count_words(sc.get("narration_segment", ""))
+            dur = max(1, round(w / wpm * 60))
+        conn.execute("""
+            INSERT INTO scenes (project_id, script_id, scene_number,
+                narration, visual_description, camera_movement,
+                transition, duration_seconds, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            project_id, sid, scene_num,
+            sc.get("narration_segment", ""),
+            sc.get("image_prompt", "")
+                or sc.get("visual_description", ""),
+            sc.get("camera_movement", "") or "",
+            sc.get("transition", "") or "",
+            dur, now,
+        ))
+
+
 def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
     """Best-effort: persiste el raw en la tabla del stage correspondiente."""
     now = now_iso()
@@ -839,63 +916,9 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                     parsed["revelations"], parsed["conclusion"],
                     parsed["cta"], body, wc, now,
                 ))
-        elif node_key == "scenes":
-            parsed = parse_scenes(raw) or []
-            target = conn.execute(
-                "SELECT id FROM scripts WHERE project_id=? AND type='long'",
-                (project_id,),
-            ).fetchone()
-            sid = target["id"] if target else None
-            if sid is not None and parsed:
-                conn.execute(
-                    "DELETE FROM scenes WHERE project_id=? AND script_id=?",
-                    (project_id, sid),
-                )
-                wpm = 150
-                proj = conn.execute(
-                    "SELECT profile_id FROM projects WHERE id=?",
-                    (project_id,),
-                ).fetchone()
-                if proj and proj["profile_id"]:
-                    prof = conn.execute(
-                        "SELECT narration_speed FROM profiles WHERE id=?",
-                        (proj["profile_id"],),
-                    ).fetchone()
-                    if prof and prof["narration_speed"]:
-                        wpm = prof["narration_speed"]
-                total_words = sum(
-                    count_words(sc.get("narration_segment", "")) for sc in parsed
-                )
-                for sc in parsed:
-                    try:
-                        scene_num = int(sc.get("scene_number", 0) or 0)
-                    except (TypeError, ValueError) as e:
-                        # expected: scene_number puede venir no numerico del LLM;
-                        # caemos a 0 y el INSERT posterior lo reordena.
-                        log.debug("scene_number no numerico en escena: %s", e)
-                        scene_num = 0
-                    try:
-                        dur = int(sc.get("duration_seconds", 0) or 0)
-                    except (TypeError, ValueError) as e:
-                        log.debug("duration_seconds no numerico en escena: %s", e)
-                        dur = 0
-                    if not dur and total_words > 0:
-                        w = count_words(sc.get("narration_segment", ""))
-                        dur = max(1, round(w / wpm * 60))
-                    conn.execute("""
-                        INSERT INTO scenes (project_id, script_id, scene_number,
-                            narration, visual_description, camera_movement,
-                            transition, duration_seconds, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        project_id, sid, scene_num,
-                        sc.get("narration_segment", ""),
-                        sc.get("image_prompt", "")
-                            or sc.get("visual_description", ""),
-                        sc.get("camera_movement", "") or "",
-                        sc.get("transition", "") or "",
-                        dur, now,
-                    ))
+        elif node_key in ("scenes", "scenes_short"):
+            script_type = "long" if node_key == "scenes" else "short"
+            _persist_scenes(conn, project_id, script_type, parse_scenes(raw) or [], now)
         elif node_key in ("metadata_youtube", "metadata_shorts",
                           "metadata_youtube_long", "metadata_youtube_short",
                           "metadata_facebook_long", "metadata_reels_short"):
@@ -1014,6 +1037,10 @@ def _build_user_msg_for_fixed(project_id: int, profile: dict | None,
         return user_msg
     if node_key == "scenes":
         script = _load_first_script(project_id, "long")
+        _, user_msg = build_scenes_prompt(project, profile, script)
+        return user_msg
+    if node_key == "scenes_short":
+        script = _load_first_script(project_id, "short")
         _, user_msg = build_scenes_prompt(project, profile, script)
         return user_msg
     if node_key == "metadata_youtube":
