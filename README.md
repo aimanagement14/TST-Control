@@ -27,6 +27,10 @@ Sin ORM, sin microservicios, sin 47 capas de abstracción.
 
 ## Instalación
 
+> **Python:** el kit corre en **Python 3.13** (alineado con CI en
+> `.github/workflows/ci.yml` y `.python-version`). Versiones 3.11 y 3.12
+> también funcionan en local; 3.14+ puede dar warnings de deprecation.
+
 ```bash
 # 1. Dependencias (Flask + waitress + python-dotenv, versiones pinned)
 python3 -m pip install -r requirements.txt

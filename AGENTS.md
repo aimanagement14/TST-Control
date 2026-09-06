@@ -4,7 +4,7 @@ Guía para agentes de IA que trabajan en este proyecto.
 
 ## Convenciones
 
-- Stack: **Python 3.14 + Flask 3 + Jinja2 + SQLite** (sin ORM), frontend sin build
+- Stack: **Python 3.13 + Flask 3 + Jinja2 + SQLite** (sin ORM), frontend sin build
   step (`static/app.js`, `static/graph.js`, importmap a `esm.sh`).
 - Type hints donde aporten valor. Evitar `Any` salvo en bordes justificados
   (parsing LLM, JSON externo).
