@@ -1,5 +1,13 @@
 # SPRINT — Auditoría 2026-09
 
+> **Archivado:** este documento describe el sprint ejecutado entre el
+> 2026-08-29 y el 2026-09-02. Las tareas referencian paths del entorno
+> original del autor (`C:\Users\kevin\Dev\TST-Control`) que ya no
+> aplican. Se conserva en `docs/archive/` como referencia histórica y
+> evidencia de las decisiones tomadas. Para el estado actual del
+> proyecto ver `CHANGELOG.md`, `TASKS.md`, `AGENTS.md` y
+> `docs/ARCHITECTURE.md`.
+
 > Plan derivado de la auditoría exhaustiva del 2026-09-01 (resumen ejecutivo en chat; este documento es ejecutable).
 > Ejecutar **en orden**. Cada tarea debe cerrar (tests en verde + commit) antes de empezar la siguiente.
 > Idioma: español en docs y mensajes de commit. Commits en Conventional Commits.
