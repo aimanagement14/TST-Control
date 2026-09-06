@@ -2,7 +2,7 @@
 
 **Tema:** Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
 
-**Estado:** research
+**Estado:** metadata
 
 **Creado:** 2026-09-04T18:39:15
 

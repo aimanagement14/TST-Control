@@ -1,10 +1,10 @@
-# Prompts usados en Todo sobre la Antártida
+# Prompts usados en Todo sobre La Piedra Rúnica Encontrada Bajo una Capilla
 
 Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.
 
 ## Concepto
 
-_Actualizado: 2026-09-04T18:50:54_
+_Actualizado: 2026-09-05T17:18:32_
 
 ### Prompt del sistema
 
@@ -15,11 +15,11 @@ Eres un director creativo especializado en contenido de misterio, conspiraciones
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Investigación disponible:
-La Antártida es el continente más austral de la Tierra, un desierto helado cuya superficie ronda los 14 millones de km² (cuarto más grande) y está 98% cubierta por hielo de unos 1,9 km de espesor. Es el lugar más frío, seco y ventoso del planeta; allí se registró la temperatura mínima absoluta mundial (−89,2 °C). Bajo su manto de hielo existen montañas de varios kilómetros, profundos valles y cientos de lagos y ríos ocultos, descubiertos por radar y estudios geofísicos. En conjunto contiene cerca del 90% del hielo terrestre y alrededor del 70% del agua dulce del planeta. No hay población humana nativa; sólo viven temporalmente entre 1.000 y 5.000 personas (científicos y técnicos) según la temporada. Desde 1959 la Antártida se rige por el Tratado Antártico, que prohíbe actividades militares y la explotación mineral, promoviendo exclusivamente la investigación científica pacífica.  
+El hallazgo es real y fue comunicado en agosto de 2026, pero hay una precisión importante: la piedra fue descubierta durante excavaciones realizadas en julio de 2026 y la noticia se difundió posteriormente en agosto. Fue encontrada incorporada al suelo de una estructura medieval en el yacimiento de Á Sondum, cerca de Sandur, en la isla de Sandoy, Islas Feroe. La estructura es interpretada provisionalmente como un pequeño oratorio o casa de oración cristiana. ([Medievalists.net][1])
 
-A pesar de estos hechos comprobados, la Antártida ha sido foco de mitos y teorías conspirativas. Su aislamiento extremo y la historia legendaria de la “Tierra Austral” han alimentado rumores sobre bases secretas (nazis u otras potencias), civilizaciones ocultas (pueblos hiperbóreos bajo el hielo) o presencia extraterrestre en el continente. En la práctica, la comunidad científica y los historiadores han desmentido esas versiones: por ejemplo, no hay evidencias de que Hitler huyera a una “fortaleza antártica” ni de bases nazis subterráneas, y lo que algunos ven como “pirámides” en imágenes satelitales resultan ser simplemente montañas erosionadas. A lo largo de este informe distinguimos rigurosamente los **hechos confirmados** (datos geográficos, climáticos, históricos) de las **teorías no contrastadas** y las controversias populares.
+Lo extraordinario es la combinación de tres elementos: una inscripción rúnica extremadamente poco común en las Islas Feroe, un edificio aparentemente religioso y varios objetos asociados con el cristianismo. Una lectura preliminar realizada por el arqueólogo Helgi Michelsen parece identificar las palabras “Her hvílur”, aproximadamente “Aquí yace” o “Aquí reposa”. Si esa lectura se confirma, la piedra podría haber funcionado originalmente como marcador funerario. Sin embargo, la inscripción todavía no ha sido descifrada completamente, por lo que no se puede afirmar quién estaba enterrado, cuándo se colocó originalmente la piedra ni si el individuo mencionado tenía alguna importancia especial. ([Medievalists.net][1])
 
 Perfil del proyecto:
 - Tono: Serio con toques intrigantes, narrativo
@@ -61,7 +61,7 @@ Devuelve SIEMPRE en este formato:
 
 ## Metadata Facebook 5 min
 
-_Actualizado: 2026-09-04T20:10:57_
+_Actualizado: 2026-09-04T20:13:52_
 
 ### Prompt del sistema
 
@@ -275,7 +275,7 @@ Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown extra, solo 
 
 ## Metadata YouTube 1 min
 
-_Actualizado: 2026-09-03T19:17:33_
+_Actualizado: 2026-09-04T21:12:19_
 
 ### Prompt del sistema
 
@@ -286,7 +286,7 @@ Eres experto en copy para YouTube Shorts verticales de 1 minuto sobre misterio y
 ### Prompt del usuario
 
 ```
-Tema: La Especie Humana Perdida De Asia Que Desapareció Sin Dejar Rastro
+Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
 Título del guion: 
 Hook: 
 Tipo de contenido: Documental de misterio
@@ -321,7 +321,7 @@ Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown extra, solo 
 
 ## Investigación
 
-_Actualizado: 2026-09-04T18:41:31_
+_Actualizado: 2026-09-05T16:54:39_
 
 ### Prompt del sistema
 
@@ -332,7 +332,7 @@ Eres un investigador documental riguroso. Tu trabajo es proporcionar informació
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Canal: Todo Sobre Todo
 Tipo de contenido: Documental de misterio
 Perfil de misterio: 7/10
@@ -444,7 +444,7 @@ Reglas TST innegociables:
 
 ## Guion 5 min
 
-_Actualizado: 2026-09-04T18:51:45_
+_Actualizado: 2026-09-05T17:34:04_
 
 ### Prompt del sistema
 
@@ -455,21 +455,21 @@ Eres guionista de documentales cinematográficos de 5 minutos para el canal 'Tod
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Duración objetivo: 5 minutos
-Ángulo: La Antártida no será presentada simplemente como un continente congelado, sino como uno de los lugares más inaccesibles y extraños de la Tierra, donde hechos científicos extraordinarios parecen alimentar algunas de las teorías más inquietantes de la historia moderna. El recorrido irá desde lo que realmente existe bajo kilómetros de hielo, como lagos, montañas y valles ocultos, hasta las historias sobre expediciones nazis, pirámides, civilizaciones perdidas, bases secretas y visitantes extraterrestres. La clave será enfrentar cada misterio con una pregunta incómoda: ¿qué parte nació de evidencias reales, qué parte fue exagerada y qué cosas todavía no comprendemos completamente? Así el misterio surge de la propia Antártida, sin necesidad de convertir los rumores en hechos, porque aparentemente el planeta ya tenía suficiente material para inquietarnos.
-Tesis: La Antártida es real y, precisamente por eso, resulta más misteriosa de lo que muchas conspiraciones necesitan inventar. Bajo su hielo existe un mundo que todavía estamos descubriendo, mientras que alrededor de él se ha construido una enorme colección de leyendas y teorías que mezclan hechos históricos, imágenes ambiguas y pura especulación.
+Ángulo: El enfoque más potente es tratar la piedra no simplemente como una inscripción vikinga, sino como una pieza fuera de lugar dentro de un pequeño edificio cristiano: una posible lápida reutilizada, incrustada deliberadamente en el suelo de un oratorio. La pregunta que sostiene todo el video será: ¿por qué una piedra que podría decir “Aquí yace” terminó bajo los pies de quienes entraban a un lugar de oración? A partir de ahí, el relato puede explorar tres posibilidades sin presentarlas como hechos: que la piedra fuera un antiguo marcador funerario, que perteneciera a una fase cristiana temprana o que su reutilización revele que los habitantes de Á Sondum estaban transformando un paisaje religioso más antiguo de lo que creemos. El componente conspirativo debe surgir de la anomalía y de las preguntas sin resolver, no de afirmar que existe una conspiración demostrada.
+Tesis: Una piedra que posiblemente decía “Aquí yace” apareció incrustada en el suelo de un antiguo edificio cristiano en un lugar donde las inscripciones rúnicas son excepcionalmente raras. Si la lectura preliminar se confirma, el verdadero misterio no será solamente quién está enterrado allí, sino por qué su piedra terminó formando parte del suelo de un oratorio.
 Puntos clave:
-- El continente prohibido: explicar por qué la Antártida es uno de los lugares más extremos y aislados del planeta, y cómo el Tratado Antártico alimentó la percepción popular de que allí existe algo que no podemos ver.
-- El mundo bajo el hielo: mostrar los lagos subglaciales, montañas, valles y estructuras geológicas descubiertas mediante radar y estudios geofísicos, planteando la pregunta de qué más podría encontrarse bajo casi dos kilómetros de hielo.
-- La sombra de los nazis: investigar la expedición alemana de 1938-1939 y separar los hechos históricos de la leyenda posterior sobre bases secretas, tecnología desconocida y una supuesta fortaleza antártica de Hitler.
-- Las imágenes que alimentaron las conspiraciones: analizar las famosas “pirámides” antárticas, estructuras aparentemente artificiales y otras anomalías visuales, contrastándolas con explicaciones geológicas y evitando presentar pareidolia como evidencia.
-- El gran misterio: cerrar con las teorías sobre civilizaciones antiguas, mundos ocultos, extraterrestres y territorios desconocidos, pero regresar a una conclusión más inquietante: quizá el verdadero misterio no sea lo que alguien supuestamente escondió en la Antártida, sino cuánto de ese continente sigue siendo desconocido para nosotros.
+- El hallazgo imposible de ignorar: una piedra rúnica excepcionalmente rara aparece durante las excavaciones de 2026 en Á Sondum, integrada en el suelo de una estructura interpretada provisionalmente como oratorio cristiano.
+- Las palabras que cambian la historia: la lectura preliminar “Her hvílur”, “Aquí yace” o “Aquí reposa”, abre la posibilidad de que la piedra fuera originalmente un marcador funerario. Pero todavía falta descifrar la inscripción completa.
+- La piedra fuera de lugar: si realmente fue una lápida, ¿por qué terminó reutilizada como parte del suelo? Aquí entra el misterio arqueológico de la reutilización, diferenciando claramente lo que sabemos de lo que solamente podemos imaginar.
+- El escenario es todavía más extraño: Á Sondum conserva una secuencia arqueológica de varios periodos, con evidencias de ocupación anterior a la época vikinga, un asentamiento vikingo y posteriormente depósitos medievales. La piedra aparece así dentro de un paisaje con una historia mucho más profunda que la del pequeño oratorio.
+- La pregunta prohibida: ¿estamos ante una simple reutilización práctica de una piedra, ante la transformación de un antiguo espacio funerario o ante una pista sobre cómo cambió la religión en las Islas Feroe? El video debe cerrar dejando abierta esa incógnita, porque la arqueología rara vez entrega respuestas con moño.
 
 Datos de la investigación:
-La Antártida es el continente más austral de la Tierra, un desierto helado cuya superficie ronda los 14 millones de km² (cuarto más grande) y está 98% cubierta por hielo de unos 1,9 km de espesor. Es el lugar más frío, seco y ventoso del planeta; allí se registró la temperatura mínima absoluta mundial (−89,2 °C). Bajo su manto de hielo existen montañas de varios kilómetros, profundos valles y cientos de lagos y ríos ocultos, descubiertos por radar y estudios geofísicos. En conjunto contiene cerca del 90% del hielo terrestre y alrededor del 70% del agua dulce del planeta. No hay población humana nativa; sólo viven temporalmente entre 1.000 y 5.000 personas (científicos y técnicos) según la temporada. Desde 1959 la Antártida se rige por el Tratado Antártico, que prohíbe actividades militares y la explotación mineral, promoviendo exclusivamente la investigación científica pacífica.  
+El hallazgo es real y fue comunicado en agosto de 2026, pero hay una precisión importante: la piedra fue descubierta durante excavaciones realizadas en julio de 2026 y la noticia se difundió posteriormente en agosto. Fue encontrada incorporada al suelo de una estructura medieval en el yacimiento de Á Sondum, cerca de Sandur, en la isla de Sandoy, Islas Feroe. La estructura es interpretada provisionalmente como un pequeño oratorio o casa de oración cristiana. ([Medievalists.net][1])
 
-A pesar de estos hechos comprobados, la Antártida ha sido foco de mitos y teorías conspirativas. Su aislamiento extremo y la historia legendaria de la “Tierra Austral” han alimentado rumores sobre bases secretas (nazis u otras potencias), civilizaciones ocultas (pueblos hiperbóreos bajo el hielo) o presencia extraterrestre en el continente. En la práctica, la comunidad científica y los historiadores han desmentido esas versiones: por ejemplo, no hay evidencias de que Hitler huyera a una “fortaleza antártica” ni de bases nazis subterráneas, y lo que algunos ven como “pirámides” en imágenes satelitales resultan ser simplemente montañas erosionadas. A lo largo de este informe distinguimos rigurosamente los **hechos confirmados** (datos geográficos, climáticos, históricos) de las **teorías no contrastadas** y las controversias populares.
+Lo extraordinario es la combinación de tres elementos: una inscripción rúnica extremadamente poco común en las Islas Feroe, un edificio aparentemente religioso y varios objetos asociados con el cristianismo. Una lectura preliminar realizada por el arqueólogo Helgi Michelsen parece identificar las palabras “Her hvílur”, aproximadamente “Aquí yace” o “Aquí reposa”. Si esa lectura se confirma, la piedra podría haber funcionado originalmente como marcador funerario. Sin embargo, la inscripción todavía no ha sido descifrada completamente, por lo que no se puede afirmar quién estaba enterrado, cuándo se colocó originalmente la piedra ni si el individuo mencionado tenía alguna importancia especial. ([Medievalists.net][1])
 
 Tono: Serio con toques intrigantes, narrativo
 Nivel de misterio: 7/10
@@ -517,7 +517,7 @@ Devuelve SIEMPRE en este formato:
 
 ## Guion 1 min
 
-_Actualizado: 2026-09-04T19:25:02_
+_Actualizado: 2026-09-05T18:01:14_
 
 ### Prompt del sistema
 
@@ -528,21 +528,21 @@ Eres guionista de videos cortos de 1 minuto (60-75 segundos) para el canal 'Todo
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Duración objetivo: 1 minuto (60-75 segundos)
-Ángulo: La Antártida no será presentada simplemente como un continente congelado, sino como uno de los lugares más inaccesibles y extraños de la Tierra, donde hechos científicos extraordinarios parecen alimentar algunas de las teorías más inquietantes de la historia moderna. El recorrido irá desde lo que realmente existe bajo kilómetros de hielo, como lagos, montañas y valles ocultos, hasta las historias sobre expediciones nazis, pirámides, civilizaciones perdidas, bases secretas y visitantes extraterrestres. La clave será enfrentar cada misterio con una pregunta incómoda: ¿qué parte nació de evidencias reales, qué parte fue exagerada y qué cosas todavía no comprendemos completamente? Así el misterio surge de la propia Antártida, sin necesidad de convertir los rumores en hechos, porque aparentemente el planeta ya tenía suficiente material para inquietarnos.
-Tesis: La Antártida es real y, precisamente por eso, resulta más misteriosa de lo que muchas conspiraciones necesitan inventar. Bajo su hielo existe un mundo que todavía estamos descubriendo, mientras que alrededor de él se ha construido una enorme colección de leyendas y teorías que mezclan hechos históricos, imágenes ambiguas y pura especulación.
+Ángulo: El enfoque más potente es tratar la piedra no simplemente como una inscripción vikinga, sino como una pieza fuera de lugar dentro de un pequeño edificio cristiano: una posible lápida reutilizada, incrustada deliberadamente en el suelo de un oratorio. La pregunta que sostiene todo el video será: ¿por qué una piedra que podría decir “Aquí yace” terminó bajo los pies de quienes entraban a un lugar de oración? A partir de ahí, el relato puede explorar tres posibilidades sin presentarlas como hechos: que la piedra fuera un antiguo marcador funerario, que perteneciera a una fase cristiana temprana o que su reutilización revele que los habitantes de Á Sondum estaban transformando un paisaje religioso más antiguo de lo que creemos. El componente conspirativo debe surgir de la anomalía y de las preguntas sin resolver, no de afirmar que existe una conspiración demostrada.
+Tesis: Una piedra que posiblemente decía “Aquí yace” apareció incrustada en el suelo de un antiguo edificio cristiano en un lugar donde las inscripciones rúnicas son excepcionalmente raras. Si la lectura preliminar se confirma, el verdadero misterio no será solamente quién está enterrado allí, sino por qué su piedra terminó formando parte del suelo de un oratorio.
 Puntos clave:
-- El continente prohibido: explicar por qué la Antártida es uno de los lugares más extremos y aislados del planeta, y cómo el Tratado Antártico alimentó la percepción popular de que allí existe algo que no podemos ver.
-- El mundo bajo el hielo: mostrar los lagos subglaciales, montañas, valles y estructuras geológicas descubiertas mediante radar y estudios geofísicos, planteando la pregunta de qué más podría encontrarse bajo casi dos kilómetros de hielo.
-- La sombra de los nazis: investigar la expedición alemana de 1938-1939 y separar los hechos históricos de la leyenda posterior sobre bases secretas, tecnología desconocida y una supuesta fortaleza antártica de Hitler.
-- Las imágenes que alimentaron las conspiraciones: analizar las famosas “pirámides” antárticas, estructuras aparentemente artificiales y otras anomalías visuales, contrastándolas con explicaciones geológicas y evitando presentar pareidolia como evidencia.
-- El gran misterio: cerrar con las teorías sobre civilizaciones antiguas, mundos ocultos, extraterrestres y territorios desconocidos, pero regresar a una conclusión más inquietante: quizá el verdadero misterio no sea lo que alguien supuestamente escondió en la Antártida, sino cuánto de ese continente sigue siendo desconocido para nosotros.
+- El hallazgo imposible de ignorar: una piedra rúnica excepcionalmente rara aparece durante las excavaciones de 2026 en Á Sondum, integrada en el suelo de una estructura interpretada provisionalmente como oratorio cristiano.
+- Las palabras que cambian la historia: la lectura preliminar “Her hvílur”, “Aquí yace” o “Aquí reposa”, abre la posibilidad de que la piedra fuera originalmente un marcador funerario. Pero todavía falta descifrar la inscripción completa.
+- La piedra fuera de lugar: si realmente fue una lápida, ¿por qué terminó reutilizada como parte del suelo? Aquí entra el misterio arqueológico de la reutilización, diferenciando claramente lo que sabemos de lo que solamente podemos imaginar.
+- El escenario es todavía más extraño: Á Sondum conserva una secuencia arqueológica de varios periodos, con evidencias de ocupación anterior a la época vikinga, un asentamiento vikingo y posteriormente depósitos medievales. La piedra aparece así dentro de un paisaje con una historia mucho más profunda que la del pequeño oratorio.
+- La pregunta prohibida: ¿estamos ante una simple reutilización práctica de una piedra, ante la transformación de un antiguo espacio funerario o ante una pista sobre cómo cambió la religión en las Islas Feroe? El video debe cerrar dejando abierta esa incógnita, porque la arqueología rara vez entrega respuestas con moño.
 
 Datos de la investigación:
-La Antártida es el continente más austral de la Tierra, un desierto helado cuya superficie ronda los 14 millones de km² (cuarto más grande) y está 98% cubierta por hielo de unos 1,9 km de espesor. Es el lugar más frío, seco y ventoso del planeta; allí se registró la temperatura mínima absoluta mundial (−89,2 °C). Bajo su manto de hielo existen montañas de varios kilómetros, profundos valles y cientos de lagos y ríos ocultos, descubiertos por radar y estudios geofísicos. En conjunto contiene cerca del 90% del hielo terrestre y alrededor del 70% del agua dulce del planeta. No hay población humana nativa; sólo viven temporalmente entre 1.000 y 5.000 personas (científicos y técnicos) según la temporada. Desde 1959 la Antártida se rige por el Tratado Antártico, que prohíbe actividades militares y la explotación mineral, promoviendo exclusivamente la investigación científica pacífica.  
+El hallazgo es real y fue comunicado en agosto de 2026, pero hay una precisión importante: la piedra fue descubierta durante excavaciones realizadas en julio de 2026 y la noticia se difundió posteriormente en agosto. Fue encontrada incorporada al suelo de una estructura medieval en el yacimiento de Á Sondum, cerca de Sandur, en la isla de Sandoy, Islas Feroe. La estructura es interpretada provisionalmente como un pequeño oratorio o casa de oración cristiana. ([Medievalists.net][1])
 
-A pesar de estos hechos comprobados, la Antártida ha sido foco de mitos y teorías conspirativas. Su aislamiento extremo y la historia legendaria de la “Tierra Austral” han alimentado rumores sobre bases secretas (nazis u otras potencias), civilizaciones ocultas (pueblos hiperbóreos bajo el hielo) o presencia extraterrestre en el continente. En la práctica, la comunidad científica y los historiadores han desmentido esas versiones: por ejemplo, no hay evidencias de que Hitler huyera a una “fortaleza antártica” ni de bases nazis subterráneas, y lo que algunos ven como “pirámides” en imágenes satelitales resultan ser simplemente montañas erosionadas. A lo largo de este informe distinguimos rigurosamente los **hechos confirmados** (datos geográficos, climáticos, históricos) de las **teorías no contrastadas** y las controversias populares.
+Lo extraordinario es la combinación de tres elementos: una inscripción rúnica extremadamente poco común en las Islas Feroe, un edificio aparentemente religioso y varios objetos asociados con el cristianismo. Una lectura preliminar realizada por el arqueólogo Helgi Michelsen parece identificar las palabras “Her hvílur”, aproximadamente “Aquí yace” o “Aquí reposa”. Si esa lectura se confirma, la piedra podría haber funcionado originalmente como marcador funerario. Sin embargo, la inscripción todavía no ha sido descifrada completamente, por lo que no se puede afirmar quién estaba enterrado, cuándo se colocó originalmente la piedra ni si el individuo mencionado tenía alguna importancia especial. ([Medievalists.net][1])
 
 Tono: Serio con toques intrigantes, narrativo
 Nivel de misterio: 7/10
