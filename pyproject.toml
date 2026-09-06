@@ -1,0 +1,63 @@
+[project]
+name = "tst-control"
+version = "1.0.0"
+description = "Todo Sobre Todo — Centro de producción de contenido. Pipeline local de preproducción para un canal de documentales (tema → ZIP)."
+requires-python = ">=3.11,<3.14"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "aimanagement14", email = "ai.management1414@gmail.com" },
+]
+
+[project.urls]
+Repository = "https://github.com/aimanagement14/TST-Control"
+
+[tool.setuptools]
+py-modules = ["app"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["services*", "blueprints*"]
+exclude = ["projects*", "examples*", "tests*"]
+
+# ---------------------------------------------------------------------------
+# ruff — linter y formatter. Si ruff no está instalado, los tests siguen
+# pasando; este bloque solo activa reglas cuando se ejecuta `ruff check .`
+# o `ruff format .`. Mismas reglas que el devkit (`biome`) en estilo:
+# line-length, sort imports y reglas de seguridad por defecto.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (formatter lo gestiona)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["services", "blueprints"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# mypy — type-check opcional. app.py usa anotaciones pero la base sigue
+# siendo dinámica en algunos bordes (json.loads, parsers LLM). Activar
+# solo con `mypy app.py services/ blueprints/ --ignore-missing-imports`.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
