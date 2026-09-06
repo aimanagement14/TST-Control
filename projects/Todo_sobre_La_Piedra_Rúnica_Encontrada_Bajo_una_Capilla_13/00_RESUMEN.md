@@ -2,7 +2,7 @@
 
 **Tema:** Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 
-**Estado:** scripts
+**Estado:** metadata
 
 **Creado:** 2026-09-04T22:50:49
 

@@ -61,7 +61,7 @@ Devuelve SIEMPRE en este formato:
 
 ## Metadata Facebook 5 min
 
-_Actualizado: 2026-09-04T20:13:52_
+_Actualizado: 2026-09-05T20:21:48_
 
 ### Prompt del sistema
 
@@ -72,7 +72,7 @@ Eres experto en copywriting para Facebook especializado en videos horizontales d
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Título del guion: 
 Hook: 
 Tipo de contenido: Documental de misterio
@@ -93,7 +93,7 @@ Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown, sin listas 
 
 ## Metadata Reels 1 min
 
-_Actualizado: 2026-09-03T19:17:46_
+_Actualizado: 2026-09-05T20:02:35_
 
 ### Prompt del sistema
 
@@ -104,7 +104,7 @@ Eres experto en copy para Facebook Reels verticales de 1 minuto sobre misterio y
 ### Prompt del usuario
 
 ```
-Tema: La Especie Humana Perdida De Asia Que Desapareció Sin Dejar Rastro
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Título del guion: 
 Hook: 
 Tipo de contenido: Documental de misterio
@@ -230,7 +230,7 @@ Devuelve SIEMPRE en este formato:
 
 ## Metadata YouTube 5 min
 
-_Actualizado: 2026-09-04T20:11:00_
+_Actualizado: 2026-09-05T20:21:10_
 
 ### Prompt del sistema
 
@@ -241,7 +241,7 @@ Eres experto en SEO y copywriting para YouTube especializado en videos horizonta
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Título del guion: 
 Hook: 
 Tipo de contenido: Documental de misterio
@@ -275,7 +275,7 @@ Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown extra, solo 
 
 ## Metadata YouTube 1 min
 
-_Actualizado: 2026-09-04T21:12:19_
+_Actualizado: 2026-09-05T20:01:02_
 
 ### Prompt del sistema
 
@@ -286,7 +286,7 @@ Eres experto en copy para YouTube Shorts verticales de 1 minuto sobre misterio y
 ### Prompt del usuario
 
 ```
-Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Título del guion: 
 Hook: 
 Tipo de contenido: Documental de misterio
@@ -375,7 +375,7 @@ Devuelve SIEMPRE la respuesta en este formato exacto:
 
 ## Escenas
 
-_Actualizado: 2026-09-03T19:05:00_
+_Actualizado: 2026-09-05T18:03:28_
 
 ### Prompt del sistema
 
@@ -404,9 +404,9 @@ Describe únicamente la imagen perfecta a generar. Nunca incluyas instrucciones 
 ### Prompt del usuario
 
 ```
-Tema: La Especie Humana Perdida De Asia Que Desapareció Sin Dejar Rastro
+Tema: Una excepcional piedra rúnica medieval fue descubierta en agosto de 2026 incrustada en el suelo de un antiguo oratorio en el yacimiento arqueológico de Á Sondum, en la isla de Sandoy, Islas Feroe
 Estilo visual: Cinematográfico, contrastado, con toques conspiranoicos
-Duración total objetivo: 338 segundos
+Duración total objetivo: 386 segundos
 
 Guion a convertir en escenas:
 

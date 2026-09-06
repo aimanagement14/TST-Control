@@ -1,11 +1,9 @@
 # Concepto — Todo sobre La Piedra Rúnica Encontrada Bajo una Capilla
 
 ## Ángulo
-
 El enfoque más potente es tratar la piedra no simplemente como una inscripción vikinga, sino como una pieza fuera de lugar dentro de un pequeño edificio cristiano: una posible lápida reutilizada, incrustada deliberadamente en el suelo de un oratorio. La pregunta que sostiene todo el video será: ¿por qué una piedra que podría decir “Aquí yace” terminó bajo los pies de quienes entraban a un lugar de oración? A partir de ahí, el relato puede explorar tres posibilidades sin presentarlas como hechos: que la piedra fuera un antiguo marcador funerario, que perteneciera a una fase cristiana temprana o que su reutilización revele que los habitantes de Á Sondum estaban transformando un paisaje religioso más antiguo de lo que creemos. El componente conspirativo debe surgir de la anomalía y de las preguntas sin resolver, no de afirmar que existe una conspiración demostrada.
 
 ## Tesis
-
 Una piedra que posiblemente decía “Aquí yace” apareció incrustada en el suelo de un antiguo edificio cristiano en un lugar donde las inscripciones rúnicas son excepcionalmente raras. Si la lectura preliminar se confirma, el verdadero misterio no será solamente quién está enterrado allí, sino por qué su piedra terminó formando parte del suelo de un oratorio.
 
 ## Puntos clave
@@ -17,7 +15,6 @@ Una piedra que posiblemente decía “Aquí yace” apareció incrustada en el s
 5. La pregunta prohibida: ¿estamos ante una simple reutilización práctica de una piedra, ante la transformación de un antiguo espacio funerario o ante una pista sobre cómo cambió la religión en las Islas Feroe? El video debe cerrar dejando abierta esa incógnita, porque la arqueología rara vez entrega respuestas con moño.
 
 ## Gancho emocional
-
 En los primeros 10 segundos, el espectador debe sentir que está contemplando algo que no debería estar ahí: “Debajo de los pies de quienes rezaban en este antiguo oratorio apareció una piedra con unas palabras inquietantes: ‘Aquí yace’. Pero nadie sabe todavía a quién se referían… ni por qué aquella piedra terminó enterrada en el suelo.” La emoción buscada es curiosidad inmediata mezclada con una sensación de descubrimiento prohibido.
 
 ## Qué aprenden
