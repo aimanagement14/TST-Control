@@ -54,15 +54,18 @@ python3 app.py
 
 ### Cómo regenerar el lockfile
 
-`requirements.txt` es el lockfile con versiones pinned (`==`).
-`requirements.in` contiene las specs de alto nivel (`flask>=2.2`,
-`waitress>=3.0`). Para regenerar el lock:
+`requirements.txt` es el lockfile con versiones pinned (`==`) que
+usa CI y dev. `requirements.in` contiene las specs de alto nivel
+(`flask>=2.2`, `waitress>=3.0`, `python-dotenv>=1.0`). El lock se
+regenera con `pip-tools` solo cuando cambian las specs:
 
 ```bash
 python -m pip install pip-tools
-python -m piptools compile requirements.in --output-file requirements.lock --no-header --no-annotate
-mv requirements.lock requirements.txt
+python -m piptools compile requirements.in --output-file requirements.txt --no-header --no-annotate
 ```
+
+Tras un bump, revisa el diff, commitea `requirements.txt` y vuelve
+a correr `test_core.py` + `verify_project.py` antes de subir el PR.
 
 ## Flujo
 
