@@ -40,7 +40,7 @@
         <li><span>Misterio / drama</span><b>{{ profile.mystery_level }} · {{ profile.drama_level }}</b></li>
         <li><span>Velocidad de narración</span><b>{{ profile.narration_speed }} ppm</b></li>
     </ul>
-    <p class="hint">Los perfiles se editan en <a href="{{ url_for('profiles') }}">Perfiles</a>.</p>
+    <p class="hint">Los perfiles se editan en <a href="{{ url_for('profiles.view') }}">Perfiles</a>.</p>
 </details>
 {% endif %}
 

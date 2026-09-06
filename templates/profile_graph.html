@@ -5,14 +5,14 @@
 <section class="page-head">
     <div>
         <p class="eyebrow">
-            <a href="{{ url_for('profiles') }}">Perfiles</a>
+            <a href="{{ url_for('profiles.view') }}">Perfiles</a>
             &middot; Editor visual de prompts
         </p>
         <h1>Editor de grafo: {{ graph_data.profileName }}</h1>
         <p class="lede">Nueve etapas obligatorias en un guion. Mueve los nodos, conecta entradas auxiliares y edita los prompts de cada paso.</p>
     </div>
     <div class="page-head-actions">
-        <a class="btn btn-ghost" href="{{ url_for('profiles') }}">&larr; Volver a perfiles</a>
+        <a class="btn btn-ghost" href="{{ url_for('profiles.view') }}">&larr; Volver a perfiles</a>
     </div>
 </section>
 
