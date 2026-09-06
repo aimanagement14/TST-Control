@@ -5,6 +5,43 @@ publicarse una versión.
 
 ## Pendientes
 
+### Sprint auditoría 2026-09-05 (continuación — monolito + tooling)
+
+- [x] **R1** Extraer `sync_project_folder`, `safe_project_dir` y
+  `delete_project_folder` a `services/sync.py`. Re-exportar desde
+  `app.py` para preservar `app.safe_project_dir` y
+  `app.sync_project_folder` (usados por `test_core.py`).
+- [x] **R2** Extraer `/profiles` y `/settings` a
+  `blueprints/profiles.py` (`profiles_bp`) y `blueprints/settings.py`
+  (`settings_bp`). `strict_slashes=False` para no romper los tests.
+  Renombrar endpoints a `profiles.view` y `settings.view`.
+- [x] **H1** Commitear `projects/Todo_sobre_La_Piedra_Rúnica_13/`
+  (nuevo) + etapas 01–06 de `projects/Todo_sobre_la_Antártida_12/`
+  que estaban untracked.
+- [x] **H2** Alinear Python canónico: AGENTS.md «3.14» → «3.13»,
+  README.md con nota «Python: 3.13», `.python-version` nuevo.
+- [x] **H3** Archivar `docs/SPRINT-2026-09-audit.md` →
+  `docs/archive/` con header de «Archivado» (paths legacy).
+- [x] **H4** Eliminar `requirements.lock` (duplicado literal de
+  `requirements.txt`).
+- [x] **H5** `pyproject.toml` mínimo con `requires-python` y config
+  opcional de `ruff`/`mypy`.
+- [x] **H6** `scripts/validate.py` (equivalente `npm run validate`):
+  pyflakes/tests/e2e obligatorios; ruff/mypy informativos.
+- [x] **H7** Añadir cobertura E2E de `scenes_short` al
+  `verify_project.py`. Antes solo se ejercitaba el guion largo.
+
+### Pendiente para futuro sprint
+
+- [ ] Llevar ruff y mypy a `required=True` en `scripts/validate.py`
+  una vez resueltos los 35 hallazgos de ruff y 7 de mypy (anotado
+  en `scripts/validate.py` con `required=False` por ahora).
+- [ ] Evaluar extracción de las 8 rutas por etapa
+  (`research`/`concept`/`scripts`/`scenes`/`metadata`/`thumbnails`/
+  `qc`/`export`) a blueprints dedicados. La bloqueante es
+  `fetch_project_or_404` y los builders de prompts, que viven en
+  `app.py` y se reusan en varios handlers.
+
 ### Sprint auditoría 2026-09 (Phase 0 — Quick wins)
 
 - [x] T0.1 — `secret_key` desde variable de entorno

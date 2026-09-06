@@ -7,6 +7,60 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- `services/sync.py` con `safe_project_dir`, `delete_project_folder` y
+  `sync_project_folder`. Extraído del monolito tras los `parsers`,
+  `llm` y `qc` (siguiente paso tras ADR-010). Misma API pública
+  (re-exportadas desde `app.py` para preservar `app.safe_project_dir`
+  y `app.sync_project_folder` que usan los tests).
+- `blueprints/profiles.py` (`profiles_bp`) y `blueprints/settings.py`
+  (`settings_bp`) con las rutas `/profiles` y `/settings`. Misma
+  convención que `graph_bp` y `runner_bp`: imports locales para evitar
+  ciclos con `app.py`. `strict_slashes=False` en las rutas para no
+  redirigir a `/profiles/` con barra final.
+- `pyproject.toml` con `[project]` (`name=tst-control`,
+  `version=1.0.0`, `requires-python=">=3.11,<3.14"`, `license=MIT`)
+  y `[tool.ruff]` + `[tool.mypy]` opcionales para activar linter /
+  type-check cuando estén instalados.
+- `scripts/validate.py` (equivalente a `npm run validate` del
+  devkit): ejecuta `pyflakes` (o `py_compile` fallback) → `test_core.py`
+  → `verify_project.py` → `ruff check`/`format --check`/`mypy`
+  (opcionales/informativos). Sale con código != 0 si cualquier paso
+  obligatorio falla.
+- `.python-version` fijando `3.13` para `pyenv` / `asdf` / `mise`.
+- `verify_project.py`: cobertura E2E del guion corto en `Escenas`.
+  Antes solo posteaba al guion largo y el QC avisaba «Faltan escenas
+  para el guion 1 min» como warning no-bloqueante. Ahora `SCENES_SHORT_JSON`
+  (4 escenas) y POST adicional a `/scenes` con `script_id=short_s['id']`.
+  Aserciones por guion: `Escenas long guardadas >= 6` y
+  `Escenas short guardadas >= 4`.
+
+### Changed
+
+- `app.py` 2793 → 2365 líneas (-428, -15%). Las rutas del monolito
+  restantes son las 8 páginas por etapa del proyecto (`research`,
+  `concept`, `scripts`, `scenes`, `metadata`, `thumbnails`, `qc`,
+  `export`) más `dashboard`, `new_project`, `view_project`,
+  `delete_project` y `favicon`.
+- `templates/*.html`: `url_for('profiles')` → `url_for('profiles.view')`
+  y `url_for('settings')` → `url_for('settings.view')` (7 llamadas).
+- `AGENTS.md` y `README.md`: Python canónico **3.13** (antes «3.14»
+  en AGENTS). Coherente con `.github/workflows/ci.yml` y `.python-version`.
+- `README.md`: instrucciones de regenerar el lockfile simplificadas.
+  `requirements.lock` (idéntico a `requirements.txt`) eliminado;
+  `pip-compile` ahora apunta directo a `requirements.txt`.
+- `docs/SPRINT-2026-09-audit.md` → `docs/archive/SPRINT-2026-09-audit.md`
+  con header «Archivado» (paths legacy `C:\Users\kevin\Dev\TST-Control`
+  del autor original).
+
+### Removed
+
+- `requirements.lock` (duplicado literal de `requirements.txt`).
+- Helpers legacy `get_saved_prompt`, `save_stage_prompt`,
+  `list_saved_prompts`, `_ensure_stage_prompt`, `_stage_context`
+  (ya estaban listados en entradas previas; sin cambios adicionales).
+
 ### Fixed
 
 - **Bug crítico**: las páginas por etapa (research, concept, scripts,
