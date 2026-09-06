@@ -241,7 +241,7 @@ SCENES_JSON = """\
     "visual_description": "Investigadores con ropa de alta montaña extrayendo muestras de sedimento en la base de un glaciar, tubos de ensayo etiquetados, luz fría azulada.",
     "camera_movement": "paneo lento",
     "duration_seconds": 40,
-    "transition": "disolución"
+    "transition": "fundido"
   },
   {
     "scene_number": 6,
@@ -273,6 +273,46 @@ SCENES_JSON = """\
     "visual_description": "Vista panorámica del Himalaya con texto en pantalla desvaneciéndose, un geólogo sentado en una roca con martillo en mano mirando la cordillera.",
     "camera_movement": "travelling",
     "duration_seconds": 15,
+    "transition": "fundido"
+  }
+]
+"""
+
+# Set corto (1 min, Shorts/Reels). Set reducido de 4 escenas para
+# ejercitar el camino script_id=short en el runner y la ruta /scenes
+# (min_scenes_short del QC = 4, asi evitamos el warning no-bloqueante).
+SCENES_SHORT_JSON = """\
+[
+  {
+    "scene_number": 1,
+    "narration_segment": "El techo del mundo fue un mar. Hace 50 millones de años.",
+    "visual_description": "Time-lapse del Himalaya con el mar cubriendo la zona donde hoy están las cumbres, transición fundida a las nieves actuales.",
+    "camera_movement": "zoom out",
+    "duration_seconds": 10,
+    "transition": "fundido"
+  },
+  {
+    "scene_number": 2,
+    "narration_segment": "El deshielo está sacando a la luz criaturas atrapadas durante milenios.",
+    "visual_description": "Glaciar retrocediendo, ammonite diminuto asomando entre el sedimento, luz rasante cinematográfica.",
+    "camera_movement": "primer plano",
+    "duration_seconds": 12,
+    "transition": "corte seco"
+  },
+  {
+    "scene_number": 3,
+    "narration_segment": "Un registro científico excepcional. Ammonites y nummulites del antiguo Mar de Tetis.",
+    "visual_description": "Primer plano de un ammonite fosilizado, manos con guantes de nitrilo sosteniendo la muestra, fondo oscuro.",
+    "camera_movement": "zoom in",
+    "duration_seconds": 10,
+    "transition": "corte seco"
+  },
+  {
+    "scene_number": 4,
+    "narration_segment": "El Himalaya no necesita misterios inventados. Solo geología real.",
+    "visual_description": "Cumbre del Everest al atardecer, texto en pantalla desvaneciéndose, silencio y quietud.",
+    "camera_movement": "estático",
+    "duration_seconds": 8,
     "transition": "fundido"
   }
 ]
@@ -449,12 +489,36 @@ def main():
         },
         follow_redirects=True,
     )
-    log("Escenas POST", f"status {r.status_code}", r.status_code == 200)
+    log("Escenas POST (long)", f"status {r.status_code}", r.status_code == 200)
+    r = client.post(
+        f"/projects/{PROJECT_ID}/scenes",
+        data={
+            "action": "save",
+            "script_id": str(short_s["id"]),
+            "text": SCENES_SHORT_JSON,
+        },
+        follow_redirects=True,
+    )
+    log("Escenas POST (short)", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        n_scenes = conn.execute(
-            "SELECT COUNT(*) AS n FROM scenes WHERE project_id=?", (PROJECT_ID,)
+        n_long = conn.execute(
+            "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
+            (PROJECT_ID, long_s["id"]),
         ).fetchone()["n"]
-    log("Escenas guardadas", f"{n_scenes} (>= 6)", n_scenes >= 6)
+        n_short = conn.execute(
+            "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
+            (PROJECT_ID, short_s["id"]),
+        ).fetchone()["n"]
+    log(
+        "Escenas long guardadas",
+        f"{n_long} (>= 6)",
+        n_long >= 6,
+    )
+    log(
+        "Escenas short guardadas",
+        f"{n_short} (>= 4)",
+        n_short >= 4,
+    )
 
     # ---- 6) Metadata YouTube ----
     print("\n=== 6) Metadata YouTube ===")
