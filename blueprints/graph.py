@@ -84,7 +84,10 @@ def save_graph_node_route(profile_id: int):
     pos = body.get("position") or {}
     is_fixed = bool(body.get("is_fixed", node_key in KNOWN_FIXED_NODE_KEYS))
     node = save_graph_node(
-        profile_id, str(node_key), str(label), str(sys_prompt),
+        profile_id,
+        str(node_key),
+        str(label),
+        str(sys_prompt),
         str(user_prompt),
         json.dumps(inputs, ensure_ascii=False),
         float(pos.get("x", 0) or 0),

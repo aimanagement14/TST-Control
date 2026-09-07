@@ -17,6 +17,7 @@ PROJECT_ID se eligió alto (2) para no chocar con proyectos reales que el
 usuario pueda tener en id=1. Renombrar este archivo o cambiar el id es
 trivial.
 """
+
 import io
 import json
 import sys
@@ -36,9 +37,7 @@ def ensure_project():
     el perfil por defecto. Devuelve el id del proyecto listo para usar.
     """
     with app.get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM projects WHERE id=?", (PROJECT_ID,)
-        ).fetchone()
+        row = conn.execute("SELECT id FROM projects WHERE id=?", (PROJECT_ID,)).fetchone()
         if row:
             return row["id"]
         default_profile = conn.execute(
@@ -61,6 +60,7 @@ def ensure_project():
             ),
         )
         return cur.lastrowid or PROJECT_ID
+
 
 # ---------------------------------------------------------------------------
 # Datos simulados del LLM (modo manual) por etapa
@@ -410,9 +410,9 @@ def main():
     )
     log("Investigación POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        research = dict(conn.execute(
-            "SELECT * FROM research WHERE project_id=?", (PROJECT_ID,)
-        ).fetchone())
+        research = dict(
+            conn.execute("SELECT * FROM research WHERE project_id=?", (PROJECT_ID,)).fetchone()
+        )
     parsed_sources = json.loads(research["sources"] or "[]")
     parsed_facts = json.loads(research["facts"] or "[]")
     parsed_theories = json.loads(research["theories"] or "[]")
@@ -431,9 +431,9 @@ def main():
     )
     log("Concepto POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        concept = dict(conn.execute(
-            "SELECT * FROM concept WHERE project_id=?", (PROJECT_ID,)
-        ).fetchone())
+        concept = dict(
+            conn.execute("SELECT * FROM concept WHERE project_id=?", (PROJECT_ID,)).fetchone()
+        )
     log("Ángulo", bool(concept["angle"]), bool(concept["angle"]))
     log("Tesis", bool(concept["thesis"]), bool(concept["thesis"]))
     kp = json.loads(concept["key_points"] or "[]")
@@ -448,18 +448,23 @@ def main():
     )
     log("Guion largo POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        long_s = dict(conn.execute(
-            "SELECT * FROM scripts WHERE project_id=? AND type='long'",
-            (PROJECT_ID,),
-        ).fetchone())
+        long_s = dict(
+            conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND type='long'",
+                (PROJECT_ID,),
+            ).fetchone()
+        )
     log("Hook largo", bool(long_s["hook"]), bool(long_s["hook"]))
     log("Contexto largo", bool(long_s["context"]), bool(long_s["context"]))
     log("Desarrollo largo", bool(long_s["development"]), bool(long_s["development"]))
     log("Revelaciones largo", bool(long_s["revelations"]), bool(long_s["revelations"]))
     log("Conclusión largo", bool(long_s["conclusion"]), bool(long_s["conclusion"]))
     log("CTA largo", bool(long_s["cta"]), bool(long_s["cta"]))
-    log("Palabras largo", f"{long_s['word_count']} (rango 650-850)",
-        650 <= long_s["word_count"] <= 850)
+    log(
+        "Palabras largo",
+        f"{long_s['word_count']} (rango 650-850)",
+        650 <= long_s["word_count"] <= 850,
+    )
 
     # ---- 4) Guion corto ----
     print("\n=== 4) Guion corto (1 min) ===")
@@ -470,13 +475,18 @@ def main():
     )
     log("Guion corto POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        short_s = dict(conn.execute(
-            "SELECT * FROM scripts WHERE project_id=? AND type='short'",
-            (PROJECT_ID,),
-        ).fetchone())
+        short_s = dict(
+            conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND type='short'",
+                (PROJECT_ID,),
+            ).fetchone()
+        )
     log("Hook corto", bool(short_s["hook"]), bool(short_s["hook"]))
-    log("Palabras corto", f"{short_s['word_count']} (rango 130-180)",
-        130 <= short_s["word_count"] <= 180)
+    log(
+        "Palabras corto",
+        f"{short_s['word_count']} (rango 130-180)",
+        130 <= short_s["word_count"] <= 180,
+    )
 
     # ---- 5) Escenas ----
     print("\n=== 5) Escenas ===")
@@ -534,10 +544,12 @@ def main():
     )
     log("Metadata YT POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        m_yt = dict(conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_long'",
-            (PROJECT_ID,),
-        ).fetchone())
+        m_yt = dict(
+            conn.execute(
+                "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_long'",
+                (PROJECT_ID,),
+            ).fetchone()
+        )
     titles = json.loads(m_yt["titles"] or "[]")
     chapters = json.loads(m_yt["chapters"] or "[]")
     tags = json.loads(m_yt["tags"] or "[]")
@@ -562,10 +574,12 @@ def main():
     )
     log("Metadata Shorts POST", f"status {r.status_code}", r.status_code == 200)
     with app.get_db() as conn:
-        m_sh = dict(conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_short'",
-            (PROJECT_ID,),
-        ).fetchone())
+        m_sh = dict(
+            conn.execute(
+                "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_short'",
+                (PROJECT_ID,),
+            ).fetchone()
+        )
     sh_hashtags = json.loads(m_sh["hashtags"] or "[]")
     sh_text = json.loads(m_sh["on_screen_text"] or "[]")
     log("Caption Shorts", bool(m_sh["caption"]), bool(m_sh["caption"]))
@@ -598,18 +612,18 @@ Close-up of an ancient trilobite fossil eye filling the frame, orange and teal c
         log(f"Thumbnail {stype} POST", f"status {r.status_code}", r.status_code == 200)
         with app.get_db() as conn:
             row = conn.execute(
-                "SELECT prompt FROM thumbnail_records "
-                "WHERE project_id=? AND script_type=?",
+                "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type=?",
                 (PROJECT_ID, stype),
             ).fetchone()
-        log(f"Thumbnail {stype} guardada",
-            bool(row and row["prompt"]),
-            bool(row and row["prompt"]))
+        log(f"Thumbnail {stype} guardada", bool(row and row["prompt"]), bool(row and row["prompt"]))
     # Etapa 'thumbnails' debe estar completa (ambas con prompt)
     stages = app.project_stage_status(
-        {"id": PROJECT_ID, "status": app.get_db().execute(
-            "SELECT status FROM projects WHERE id=?", (PROJECT_ID,)
-        ).fetchone()["status"]}
+        {
+            "id": PROJECT_ID,
+            "status": app.get_db()
+            .execute("SELECT status FROM projects WHERE id=?", (PROJECT_ID,))
+            .fetchone()["status"],
+        }
     )
     log("Etapa thumbnails completa", bool(stages.get("thumbnails")), bool(stages.get("thumbnails")))
 
@@ -629,17 +643,19 @@ Close-up of an ancient trilobite fossil eye filling the frame, orange and teal c
             print(f"      [{sev}] {stage}: {msg}")
 
     with app.get_db() as conn:
-        status = conn.execute(
-            "SELECT status FROM projects WHERE id=?", (PROJECT_ID,)
-        ).fetchone()["status"]
+        status = conn.execute("SELECT status FROM projects WHERE id=?", (PROJECT_ID,)).fetchone()[
+            "status"
+        ]
     log("Status del proyecto", f"'{status}' (esperado 'ready')", status == "ready")
 
     # ---- 9) Export ZIP ----
     print("\n=== 9) Exportación ZIP ===")
     r = client.post(f"/projects/{PROJECT_ID}/export", follow_redirects=False)
     log("Export POST", f"status {r.status_code}", r.status_code == 200)
-    log("Content-Type zip", "zip" in r.headers.get("Content-Type", "").lower()
-        or r.data[:2] == b"PK")
+    log(
+        "Content-Type zip",
+        "zip" in r.headers.get("Content-Type", "").lower() or r.data[:2] == b"PK",
+    )
     zf = zipfile.ZipFile(io.BytesIO(r.data))
     names = zf.namelist()
     expected_substrings = [
@@ -663,12 +679,19 @@ Close-up of an ancient trilobite fossil eye filling the frame, orange and teal c
     resumen = zf.read([n for n in names if n.endswith("00_RESUMEN.md")][0]).decode("utf-8")
     resumen_ok = "Verificacion pipeline" in resumen or "Himalaya" in resumen
     log("Resumen contiene tema", resumen_ok, resumen_ok)
-    bundle = json.loads(zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0])
-                        .decode("utf-8"))
-    log("Bundle JSON", f"keys: {list(bundle.keys())[:6]}...",
-        {"project", "research", "concept", "scripts"}.issubset(bundle.keys()))
-    log("Bundle thumbnails", f"{len(bundle.get('thumbnails', []))} (esperado 2)",
-        len(bundle.get("thumbnails", [])) == 2)
+    bundle = json.loads(
+        zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0]).decode("utf-8")
+    )
+    log(
+        "Bundle JSON",
+        f"keys: {list(bundle.keys())[:6]}...",
+        {"project", "research", "concept", "scripts"}.issubset(bundle.keys()),
+    )
+    log(
+        "Bundle thumbnails",
+        f"{len(bundle.get('thumbnails', []))} (esperado 2)",
+        len(bundle.get("thumbnails", [])) == 2,
+    )
 
     print("\n" + "=" * 60)
     print(f"  ZIP exportado: {len(names)} archivos, {len(r.data)} bytes")

@@ -10,6 +10,7 @@ Misma convencion que el resto de blueprints: las funciones de dominio
 y constantes (``get_db``, ``now_iso``, ``CONFIG``) se importan con
 local import dentro del handler para evitar ciclos con app.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,25 +29,28 @@ def view():
         if action == "create":
             platforms = request.form.getlist("platforms")
             with get_db() as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO profiles (name, content_type, audience, tone, style,
                         mystery_level, drama_level, narration_speed, platforms, notes,
                         is_default, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    request.form.get("name", "").strip(),
-                    request.form.get("content_type", "").strip(),
-                    request.form.get("audience", "").strip(),
-                    request.form.get("tone", "").strip(),
-                    request.form.get("style", "").strip(),
-                    int(request.form.get("mystery_level", 5)),
-                    int(request.form.get("drama_level", 5)),
-                    int(request.form.get("narration_speed", 150)),
-                    json.dumps(platforms),
-                    request.form.get("notes", "").strip(),
-                    1 if request.form.get("is_default") else 0,
-                    now_iso(),
-                ))
+                """,
+                    (
+                        request.form.get("name", "").strip(),
+                        request.form.get("content_type", "").strip(),
+                        request.form.get("audience", "").strip(),
+                        request.form.get("tone", "").strip(),
+                        request.form.get("style", "").strip(),
+                        int(request.form.get("mystery_level", 5)),
+                        int(request.form.get("drama_level", 5)),
+                        int(request.form.get("narration_speed", 150)),
+                        json.dumps(platforms),
+                        request.form.get("notes", "").strip(),
+                        1 if request.form.get("is_default") else 0,
+                        now_iso(),
+                    ),
+                )
             flash("Perfil creado", "ok")
         elif action == "set_default":
             pid = request.form.get("profile_id")
@@ -67,7 +71,8 @@ def view():
             with get_db() as conn:
                 if make_default:
                     conn.execute("UPDATE profiles SET is_default=0")
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE profiles SET
                         name = ?,
                         content_type = ?,
@@ -81,20 +86,22 @@ def view():
                         notes = ?,
                         is_default = ?
                     WHERE id = ?
-                """, (
-                    name,
-                    request.form.get("content_type", "").strip(),
-                    request.form.get("audience", "").strip(),
-                    request.form.get("tone", "").strip(),
-                    request.form.get("style", "").strip(),
-                    int(request.form.get("mystery_level", 5)),
-                    int(request.form.get("drama_level", 5)),
-                    int(request.form.get("narration_speed", 150)),
-                    json.dumps(platforms),
-                    request.form.get("notes", "").strip(),
-                    1 if make_default else 0,
-                    pid,
-                ))
+                """,
+                    (
+                        name,
+                        request.form.get("content_type", "").strip(),
+                        request.form.get("audience", "").strip(),
+                        request.form.get("tone", "").strip(),
+                        request.form.get("style", "").strip(),
+                        int(request.form.get("mystery_level", 5)),
+                        int(request.form.get("drama_level", 5)),
+                        int(request.form.get("narration_speed", 150)),
+                        json.dumps(platforms),
+                        request.form.get("notes", "").strip(),
+                        1 if make_default else 0,
+                        pid,
+                    ),
+                )
             flash("Perfil actualizado", "ok")
         elif action == "delete":
             pid = request.form.get("profile_id")
@@ -103,9 +110,9 @@ def view():
         return redirect(url_for("profiles.view"))
 
     with get_db() as conn:
-        profiles_list = [dict(r) for r in conn.execute(
-            "SELECT * FROM profiles ORDER BY name"
-        ).fetchall()]
+        profiles_list = [
+            dict(r) for r in conn.execute("SELECT * FROM profiles ORDER BY name").fetchall()
+        ]
     for p in profiles_list:
         try:
             p["platforms_list"] = json.loads(p.get("platforms") or "[]")

@@ -82,15 +82,17 @@ def call_llm(sys_prompt: str, user_msg: str) -> str:
         if not api_key:
             return _manual_fallback(sys_prompt, user_msg, "No hay API key configurada")
         try:
-            data = json.dumps({
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                "temperature": CONFIG["llm"]["temperature"],
-                "max_tokens": CONFIG["llm"]["max_tokens"],
-            }).encode("utf-8")
+            data = json.dumps(
+                {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    "temperature": CONFIG["llm"]["temperature"],
+                    "max_tokens": CONFIG["llm"]["max_tokens"],
+                }
+            ).encode("utf-8")
             req = urllib.request.Request(
                 f"{base_url.rstrip('/')}/chat/completions",
                 data=data,
@@ -118,6 +120,7 @@ def call_llm(sys_prompt: str, user_msg: str) -> str:
             return _manual_fallback(sys_prompt, user_msg, "No hay API key de Anthropic configurada")
         try:
             import anthropic  # type: ignore
+
             client = anthropic.Anthropic(api_key=api_key)
             message = client.messages.create(
                 model=model,
@@ -128,12 +131,14 @@ def call_llm(sys_prompt: str, user_msg: str) -> str:
             return message.content[0].text
         except ImportError:
             try:
-                data = json.dumps({
-                    "model": model,
-                    "max_tokens": CONFIG["llm"]["max_tokens"],
-                    "system": sys_prompt,
-                    "messages": [{"role": "user", "content": user_msg}],
-                }).encode("utf-8")
+                data = json.dumps(
+                    {
+                        "model": model,
+                        "max_tokens": CONFIG["llm"]["max_tokens"],
+                        "system": sys_prompt,
+                        "messages": [{"role": "user", "content": user_msg}],
+                    }
+                ).encode("utf-8")
                 req = urllib.request.Request(
                     "https://api.anthropic.com/v1/messages",
                     data=data,

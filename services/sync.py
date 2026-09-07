@@ -11,6 +11,7 @@ Para evitar ciclos con ``app.py`` (T2.1) las dependencias de Flask
 (``get_db``, ``PROJECTS_DIR``, helpers de BD como ``get_profile`` /
 ``fetch_optional_dict``) se importan localmente dentro de cada función.
 """
+
 from __future__ import annotations
 
 import json
@@ -68,29 +69,41 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
     )
 
     with get_db() as conn:
-        project = conn.execute("SELECT * FROM projects WHERE id=?",
-                               (project_id,)).fetchone()
+        project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
         if not project:
             return PROJECTS_DIR / "_missing", []
         project = dict(project)
         profile = get_profile(project["profile_id"])
-        research_obj = fetch_optional_dict(conn,
-            "SELECT * FROM research WHERE project_id=?", (project_id,))
-        concept_obj = fetch_optional_dict(conn,
-            "SELECT * FROM concept WHERE project_id=?", (project_id,))
-        scripts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-        ).fetchall()]
-        scenes_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number",
-            (project_id,)
-        ).fetchall()]
-        meta_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
-        ).fetchall()]
-        thumb_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
-        ).fetchall()]
+        research_obj = fetch_optional_dict(
+            conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
+        )
+        concept_obj = fetch_optional_dict(
+            conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
+        )
+        scripts_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        scenes_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
+            ).fetchall()
+        ]
+        meta_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        thumb_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
 
     out_dir = safe_project_dir(project_id, project["name"])
     if out_dir.exists():
@@ -108,12 +121,12 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
         f.write(f"**Creado:** {project['created_at']}\n\n")
         if profile:
             f.write(f"**Perfil:** {profile['name']}\n\n")
-            f.write(f"- Tipo: {profile.get('content_type','')}\n")
-            f.write(f"- Tono: {profile.get('tone','')}\n")
-            f.write(f"- Estilo: {profile.get('style','')}\n")
-            f.write(f"- Misterio: {profile.get('mystery_level','')}/10\n")
-            f.write(f"- Dramatización: {profile.get('drama_level','')}/10\n")
-            f.write(f"- Velocidad: {profile.get('narration_speed','')} ppm\n")
+            f.write(f"- Tipo: {profile.get('content_type', '')}\n")
+            f.write(f"- Tono: {profile.get('tone', '')}\n")
+            f.write(f"- Estilo: {profile.get('style', '')}\n")
+            f.write(f"- Misterio: {profile.get('mystery_level', '')}/10\n")
+            f.write(f"- Dramatización: {profile.get('drama_level', '')}/10\n")
+            f.write(f"- Velocidad: {profile.get('narration_speed', '')} ppm\n")
     written.append(rel)
 
     # 01_investigacion.md
@@ -134,8 +147,8 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
         rel = "02_concepto.md"
         with open(out_dir / rel, "w", encoding="utf-8") as f:
             f.write(f"# Concepto — {project['name']}\n\n")
-            f.write(f"## Ángulo\n{concept_obj.get('angle','')}\n\n")
-            f.write(f"## Tesis\n{concept_obj.get('thesis','')}\n\n")
+            f.write(f"## Ángulo\n{concept_obj.get('angle', '')}\n\n")
+            f.write(f"## Tesis\n{concept_obj.get('thesis', '')}\n\n")
             kp = json.loads(concept_obj.get("key_points") or "[]")
             if kp:
                 f.write("## Puntos clave\n\n")
@@ -170,8 +183,8 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
         for s in scripts_rows:
             rel = f"03_guiones/guion_{s['type']}.md"
             with open(gdir / Path(rel).name, "w", encoding="utf-8") as f:
-                f.write(f"# {s.get('title','')}\n\n")
-                f.write(f"**Tipo:** {s['type']} ({s.get('word_count',0)} palabras)\n\n")
+                f.write(f"# {s.get('title', '')}\n\n")
+                f.write(f"**Tipo:** {s['type']} ({s.get('word_count', 0)} palabras)\n\n")
                 if s.get("hook"):
                     f.write(f"## Hook\n{s['hook']}\n\n")
                 if s.get("context"):
@@ -193,18 +206,22 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
         rel = "04_escenas/escenas.md"
         with open(edir / "escenas.md", "w", encoding="utf-8") as f:
             f.write(f"# Escenas — {project['name']}\n")
-            f.write(f"_Total: {len(scenes_rows)} escenas · "
-                    f"duración acumulada: "
-                    f"{sum(s.get('duration_seconds', 0) for s in scenes_rows)}s_\n")
+            f.write(
+                f"_Total: {len(scenes_rows)} escenas · "
+                f"duración acumulada: "
+                f"{sum(s.get('duration_seconds', 0) for s in scenes_rows)}s_\n"
+            )
             f.write("---\n")
             for s in scenes_rows:
                 imagen = s.get("visual_description", "").strip()
                 f.write(f"## ESCENA {s['scene_number']}\n")
-                f.write(f"**TEXTO AUDIO:** {s.get('narration','').strip()}\n")
+                f.write(f"**TEXTO AUDIO:** {s.get('narration', '').strip()}\n")
                 f.write(f"**IMAGEN:** {imagen}\n")
-                f.write(f"_Cámara: {s.get('camera_movement','')} · "
-                        f"Transición: {s.get('transition','')} · "
-                        f"Duración: {s.get('duration_seconds',0)}s_\n")
+                f.write(
+                    f"_Cámara: {s.get('camera_movement', '')} · "
+                    f"Transición: {s.get('transition', '')} · "
+                    f"Duración: {s.get('duration_seconds', 0)}s_\n"
+                )
                 f.write("---\n")
         written.append(rel)
 
@@ -286,7 +303,9 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
         rel = "07_prompts_usados.md"
         with open(out_dir / rel, "w", encoding="utf-8") as f:
             f.write(f"# Prompts usados en {project['name']}\n\n")
-            f.write("Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n\n")
+            f.write(
+                "Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n\n"
+            )
             for stage, p in stage_prompts.items():
                 label = stage_labels.get(stage, stage)
                 f.write(f"## {label}\n\n")

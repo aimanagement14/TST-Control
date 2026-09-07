@@ -228,7 +228,7 @@ def parse_scenes_json(text: str) -> list[dict] | None:
     end = text.rfind("]")
     if start == -1 or end == -1 or end <= start:
         return None
-    candidate = text[start:end + 1]
+    candidate = text[start : end + 1]
     try:
         data = json.loads(candidate)
         if isinstance(data, list):
@@ -308,7 +308,7 @@ def parse_prompt_json(text: str) -> dict | None:
     end = text.rfind("}")
     if start != -1 and end > start:
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start : end + 1])
         except Exception as e:
             log.debug("parse_prompt_json: candidato {..} no es JSON valido: %s", e)
             return None
@@ -328,7 +328,6 @@ def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
         "on_screen_text": [],
     }
     cur = None
-    buf: list[str] = []
     for line in text.splitlines():
         s = line.strip()
         up = re.sub(r"\s+", " ", s.upper())

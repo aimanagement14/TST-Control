@@ -10,6 +10,7 @@ Misma convencion que el resto de blueprints: ``CONFIG`` y
 ``CONFIG_PATH`` se importan con local import dentro del handler para
 evitar ciclos con app.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -69,7 +70,9 @@ def view():
         else:
             CONFIG["llm"]["provider"] = request.form.get("provider", "manual")
             CONFIG["llm"]["openai"]["api_key"] = request.form.get("openai_key", "").strip()
-            CONFIG["llm"]["openai"]["model"] = request.form.get("openai_model", "gpt-4o-mini").strip()
+            CONFIG["llm"]["openai"]["model"] = request.form.get(
+                "openai_model", "gpt-4o-mini"
+            ).strip()
             CONFIG["llm"]["openai"]["base_url"] = request.form.get(
                 "openai_base", "https://api.openai.com/v1"
             ).strip()
@@ -83,7 +86,5 @@ def view():
             json.dump(CONFIG, f, ensure_ascii=False, indent=2)
         return redirect(url_for("settings.view"))
 
-    presets = {
-        k: v for k, v in CONFIG["llm"].get("presets", {}).items() if not k.startswith("_")
-    }
+    presets = {k: v for k, v in CONFIG["llm"].get("presets", {}).items() if not k.startswith("_")}
     return render_template("settings.html", config=CONFIG, presets=presets)

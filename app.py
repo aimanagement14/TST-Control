@@ -9,43 +9,48 @@ Arquitectura deliberadamente simple:
 - Plantillas Jinja2
 """
 
-import os
-import re
-import sys
 import json
-import sqlite3
-import time
 import logging
-import urllib.request
-import zipfile
+import os
 import shutil
-import uuid
+import sqlite3
+import sys
+import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    flash, jsonify, send_file, send_from_directory, abort, session, g,
-    has_app_context,
-)
-
-from services.parsers import (
-    parse_research,
-    parse_concept,
-    parse_script,
-    parse_scenes,
-    parse_scenes_tst,
-    parse_scenes_json,
-    parse_prompt_json,
-    parse_metadata,
-    parse_thumbnail,
-    count_words,
-    estimate_duration_seconds,
-)
-from services.llm import call_llm, _manual_fallback, llm_output_is_manual
-from services.qc import run_qc, save_qc_issues
-from services.sync import safe_project_dir, delete_project_folder, sync_project_folder
 
 from dotenv import load_dotenv
+from flask import (
+    Flask,
+    abort,
+    flash,
+    g,
+    has_app_context,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    url_for,
+)
+
+from services.llm import call_llm, llm_output_is_manual
+from services.parsers import (
+    count_words,
+    parse_concept,
+    parse_metadata,
+    parse_research,
+    parse_scenes,
+    parse_script,
+    parse_thumbnail,
+)
+from services.qc import run_qc, save_qc_issues
+from services.sync import (
+    delete_project_folder,
+    safe_project_dir,
+    sync_project_folder,
+)
 
 logging.basicConfig(
     level=os.environ.get("TST_LOG_LEVEL", "INFO"),
@@ -66,7 +71,7 @@ STATIC_DIR = BASE_DIR / "static"
 
 load_dotenv(BASE_DIR / ".env", override=False)
 
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+with open(CONFIG_PATH, encoding="utf-8") as f:
     CONFIG = json.load(f)
 
 PROJECTS_DIR.mkdir(exist_ok=True)
@@ -88,9 +93,10 @@ app.config["JSON_AS_ASCII"] = False
 # blueprints/runner.py. Los imports se hacen aqui para que los
 # modulos blueprints puedan importar desde app sin ciclos.
 from blueprints.graph import graph_bp  # noqa: E402
-from blueprints.runner import runner_bp  # noqa: E402
 from blueprints.profiles import profiles_bp  # noqa: E402
+from blueprints.runner import runner_bp  # noqa: E402
 from blueprints.settings import settings_bp  # noqa: E402
+
 app.register_blueprint(graph_bp)
 app.register_blueprint(runner_bp)
 app.register_blueprint(profiles_bp)
@@ -100,6 +106,7 @@ app.register_blueprint(settings_bp)
 @app.route("/favicon.ico")
 def favicon():
     return send_from_directory(STATIC_DIR, "favicon.ico", mimetype="image/x-icon")
+
 
 # ---------------------------------------------------------------------------
 # Base de datos
@@ -344,29 +351,33 @@ def init_db():
         conn.execute("PRAGMA busy_timeout = 5000")
         conn.executescript(SCHEMA)
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS _schema_migrations "
-            "(name TEXT PRIMARY KEY, applied_at TEXT)"
+            "CREATE TABLE IF NOT EXISTS _schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT)"
         )
         _migrate_stage_prompts_to_profile_prompts(conn)
         # Perfil por defecto si no existe ninguno
         cur = conn.execute("SELECT COUNT(*) AS n FROM profiles")
         if cur.fetchone()["n"] == 0:
             now = datetime.now().isoformat()
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO profiles
                 (name, content_type, audience, tone, style, mystery_level,
                  drama_level, narration_speed, platforms, is_default, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-            """, (
-                "Todo Sobre Todo / Misterio",
-                "Documental de misterio",
-                "Curiosos, aficionados a lo alternativo, 25-55 años",
-                "Serio con toques intrigantes, narrativo",
-                "Cinematográfico, contrastado, con toques conspiranoicos",
-                7, 6, 150,
-                json.dumps(["youtube", "shorts", "tiktok", "instagram", "facebook"]),
-                now,
-            ))
+            """,
+                (
+                    "Todo Sobre Todo / Misterio",
+                    "Documental de misterio",
+                    "Curiosos, aficionados a lo alternativo, 25-55 años",
+                    "Serio con toques intrigantes, narrativo",
+                    "Cinematográfico, contrastado, con toques conspiranoicos",
+                    7,
+                    6,
+                    150,
+                    json.dumps(["youtube", "shorts", "tiktok", "instagram", "facebook"]),
+                    now,
+                ),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -446,14 +457,16 @@ def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
     return "", ""
 
 
-def save_profile_prompt(profile_id: int | None, stage: str,
-                         sys_prompt: str, user_prompt: str) -> None:
+def save_profile_prompt(
+    profile_id: int | None, stage: str, sys_prompt: str, user_prompt: str
+) -> None:
     """UPSERT en `profile_prompts` por (profile_id, stage). No hace nada si profile_id es None."""
     if profile_id is None:
         return
     now = now_iso()
     with get_db() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO profile_prompts
                 (profile_id, stage, sys_prompt, user_prompt, updated_at)
             VALUES (?, ?, ?, ?, ?)
@@ -461,7 +474,9 @@ def save_profile_prompt(profile_id: int | None, stage: str,
                 sys_prompt=excluded.sys_prompt,
                 user_prompt=excluded.user_prompt,
                 updated_at=excluded.updated_at
-        """, (profile_id, stage, sys_prompt, user_prompt, now))
+        """,
+            (profile_id, stage, sys_prompt, user_prompt, now),
+        )
 
 
 def list_profile_prompts(profile_id: int | None) -> dict[str, dict[str, str]]:
@@ -500,9 +515,16 @@ def get_default_prompts_from_config() -> dict[str, dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 KNOWN_FIXED_NODE_KEYS = [
-    "research", "concept", "script_long", "script_short",
-    "scenes", "scenes_short",
-    "metadata_youtube", "metadata_shorts", "thumbnail_long", "thumbnail_short",
+    "research",
+    "concept",
+    "script_long",
+    "script_short",
+    "scenes",
+    "scenes_short",
+    "metadata_youtube",
+    "metadata_shorts",
+    "thumbnail_long",
+    "thumbnail_short",
 ]
 
 DEFAULT_NODE_LABELS = {
@@ -551,11 +573,13 @@ def get_or_create_fixed_graph_nodes(profile_id: int | None) -> list[dict]:
     if not profile_id:
         return []
     with get_db() as conn:
-        existing = [dict(r) for r in conn.execute(
-            "SELECT * FROM profile_graph_nodes "
-            "WHERE profile_id=? AND is_fixed=1",
-            (profile_id,),
-        ).fetchall()]
+        existing = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM profile_graph_nodes WHERE profile_id=? AND is_fixed=1",
+                (profile_id,),
+            ).fetchall()
+        ]
         existing_keys = {row["node_key"] for row in existing}
         now = now_iso()
         for row in existing:
@@ -575,35 +599,48 @@ def get_or_create_fixed_graph_nodes(profile_id: int | None) -> list[dict]:
             x, y = DEFAULT_NODE_POSITIONS.get(key, (0.0, 0.0))
             default_sys = CONFIG["prompts"].get(key, {}).get("system", "")
             default_user = CONFIG["prompts"].get(key, {}).get("format", "")
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO profile_graph_nodes
                     (profile_id, node_key, label, sys_prompt, user_prompt,
                      inputs_json, position_x, position_y, sort_order,
                      is_fixed, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-            """, (
-                profile_id, key,
-                DEFAULT_NODE_LABELS.get(key, key),
-                default_sys, default_user, "[]", x, y,
-                KNOWN_FIXED_NODE_KEYS.index(key),
-                now,
-            ))
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM profile_graph_nodes "
-            "WHERE profile_id=? AND is_fixed=1 ORDER BY sort_order, id",
-            (profile_id,),
-        ).fetchall()]
+            """,
+                (
+                    profile_id,
+                    key,
+                    DEFAULT_NODE_LABELS.get(key, key),
+                    default_sys,
+                    default_user,
+                    "[]",
+                    x,
+                    y,
+                    KNOWN_FIXED_NODE_KEYS.index(key),
+                    now,
+                ),
+            )
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM profile_graph_nodes "
+                "WHERE profile_id=? AND is_fixed=1 ORDER BY sort_order, id",
+                (profile_id,),
+            ).fetchall()
+        ]
 
 
 def fetch_graph_nodes(profile_id: int | None) -> list[dict]:
     if not profile_id:
         return []
     with get_db() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM profile_graph_nodes WHERE profile_id=? "
-            "ORDER BY sort_order, id",
-            (profile_id,),
-        ).fetchall()]
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM profile_graph_nodes WHERE profile_id=? ORDER BY sort_order, id",
+                (profile_id,),
+            ).fetchall()
+        ]
 
 
 def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
@@ -617,11 +654,13 @@ def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
     rows: list[dict] = []
     if profile_id:
         with get_db() as conn:
-            rows = [dict(r) for r in conn.execute(
-                "SELECT node_key, inputs_json FROM profile_graph_nodes "
-                "WHERE profile_id=?",
-                (profile_id,),
-            ).fetchall()]
+            rows = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT node_key, inputs_json FROM profile_graph_nodes WHERE profile_id=?",
+                    (profile_id,),
+                ).fetchall()
+            ]
     valid_keys: set[str] = {r["node_key"] for r in rows}
     for src, tgt in DEFAULT_EDGES:
         if src not in valid_keys or tgt not in valid_keys:
@@ -644,73 +683,103 @@ def fetch_graph_edges_as_eedges(profile_id: int | None) -> list[dict]:
             key = (str(src), r["node_key"])
             if key in seen:
                 continue
-            edges.append({
-                "id": f"e_{src}_{r['node_key']}_{i}",
-                "source": str(src),
-                "target": r["node_key"],
-            })
+            edges.append(
+                {
+                    "id": f"e_{src}_{r['node_key']}_{i}",
+                    "source": str(src),
+                    "target": r["node_key"],
+                }
+            )
             seen.add(key)
     return edges
 
 
-def save_graph_node(profile_id: int, node_key: str, label: str,
-                    sys_prompt: str, user_prompt: str,
-                    inputs_json: str, position_x: float,
-                    position_y: float, is_fixed: bool) -> dict:
+def save_graph_node(
+    profile_id: int,
+    node_key: str,
+    label: str,
+    sys_prompt: str,
+    user_prompt: str,
+    inputs_json: str,
+    position_x: float,
+    position_y: float,
+    is_fixed: bool,
+) -> dict:
     """UPSERT en profile_graph_nodes; devuelve el dict persistido."""
     now = now_iso()
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM profile_graph_nodes "
-            "WHERE profile_id=? AND node_key=?",
+            "SELECT id FROM profile_graph_nodes WHERE profile_id=? AND node_key=?",
             (profile_id, node_key),
         ).fetchone()
         if row:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE profile_graph_nodes
                 SET label=?, sys_prompt=?, user_prompt=?, inputs_json=?,
                     position_x=?, position_y=?, is_fixed=?, updated_at=?
                 WHERE id=?
-            """, (
-                label, sys_prompt, user_prompt, inputs_json,
-                float(position_x), float(position_y),
-                1 if is_fixed else 0, now, row["id"],
-            ))
-            return dict(conn.execute(
-                "SELECT * FROM profile_graph_nodes WHERE id=?",
-                (row["id"],),
-            ).fetchone())
-        conn.execute("""
+            """,
+                (
+                    label,
+                    sys_prompt,
+                    user_prompt,
+                    inputs_json,
+                    float(position_x),
+                    float(position_y),
+                    1 if is_fixed else 0,
+                    now,
+                    row["id"],
+                ),
+            )
+            return dict(
+                conn.execute(
+                    "SELECT * FROM profile_graph_nodes WHERE id=?",
+                    (row["id"],),
+                ).fetchone()
+            )
+        conn.execute(
+            """
             INSERT INTO profile_graph_nodes
                 (profile_id, node_key, label, sys_prompt, user_prompt,
                  inputs_json, position_x, position_y, sort_order,
                  is_fixed, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            profile_id, node_key, label, sys_prompt, user_prompt,
-            inputs_json, float(position_x), float(position_y),
-            0, 1 if is_fixed else 0, now,
-        ))
+        """,
+            (
+                profile_id,
+                node_key,
+                label,
+                sys_prompt,
+                user_prompt,
+                inputs_json,
+                float(position_x),
+                float(position_y),
+                0,
+                1 if is_fixed else 0,
+                now,
+            ),
+        )
         new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
-        return dict(conn.execute(
-            "SELECT * FROM profile_graph_nodes WHERE id=?",
-            (new_id,),
-        ).fetchone())
+        return dict(
+            conn.execute(
+                "SELECT * FROM profile_graph_nodes WHERE id=?",
+                (new_id,),
+            ).fetchone()
+        )
 
 
 def delete_graph_node(profile_id: int, node_key: str) -> bool:
     """Borra un nodo NO fijo. Devuelve True si se borró una fila."""
     with get_db() as conn:
         cur = conn.execute(
-            "DELETE FROM profile_graph_nodes "
-            "WHERE profile_id=? AND node_key=? AND is_fixed=0",
+            "DELETE FROM profile_graph_nodes WHERE profile_id=? AND node_key=? AND is_fixed=0",
             (profile_id, node_key),
         )
         return cur.rowcount > 0
 
 
-def update_graph_layout(profile_id: int,
-                        nodes_data: list[dict]) -> int:
+def update_graph_layout(profile_id: int, nodes_data: list[dict]) -> int:
     """Actualiza posiciones. Devuelve el número de filas tocadas."""
     count = 0
     now = now_iso()
@@ -725,15 +794,16 @@ def update_graph_layout(profile_id: int,
                 (
                     float(item.get("position_x", 0) or 0),
                     float(item.get("position_y", 0) or 0),
-                    now, profile_id, str(nk),
+                    now,
+                    profile_id,
+                    str(nk),
                 ),
             )
             count += cur.rowcount
     return count
 
 
-def _interpolate_inputs(template: str, project_id: int,
-                        inputs: list[str]) -> str:
+def _interpolate_inputs(template: str, project_id: int, inputs: list[str]) -> str:
     """Sustituye {{ inputs.X }} con el último output del nodo X."""
     if not template or not inputs:
         return template or ""
@@ -749,8 +819,12 @@ def _interpolate_inputs(template: str, project_id: int,
         except Exception as e:
             # Si la consulta falla (p.ej. proyecto borrado entre
             # requests), seguimos con el template sin interpolar.
-            log.warning("_interpolate_inputs: no se pudo leer node_executions para project=%s inputs=%s: %s",
-                        project_id, inputs, e)
+            log.warning(
+                "_interpolate_inputs: no se pudo leer node_executions para project=%s inputs=%s: %s",
+                project_id,
+                inputs,
+                e,
+            )
             rows = []
     latest: dict[str, str] = {}
     for r in rows:
@@ -771,8 +845,7 @@ def _truncate_to_bytes(text: str, limit: int) -> str:
     return encoded[:limit].decode("utf-8", "replace")
 
 
-def _persist_scenes(conn, project_id: int, script_type: str,
-                    parsed: list, now: str) -> None:
+def _persist_scenes(conn, project_id: int, script_type: str, parsed: list, now: str) -> None:
     """Borra y reinserta las escenas del guion ``script_type`` del proyecto.
 
     Reutilizado por el runner de grafo para los nodos fijos ``scenes``
@@ -803,9 +876,7 @@ def _persist_scenes(conn, project_id: int, script_type: str,
         ).fetchone()
         if prof and prof["narration_speed"]:
             wpm = prof["narration_speed"]
-    total_words = sum(
-        count_words(sc.get("narration_segment", "")) for sc in parsed
-    )
+    total_words = sum(count_words(sc.get("narration_segment", "")) for sc in parsed)
     for sc in parsed:
         try:
             scene_num = int(sc.get("scene_number", 0) or 0)
@@ -822,20 +893,25 @@ def _persist_scenes(conn, project_id: int, script_type: str,
         if not dur and total_words > 0:
             w = count_words(sc.get("narration_segment", ""))
             dur = max(1, round(w / wpm * 60))
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO scenes (project_id, script_id, scene_number,
                 narration, visual_description, camera_movement,
                 transition, duration_seconds, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            project_id, sid, scene_num,
-            sc.get("narration_segment", ""),
-            sc.get("image_prompt", "")
-                or sc.get("visual_description", ""),
-            sc.get("camera_movement", "") or "",
-            sc.get("transition", "") or "",
-            dur, now,
-        ))
+        """,
+            (
+                project_id,
+                sid,
+                scene_num,
+                sc.get("narration_segment", ""),
+                sc.get("image_prompt", "") or sc.get("visual_description", ""),
+                sc.get("camera_movement", "") or "",
+                sc.get("transition", "") or "",
+                dur,
+                now,
+            ),
+        )
 
 
 def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
@@ -844,7 +920,8 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
     with get_db() as conn:
         if node_key == "research":
             parsed = parse_research(raw)
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO research (project_id, content, sources, facts,
                     theories, unverified, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -855,17 +932,21 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                     theories=excluded.theories,
                     unverified=excluded.unverified,
                     updated_at=excluded.updated_at
-            """, (
-                project_id, parsed["content"] or raw,
-                json.dumps(parsed["sources"], ensure_ascii=False),
-                json.dumps(parsed["facts"], ensure_ascii=False),
-                json.dumps(parsed["theories"], ensure_ascii=False),
-                json.dumps(parsed["unverified"], ensure_ascii=False),
-                now,
-            ))
+            """,
+                (
+                    project_id,
+                    parsed["content"] or raw,
+                    json.dumps(parsed["sources"], ensure_ascii=False),
+                    json.dumps(parsed["facts"], ensure_ascii=False),
+                    json.dumps(parsed["theories"], ensure_ascii=False),
+                    json.dumps(parsed["unverified"], ensure_ascii=False),
+                    now,
+                ),
+            )
         elif node_key == "concept":
             parsed = parse_concept(raw)
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO concept (project_id, angle, thesis, key_points,
                     emotional_hook, what_they_learn, what_they_feel,
                     risks, updated_at)
@@ -879,16 +960,19 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                     what_they_feel=excluded.what_they_feel,
                     risks=excluded.risks,
                     updated_at=excluded.updated_at
-            """, (
-                project_id, parsed["angle"] or raw,
-                parsed["thesis"],
-                json.dumps(parsed["key_points"], ensure_ascii=False),
-                parsed["emotional_hook"],
-                json.dumps(parsed["what_they_learn"], ensure_ascii=False),
-                json.dumps(parsed["what_they_feel"], ensure_ascii=False),
-                json.dumps(parsed["risks"], ensure_ascii=False),
-                now,
-            ))
+            """,
+                (
+                    project_id,
+                    parsed["angle"] or raw,
+                    parsed["thesis"],
+                    json.dumps(parsed["key_points"], ensure_ascii=False),
+                    parsed["emotional_hook"],
+                    json.dumps(parsed["what_they_learn"], ensure_ascii=False),
+                    json.dumps(parsed["what_they_feel"], ensure_ascii=False),
+                    json.dumps(parsed["risks"], ensure_ascii=False),
+                    now,
+                ),
+            )
         elif node_key in ("script_long", "script_short"):
             stype = "long" if node_key == "script_long" else "short"
             parsed = parse_script(raw, stype)
@@ -899,34 +983,60 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                 (project_id, stype),
             ).fetchone()
             if existing:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE scripts SET title=?, hook=?, context=?, development=?,
                         revelations=?, conclusion=?, cta=?, body_full=?,
                         word_count=?, updated_at=? WHERE id=?
-                """, (
-                    parsed["title"], parsed["hook"], parsed["context"],
-                    parsed["development"], parsed["revelations"],
-                    parsed["conclusion"], parsed["cta"],
-                    body, wc, now, existing["id"],
-                ))
+                """,
+                    (
+                        parsed["title"],
+                        parsed["hook"],
+                        parsed["context"],
+                        parsed["development"],
+                        parsed["revelations"],
+                        parsed["conclusion"],
+                        parsed["cta"],
+                        body,
+                        wc,
+                        now,
+                        existing["id"],
+                    ),
+                )
             else:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO scripts (project_id, type, title, hook, context,
                         development, revelations, conclusion, cta, body_full,
                         word_count, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    project_id, stype, parsed["title"], parsed["hook"],
-                    parsed["context"], parsed["development"],
-                    parsed["revelations"], parsed["conclusion"],
-                    parsed["cta"], body, wc, now,
-                ))
+                """,
+                    (
+                        project_id,
+                        stype,
+                        parsed["title"],
+                        parsed["hook"],
+                        parsed["context"],
+                        parsed["development"],
+                        parsed["revelations"],
+                        parsed["conclusion"],
+                        parsed["cta"],
+                        body,
+                        wc,
+                        now,
+                    ),
+                )
         elif node_key in ("scenes", "scenes_short"):
             script_type = "long" if node_key == "scenes" else "short"
             _persist_scenes(conn, project_id, script_type, parse_scenes(raw) or [], now)
-        elif node_key in ("metadata_youtube", "metadata_shorts",
-                          "metadata_youtube_long", "metadata_youtube_short",
-                          "metadata_facebook_long", "metadata_reels_short"):
+        elif node_key in (
+            "metadata_youtube",
+            "metadata_shorts",
+            "metadata_youtube_long",
+            "metadata_youtube_short",
+            "metadata_facebook_long",
+            "metadata_reels_short",
+        ):
             platform = {
                 "metadata_youtube": "youtube_long",
                 "metadata_shorts": "youtube_short",
@@ -946,29 +1056,36 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                 json.dumps(parsed["chapters"], ensure_ascii=False),
                 json.dumps(parsed["tags"], ensure_ascii=False),
                 json.dumps(parsed["hashtags"], ensure_ascii=False),
-                parsed["caption"], parsed["hook"], parsed["cta"],
+                parsed["caption"],
+                parsed["hook"],
+                parsed["cta"],
                 json.dumps(parsed["on_screen_text"], ensure_ascii=False),
             )
             if existing:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE metadata_records SET titles=?, description=?,
                         chapters=?, tags=?, hashtags=?, caption=?, hook=?, cta=?,
                         on_screen_text=?, updated_at=? WHERE id=?
-                """, (*fields, now, existing["id"]))
+                """,
+                    (*fields, now, existing["id"]),
+                )
             else:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO metadata_records (project_id, platform, titles,
                         description, chapters, tags, hashtags, caption, hook,
                         cta, on_screen_text, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (project_id, platform, *fields, now))
+                """,
+                    (project_id, platform, *fields, now),
+                )
         elif node_key in ("thumbnail_long", "thumbnail_short"):
             stype = "long" if node_key == "thumbnail_long" else "short"
             parsed = parse_thumbnail(raw, stype)
             prompt_text = (parsed.get("prompt") or "").strip() or raw.strip()
             existing = conn.execute(
-                "SELECT id FROM thumbnail_records "
-                "WHERE project_id=? AND script_type=?",
+                "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
                 (project_id, stype),
             ).fetchone()
             if existing:
@@ -977,11 +1094,14 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                     (prompt_text, now, existing["id"]),
                 )
             else:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO thumbnail_records
                         (project_id, script_type, prompt, updated_at)
                     VALUES (?, ?, ?, ?)
-                """, (project_id, stype, prompt_text, now))
+                """,
+                    (project_id, stype, prompt_text, now),
+                )
 
 
 def _load_first_script(project_id: int, script_type: str) -> dict:
@@ -993,13 +1113,22 @@ def _load_first_script(project_id: int, script_type: str) -> dict:
         ).fetchone()
         if row:
             return dict(row)
-    return {"title": "", "hook": "", "body_full": "", "word_count": 0,
-            "context": "", "development": "", "revelations": "",
-            "conclusion": "", "cta": ""}
+    return {
+        "title": "",
+        "hook": "",
+        "body_full": "",
+        "word_count": 0,
+        "context": "",
+        "development": "",
+        "revelations": "",
+        "conclusion": "",
+        "cta": "",
+    }
 
 
-def _build_user_msg_for_fixed(project_id: int, profile: dict | None,
-                              project: dict, node_key: str) -> str:
+def _build_user_msg_for_fixed(
+    project_id: int, profile: dict | None, project: dict, node_key: str
+) -> str:
     """Construye el user_msg para un nodo fijo."""
     if node_key == "research":
         _, user_msg = build_research_prompt(project, profile)
@@ -1007,7 +1136,8 @@ def _build_user_msg_for_fixed(project_id: int, profile: dict | None,
     if node_key == "concept":
         with get_db() as conn:
             research_obj = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?",
+                conn,
+                "SELECT * FROM research WHERE project_id=?",
                 (project_id,),
             )
         _, user_msg = build_concept_prompt(project, profile, research_obj)
@@ -1015,29 +1145,41 @@ def _build_user_msg_for_fixed(project_id: int, profile: dict | None,
     if node_key == "script_long":
         with get_db() as conn:
             research_obj = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?",
+                conn,
+                "SELECT * FROM research WHERE project_id=?",
                 (project_id,),
             )
             concept_obj = fetch_optional_dict(
-                conn, "SELECT * FROM concept WHERE project_id=?",
+                conn,
+                "SELECT * FROM concept WHERE project_id=?",
                 (project_id,),
             )
         _, user_msg = build_script_prompt(
-            project, profile, research_obj, concept_obj, "long",
+            project,
+            profile,
+            research_obj,
+            concept_obj,
+            "long",
         )
         return user_msg
     if node_key == "script_short":
         with get_db() as conn:
             research_obj = fetch_optional_dict(
-                conn, "SELECT * FROM research WHERE project_id=?",
+                conn,
+                "SELECT * FROM research WHERE project_id=?",
                 (project_id,),
             )
             concept_obj = fetch_optional_dict(
-                conn, "SELECT * FROM concept WHERE project_id=?",
+                conn,
+                "SELECT * FROM concept WHERE project_id=?",
                 (project_id,),
             )
         _, user_msg = build_script_prompt(
-            project, profile, research_obj, concept_obj, "short",
+            project,
+            profile,
+            research_obj,
+            concept_obj,
+            "short",
         )
         return user_msg
     if node_key == "scenes":
@@ -1073,11 +1215,11 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
     try:
         with get_db() as conn:
             proj = conn.execute(
-                "SELECT * FROM projects WHERE id=?", (project_id,),
+                "SELECT * FROM projects WHERE id=?",
+                (project_id,),
             ).fetchone()
             if proj is None:
-                return {"ok": False, "status": "error",
-                        "error": "Proyecto no encontrado"}
+                return {"ok": False, "status": "error", "error": "Proyecto no encontrado"}
             project = dict(proj)
         profile = get_profile(project["profile_id"]) or get_default_profile()
         profile_id = profile["id"] if profile else None
@@ -1085,8 +1227,7 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
         if profile_id:
             with get_db() as conn:
                 row = conn.execute(
-                    "SELECT * FROM profile_graph_nodes "
-                    "WHERE profile_id=? AND node_key=?",
+                    "SELECT * FROM profile_graph_nodes WHERE profile_id=? AND node_key=?",
                     (profile_id, node_key),
                 ).fetchone()
             node_row = dict(row) if row else None
@@ -1094,14 +1235,16 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
         if node_key in KNOWN_FIXED_NODE_KEYS:
             sys_p, _ = resolve_stage_prompt(profile_id, node_key)
             user_msg = _build_user_msg_for_fixed(
-                project_id, profile, project, node_key,
+                project_id,
+                profile,
+                project,
+                node_key,
             )
             raw = call_llm(sys_p, user_msg)
             _persist_fixed_result(project_id, node_key, raw)
         else:
             if not node_row:
-                return {"ok": False, "status": "error",
-                        "error": "Nodo personalizado no encontrado"}
+                return {"ok": False, "status": "error", "error": "Nodo personalizado no encontrado"}
             sys_p = node_row.get("sys_prompt") or ""
             template = node_row.get("user_prompt") or ""
             try:
@@ -1119,17 +1262,22 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
         raw = _truncate_to_bytes(raw, MAX_OUTPUT_BYTES)
         duration_ms = int((time.monotonic() - t0) * 1000)
         with get_db() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO node_executions
                     (project_id, node_key, output, status, duration_ms, created_at)
                 VALUES (?, ?, ?, 'ok', ?, ?)
-            """, (project_id, node_key, raw, duration_ms, now_iso()))
+            """,
+                (project_id, node_key, raw, duration_ms, now_iso()),
+            )
             last = conn.execute(
                 "SELECT id, status, duration_ms, created_at FROM node_executions "
                 "WHERE id=last_insert_rowid()"
             ).fetchone()
         return {
-            "ok": True, "status": "ok", "output": raw,
+            "ok": True,
+            "status": "ok",
+            "output": raw,
             "node_executions": dict(last) if last else {},
         }
     except Exception as e:
@@ -1137,11 +1285,14 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
         msg = str(e)[:4096]
         try:
             with get_db() as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO node_executions
                         (project_id, node_key, output, status, created_at)
                     VALUES (?, ?, ?, 'error', ?)
-                """, (project_id, node_key, msg, now_iso()))
+                """,
+                    (project_id, node_key, msg, now_iso()),
+                )
         except Exception as persist_err:
             # No podemos hacer mucho más; logueamos y devolvemos el
             # error original al caller para que lo muestre al usuario.
@@ -1153,22 +1304,9 @@ def execute_graph_node(project_id: int, node_key: str) -> dict:
 # Utilidades
 # ---------------------------------------------------------------------------
 
+
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
-
-
-def count_words(text: str | None) -> int:
-    if not text:
-        return 0
-    return len(re.findall(r"\b\w+\b", text, flags=re.UNICODE))
-
-
-def estimate_duration_seconds(text: str | None, wpm: int = 150) -> int:
-    """Estima la duración de narración en segundos según palabras por minuto."""
-    words = count_words(text)
-    if wpm <= 0:
-        wpm = 150
-    return int(round(words / wpm * 60))
 
 
 def project_stage_status(project):
@@ -1180,24 +1318,32 @@ def project_stage_status(project):
         stages = {
             "research": conn.execute(
                 "SELECT COUNT(*) AS n FROM research WHERE project_id=? AND content IS NOT NULL AND content != ''",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
+                (project["id"],),
+            ).fetchone()["n"]
+            > 0,
             "concept": conn.execute(
                 "SELECT COUNT(*) AS n FROM concept WHERE project_id=? AND angle IS NOT NULL AND angle != ''",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
+                (project["id"],),
+            ).fetchone()["n"]
+            > 0,
             "scripts_long": conn.execute(
                 "SELECT COUNT(*) AS n FROM scripts WHERE project_id=? AND type='long'",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
+                (project["id"],),
+            ).fetchone()["n"]
+            > 0,
             "scripts_short": conn.execute(
                 "SELECT COUNT(*) AS n FROM scripts WHERE project_id=? AND type='short'",
-                (project["id"],)
-            ).fetchone()["n"] > 0,
+                (project["id"],),
+            ).fetchone()["n"]
+            > 0,
         }
-        scripts = [dict(r) for r in conn.execute(
-            "SELECT id, type FROM scripts WHERE project_id=?", (project["id"],),
-        ).fetchall()]
+        scripts = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, type FROM scripts WHERE project_id=?",
+                (project["id"],),
+            ).fetchall()
+        ]
         scenes_done = False
         if scripts:
             scenes_done = True
@@ -1211,10 +1357,12 @@ def project_stage_status(project):
                     scenes_done = False
                     break
         stages["scenes"] = scenes_done
-        stages["metadata"] = conn.execute(
-            "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?",
-            (project["id"],)
-        ).fetchone()["n"] > 0
+        stages["metadata"] = (
+            conn.execute(
+                "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?", (project["id"],)
+            ).fetchone()["n"]
+            > 0
+        )
         thumb_long = conn.execute(
             "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type='long'",
             (project["id"],),
@@ -1224,8 +1372,7 @@ def project_stage_status(project):
             (project["id"],),
         ).fetchone()
         stages["thumbnails"] = bool(
-            thumb_long and thumb_long["prompt"] and
-            thumb_short and thumb_short["prompt"]
+            thumb_long and thumb_long["prompt"] and thumb_short and thumb_short["prompt"]
         )
     return stages
 
@@ -1235,26 +1382,73 @@ def project_stage_status(project):
 # ---------------------------------------------------------------------------
 
 PIPELINE_STAGES = (
-    {"key": "research", "num": "01", "label": "Investigación", "short": "Investigación",
-     "endpoint": "research", "hint": "Hechos, fuentes y teorías"},
-    {"key": "concept", "num": "02", "label": "Concepto", "short": "Concepto",
-     "endpoint": "concept", "hint": "Ángulo, tesis y gancho"},
-    {"key": "scripts_long", "num": "03", "label": "Guion 5 min", "short": "Guion 5 min",
-     "endpoint": "scripts", "hint": "Documental completo"},
-    {"key": "scripts_short", "num": "04", "label": "Guion 1 min", "short": "Guion 1 min",
-     "endpoint": "scripts", "hint": "Versión vertical"},
-    {"key": "scenes", "num": "05", "label": "Escenas", "short": "Escenas",
-     "endpoint": "scenes", "hint": "Secuencia visual"},
-    {"key": "metadata", "num": "06", "label": "Metadata", "short": "Metadata",
-     "endpoint": "metadata", "hint": "Títulos, tags y CTA"},
-    {"key": "thumbnails", "num": "07", "label": "Miniaturas", "short": "Miniaturas",
-     "endpoint": "thumbnails", "hint": "Prompts visuales de portada"},
-    {"key": "qc", "num": "08", "label": "Control de calidad", "short": "Calidad",
-     "endpoint": "qc", "hint": "Revisión antes de exportar"},
+    {
+        "key": "research",
+        "num": "01",
+        "label": "Investigación",
+        "short": "Investigación",
+        "endpoint": "research",
+        "hint": "Hechos, fuentes y teorías",
+    },
+    {
+        "key": "concept",
+        "num": "02",
+        "label": "Concepto",
+        "short": "Concepto",
+        "endpoint": "concept",
+        "hint": "Ángulo, tesis y gancho",
+    },
+    {
+        "key": "scripts_long",
+        "num": "03",
+        "label": "Guion 5 min",
+        "short": "Guion 5 min",
+        "endpoint": "scripts",
+        "hint": "Documental completo",
+    },
+    {
+        "key": "scripts_short",
+        "num": "04",
+        "label": "Guion 1 min",
+        "short": "Guion 1 min",
+        "endpoint": "scripts",
+        "hint": "Versión vertical",
+    },
+    {
+        "key": "scenes",
+        "num": "05",
+        "label": "Escenas",
+        "short": "Escenas",
+        "endpoint": "scenes",
+        "hint": "Secuencia visual",
+    },
+    {
+        "key": "metadata",
+        "num": "06",
+        "label": "Metadata",
+        "short": "Metadata",
+        "endpoint": "metadata",
+        "hint": "Títulos, tags y CTA",
+    },
+    {
+        "key": "thumbnails",
+        "num": "07",
+        "label": "Miniaturas",
+        "short": "Miniaturas",
+        "endpoint": "thumbnails",
+        "hint": "Prompts visuales de portada",
+    },
+    {
+        "key": "qc",
+        "num": "08",
+        "label": "Control de calidad",
+        "short": "Calidad",
+        "endpoint": "qc",
+        "hint": "Revisión antes de exportar",
+    },
 )
 
-PAGE_ORDER = ("research", "concept", "scripts", "scenes",
-              "metadata", "thumbnails", "qc", "export")
+PAGE_ORDER = ("research", "concept", "scripts", "scenes", "metadata", "thumbnails", "qc", "export")
 
 PAGE_LABELS = {
     "research": "Investigación",
@@ -1325,8 +1519,7 @@ def pipeline_view(project, current=None):
     if not qc_done:
         with get_db() as conn:
             n_unresolved = conn.execute(
-                "SELECT COUNT(*) AS n FROM qc_issues "
-                "WHERE project_id=? AND resolved=0",
+                "SELECT COUNT(*) AS n FROM qc_issues WHERE project_id=? AND resolved=0",
                 (project["id"],),
             ).fetchone()["n"]
             qc_done = n_unresolved > 0
@@ -1354,8 +1547,7 @@ def pipeline_view(project, current=None):
         if not 0 <= pos < len(PAGE_ORDER):
             return None
         page = PAGE_ORDER[pos]
-        return {"label": PAGE_LABELS[page],
-                "url": url_for(page, project_id=project["id"])}
+        return {"label": PAGE_LABELS[page], "url": url_for(page, project_id=project["id"])}
 
     return {
         "cells": cells,
@@ -1376,8 +1568,7 @@ def get_or_create_research(project_id):
         if row:
             return dict(row)
         conn.execute(
-            "INSERT INTO research (project_id, updated_at) VALUES (?, ?)",
-            (project_id, now_iso())
+            "INSERT INTO research (project_id, updated_at) VALUES (?, ?)", (project_id, now_iso())
         )
         row = conn.execute("SELECT * FROM research WHERE project_id=?", (project_id,)).fetchone()
         return dict(row) if row else {"project_id": project_id}
@@ -1389,8 +1580,7 @@ def get_or_create_concept(project_id):
         if row:
             return dict(row)
         conn.execute(
-            "INSERT INTO concept (project_id, updated_at) VALUES (?, ?)",
-            (project_id, now_iso())
+            "INSERT INTO concept (project_id, updated_at) VALUES (?, ?)", (project_id, now_iso())
         )
         row = conn.execute("SELECT * FROM concept WHERE project_id=?", (project_id,)).fetchone()
         return dict(row) if row else {"project_id": project_id}
@@ -1399,8 +1589,7 @@ def get_or_create_concept(project_id):
 def get_script(project_id, script_type):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM scripts WHERE project_id=? AND type=?",
-            (project_id, script_type)
+            "SELECT * FROM scripts WHERE project_id=? AND type=?", (project_id, script_type)
         ).fetchone()
         return dict(row) if row else None
 
@@ -1441,6 +1630,7 @@ def fetch_optional_dict(conn, sql, params=()):
 # LLM client
 # ---------------------------------------------------------------------------
 
+
 def build_research_prompt(project, profile):
     """Construye el prompt estructurado para la fase de investigación."""
     sys_prompt = CONFIG["prompts"]["research"]["system"]
@@ -1460,7 +1650,7 @@ def build_concept_prompt(project, profile, research):
     fmt = CONFIG["prompts"]["concept"]["format"]
     user_msg = (
         f"Tema: {project['topic']}\n"
-        f"Investigación disponible:\n{research.get('content','')[:3000]}\n\n"
+        f"Investigación disponible:\n{research.get('content', '')[:3000]}\n\n"
         f"Perfil del proyecto:\n"
         f"- Tono: {profile['tone'] if profile else 'serio'}\n"
         f"- Estilo: {profile['style'] if profile else 'cinematográfico'}\n"
@@ -1495,10 +1685,10 @@ def build_script_prompt(project, profile, research, concept, script_type):
     user_msg = (
         f"Tema: {project['topic']}\n"
         f"Duración objetivo: {duration_txt}\n"
-        f"Ángulo: {concept.get('angle','')}\n"
-        f"Tesis: {concept.get('thesis','')}\n"
+        f"Ángulo: {concept.get('angle', '')}\n"
+        f"Tesis: {concept.get('thesis', '')}\n"
         f"Puntos clave:\n{key_points or ''}\n\n"
-        f"Datos de la investigación:\n{research.get('content','')[:2500]}\n\n"
+        f"Datos de la investigación:\n{research.get('content', '')[:2500]}\n\n"
         f"Tono: {profile['tone'] if profile else 'serio'}\n"
         f"Nivel de misterio: {profile['mystery_level'] if profile else 7}/10\n"
         f"Velocidad narración: {profile['narration_speed'] if profile else 150} ppm\n\n"
@@ -1513,8 +1703,8 @@ def build_scenes_prompt(project, profile, script):
     user_msg = (
         f"Tema: {project['topic']}\n"
         f"Estilo visual: {profile['style'] if profile else 'cinematográfico'}\n"
-        f"Duración total objetivo: {script.get('word_count',0)/(profile['narration_speed'] if profile else 150)*60:.0f} segundos\n\n"
-        f"Guion a convertir en escenas:\n{script.get('body_full','')}\n\n"
+        f"Duración total objetivo: {script.get('word_count', 0) / (profile['narration_speed'] if profile else 150) * 60:.0f} segundos\n\n"
+        f"Guion a convertir en escenas:\n{script.get('body_full', '')}\n\n"
         f"Devuelve SOLO el JSON con las escenas, en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
@@ -1552,11 +1742,11 @@ def build_metadata_prompt(project, profile, script, platform):
     platforms_txt = ", ".join(platforms_list) if platforms_list else "no definidas"
     user_msg = (
         f"Tema: {project['topic']}\n"
-        f"Título del guion: {script.get('title','')}\n"
-        f"Hook: {script.get('hook','')}\n"
+        f"Título del guion: {script.get('title', '')}\n"
+        f"Hook: {script.get('hook', '')}\n"
         f"Tipo de contenido: {profile['content_type'] if profile else ''}\n"
         f"Plataformas objetivo: {platforms_txt}\n\n"
-        f"Guion completo:\n{script.get('body_full','')[:3000]}\n\n"
+        f"Guion completo:\n{script.get('body_full', '')[:3000]}\n\n"
         f"Devuelve en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
@@ -1579,12 +1769,12 @@ def build_thumbnail_prompt(project, profile, script, script_type):
     user_msg = (
         f"Tema: {project['topic']}\n"
         f"Duración objetivo del guion: {duration_txt}\n"
-        f"Título del guion: {script.get('title','')}\n"
-        f"Hook: {script.get('hook','')}\n"
+        f"Título del guion: {script.get('title', '')}\n"
+        f"Hook: {script.get('hook', '')}\n"
         f"Tipo de contenido: {profile['content_type'] if profile else 'documental'}\n"
         f"Estilo visual: {profile['style'] if profile else 'cinematográfico'}\n"
         f"Nivel de misterio: {profile['mystery_level'] if profile else 7}/10\n\n"
-        f"Ángulo y tesis del guion:\n{script.get('body_full','')[:2500]}\n\n"
+        f"Ángulo y tesis del guion:\n{script.get('body_full', '')[:2500]}\n\n"
         f"Devuelve SIEMPRE en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
@@ -1601,13 +1791,17 @@ def build_thumbnail_prompt(project, profile, script, script_type):
 # Rutas
 # ---------------------------------------------------------------------------
 
+
 @app.route("/")
 def dashboard():
     with get_db() as conn:
-        projects = [dict(r) for r in conn.execute(
-            "SELECT * FROM projects ORDER BY updated_at DESC"
-        ).fetchall()]
-        profiles = [dict(r) for r in conn.execute("SELECT * FROM profiles ORDER BY name").fetchall()]
+        projects = [
+            dict(r)
+            for r in conn.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall()
+        ]
+        profiles = [
+            dict(r) for r in conn.execute("SELECT * FROM profiles ORDER BY name").fetchall()
+        ]
     for p in projects:
         p["stages"] = project_stage_status(p)
     return render_template("dashboard.html", projects=projects, profiles=profiles, config=CONFIG)
@@ -1616,7 +1810,9 @@ def dashboard():
 @app.route("/projects/new", methods=["GET", "POST"])
 def new_project():
     with get_db() as conn:
-        profiles = [dict(r) for r in conn.execute("SELECT * FROM profiles ORDER BY name").fetchall()]
+        profiles = [
+            dict(r) for r in conn.execute("SELECT * FROM profiles ORDER BY name").fetchall()
+        ]
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         topic = request.form.get("topic", "").strip()
@@ -1625,17 +1821,23 @@ def new_project():
             flash("Nombre y tema son obligatorios", "error")
             return render_template("new_project.html", profiles=profiles)
         with get_db() as conn:
-            cur = conn.execute("""
+            cur = conn.execute(
+                """
                 INSERT INTO projects (name, topic, profile_id, status, created_at, updated_at)
                 VALUES (?, ?, ?, 'research', ?, ?)
-            """, (name, topic, profile_id, now_iso(), now_iso()))
+            """,
+                (name, topic, profile_id, now_iso(), now_iso()),
+            )
             new_id = cur.lastrowid
+        assert new_id is not None
         try:
             sync_project_folder(new_id)
-        except Exception as e:
+        except Exception:
             log.exception("[sync_project_folder] create project %s", new_id)
         return redirect(url_for("view_project", project_id=new_id))
-    return render_template("new_project.html", profiles=profiles, default_profile=get_default_profile())
+    return render_template(
+        "new_project.html", profiles=profiles, default_profile=get_default_profile()
+    )
 
 
 @app.route("/projects/<int:project_id>")
@@ -1648,27 +1850,28 @@ def view_project(project_id):
         profile = get_profile(project["profile_id"])
     project["stages"] = project_stage_status(project)
     saved_prompts = list_profile_prompts(project["profile_id"])
-    return render_template("project.html", project=project, profile=profile,
-                           saved_prompts=saved_prompts)
+    return render_template(
+        "project.html", project=project, profile=profile, saved_prompts=saved_prompts
+    )
 
 
 @app.route("/projects/<int:project_id>/delete", methods=["POST"])
 def delete_project(project_id):
     with get_db() as conn:
-        row = conn.execute("SELECT name FROM projects WHERE id=?",
-                           (project_id,)).fetchone()
+        row = conn.execute("SELECT name FROM projects WHERE id=?", (project_id,)).fetchone()
         name = row["name"] if row else None
         conn.execute("DELETE FROM projects WHERE id=?", (project_id,))
     if name:
         try:
             delete_project_folder(project_id, name)
-        except Exception as e:
+        except Exception:
             log.exception("[delete_project_folder] %s", project_id)
     flash("Proyecto eliminado", "ok")
     return redirect(url_for("dashboard"))
 
 
 # --- Investigación -----------------------------------------------------------
+
 
 @app.route("/projects/<int:project_id>/research", methods=["GET", "POST"])
 def research(project_id):
@@ -1683,49 +1886,69 @@ def research(project_id):
             sys_p, user_p = build_research_prompt(project, profile)
             save_profile_prompt(project["profile_id"], "research", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("research.html", project=project, profile=profile,
-                                   research=research_obj, generated=generated,
-                                   sys_prompt=sys_p, user_prompt=user_p)
+            return render_template(
+                "research.html",
+                project=project,
+                profile=profile,
+                research=research_obj,
+                generated=generated,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+            )
         elif action == "save":
             text = request.form.get("content", "").strip()
             if text:
                 parsed = parse_research(text)
                 with get_db() as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         UPDATE research SET content=?, sources=?, facts=?,
                             theories=?, unverified=?, updated_at=?
                         WHERE project_id=?
-                    """, (
-                        parsed["content"] or text,
-                        json.dumps(parsed["sources"], ensure_ascii=False),
-                        json.dumps(parsed["facts"], ensure_ascii=False),
-                        json.dumps(parsed["theories"], ensure_ascii=False),
-                        json.dumps(parsed["unverified"], ensure_ascii=False),
-                        now_iso(), project_id,
-                    ))
-                    conn.execute("UPDATE projects SET updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                    """,
+                        (
+                            parsed["content"] or text,
+                            json.dumps(parsed["sources"], ensure_ascii=False),
+                            json.dumps(parsed["facts"], ensure_ascii=False),
+                            json.dumps(parsed["theories"], ensure_ascii=False),
+                            json.dumps(parsed["unverified"], ensure_ascii=False),
+                            now_iso(),
+                            project_id,
+                        ),
+                    )
+                    conn.execute(
+                        "UPDATE projects SET updated_at=? WHERE id=?", (now_iso(), project_id)
+                    )
                 flash("Investigación guardada", "ok")
             try:
                 sync_project_folder(project_id)
-            except Exception as e:
+            except Exception:
                 log.exception("[sync_project_folder] research %s", project_id)
             return redirect(url_for("research", project_id=project_id))
 
     sources = json.loads(research_obj.get("sources") or "[]")
     facts = json.loads(research_obj.get("facts") or "[]")
-    return render_template("research.html", project=project, profile=profile,
-                           research=research_obj, sources=sources, facts=facts)
+    return render_template(
+        "research.html",
+        project=project,
+        profile=profile,
+        research=research_obj,
+        sources=sources,
+        facts=facts,
+    )
 
 
 # --- Concepto ----------------------------------------------------------------
+
 
 @app.route("/projects/<int:project_id>/concept", methods=["GET", "POST"])
 def concept(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        research_obj = fetch_optional_dict(conn, "SELECT * FROM research WHERE project_id=?", (project_id,))
+        research_obj = fetch_optional_dict(
+            conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
+        )
     concept_obj = get_or_create_concept(project_id)
 
     if request.method == "POST":
@@ -1737,50 +1960,69 @@ def concept(project_id):
             sys_p, user_p = build_concept_prompt(project, profile, research_obj)
             save_profile_prompt(project["profile_id"], "concept", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("concept.html", project=project, profile=profile,
-                                   concept=concept_obj, generated=generated,
-                                   sys_prompt=sys_p, user_prompt=user_p)
+            return render_template(
+                "concept.html",
+                project=project,
+                profile=profile,
+                concept=concept_obj,
+                generated=generated,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+            )
         elif action == "save":
             text = request.form.get("text", "").strip()
             if text:
                 parsed = parse_concept(text)
                 with get_db() as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         UPDATE concept SET angle=?, thesis=?, key_points=?,
                             emotional_hook=?, what_they_learn=?, what_they_feel=?,
                             risks=?, updated_at=? WHERE project_id=?
-                    """, (
-                        parsed["angle"], parsed["thesis"],
-                        json.dumps(parsed["key_points"], ensure_ascii=False),
-                        parsed["emotional_hook"],
-                        json.dumps(parsed["what_they_learn"], ensure_ascii=False),
-                        json.dumps(parsed["what_they_feel"], ensure_ascii=False),
-                        json.dumps(parsed["risks"], ensure_ascii=False),
-                        now_iso(), project_id,
-                    ))
-                    conn.execute("UPDATE projects SET status='concept', updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                    """,
+                        (
+                            parsed["angle"],
+                            parsed["thesis"],
+                            json.dumps(parsed["key_points"], ensure_ascii=False),
+                            parsed["emotional_hook"],
+                            json.dumps(parsed["what_they_learn"], ensure_ascii=False),
+                            json.dumps(parsed["what_they_feel"], ensure_ascii=False),
+                            json.dumps(parsed["risks"], ensure_ascii=False),
+                            now_iso(),
+                            project_id,
+                        ),
+                    )
+                    conn.execute(
+                        "UPDATE projects SET status='concept', updated_at=? WHERE id=?",
+                        (now_iso(), project_id),
+                    )
                 flash("Concepto guardado", "ok")
             try:
                 sync_project_folder(project_id)
-            except Exception as e:
+            except Exception:
                 log.exception("[sync_project_folder] concept %s", project_id)
             return redirect(url_for("concept", project_id=project_id))
 
     key_points = json.loads(concept_obj.get("key_points") or "[]")
-    return render_template("concept.html", project=project, profile=profile,
-                           concept=concept_obj, key_points=key_points)
+    return render_template(
+        "concept.html", project=project, profile=profile, concept=concept_obj, key_points=key_points
+    )
 
 
 # --- Guiones -----------------------------------------------------------------
+
 
 @app.route("/projects/<int:project_id>/scripts", methods=["GET", "POST"])
 def scripts(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        research_obj = fetch_optional_dict(conn, "SELECT * FROM research WHERE project_id=?", (project_id,))
-        concept_obj = fetch_optional_dict(conn, "SELECT * FROM concept WHERE project_id=?", (project_id,))
+        research_obj = fetch_optional_dict(
+            conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
+        )
+        concept_obj = fetch_optional_dict(
+            conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
+        )
         long_s = get_script(project_id, "long")
         short_s = get_script(project_id, "short")
 
@@ -1794,10 +2036,17 @@ def scripts(project_id):
             sys_p, user_p = build_script_prompt(project, profile, research_obj, concept_obj, stype)
             save_profile_prompt(project["profile_id"], f"script_{stype}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("scripts.html", project=project, profile=profile,
-                                   long_s=long_s, short_s=short_s,
-                                   generated=generated, gen_type=stype,
-                                   sys_prompt=sys_p, user_prompt=user_p)
+            return render_template(
+                "scripts.html",
+                project=project,
+                profile=profile,
+                long_s=long_s,
+                short_s=short_s,
+                generated=generated,
+                gen_type=stype,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+            )
         elif action == "save" and stype in ("long", "short"):
             text = request.form.get("text", "").strip()
             if text:
@@ -1805,55 +2054,82 @@ def scripts(project_id):
                 wc = count_words(parsed["body_full"] or text)
                 with get_db() as conn:
                     existing = conn.execute(
-                        "SELECT id FROM scripts WHERE project_id=? AND type=?",
-                        (project_id, stype)
+                        "SELECT id FROM scripts WHERE project_id=? AND type=?", (project_id, stype)
                     ).fetchone()
                     if existing:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             UPDATE scripts SET title=?, hook=?, context=?, development=?,
                                 revelations=?, conclusion=?, cta=?, body_full=?,
                                 word_count=?, updated_at=? WHERE id=?
-                        """, (
-                            parsed["title"], parsed["hook"], parsed["context"],
-                            parsed["development"], parsed["revelations"],
-                            parsed["conclusion"], parsed["cta"],
-                            parsed["body_full"], wc, now_iso(), existing["id"],
-                        ))
+                        """,
+                            (
+                                parsed["title"],
+                                parsed["hook"],
+                                parsed["context"],
+                                parsed["development"],
+                                parsed["revelations"],
+                                parsed["conclusion"],
+                                parsed["cta"],
+                                parsed["body_full"],
+                                wc,
+                                now_iso(),
+                                existing["id"],
+                            ),
+                        )
                     else:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             INSERT INTO scripts (project_id, type, title, hook, context,
                                 development, revelations, conclusion, cta, body_full,
                                 word_count, updated_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            project_id, stype, parsed["title"], parsed["hook"],
-                            parsed["context"], parsed["development"],
-                            parsed["revelations"], parsed["conclusion"],
-                            parsed["cta"], parsed["body_full"], wc, now_iso(),
-                        ))
-                    conn.execute("UPDATE projects SET status='scripts', updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                        """,
+                            (
+                                project_id,
+                                stype,
+                                parsed["title"],
+                                parsed["hook"],
+                                parsed["context"],
+                                parsed["development"],
+                                parsed["revelations"],
+                                parsed["conclusion"],
+                                parsed["cta"],
+                                parsed["body_full"],
+                                wc,
+                                now_iso(),
+                            ),
+                        )
+                    conn.execute(
+                        "UPDATE projects SET status='scripts', updated_at=? WHERE id=?",
+                        (now_iso(), project_id),
+                    )
                 flash(f"Guion {stype} guardado", "ok")
             try:
                 sync_project_folder(project_id)
-            except Exception as e:
+            except Exception:
                 log.exception("[sync_project_folder] scripts %s", project_id)
             return redirect(url_for("scripts", project_id=project_id))
 
-    return render_template("scripts.html", project=project, profile=profile,
-                           long_s=long_s, short_s=short_s)
+    return render_template(
+        "scripts.html", project=project, profile=profile, long_s=long_s, short_s=short_s
+    )
 
 
 # --- Escenas -----------------------------------------------------------------
+
 
 @app.route("/projects/<int:project_id>/scenes", methods=["GET", "POST"])
 def scenes(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-        ).fetchall()]
+        scripts_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
 
     def default_script_id():
         long_s = next((s for s in scripts_rows if s["type"] == "long"), None)
@@ -1863,10 +2139,13 @@ def scenes(project_id):
         if sid is None:
             return []
         with get_db() as conn:
-            return [dict(r) for r in conn.execute(
-                "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
-                (project_id, sid),
-            ).fetchall()]
+            return [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
+                    (project_id, sid),
+                ).fetchall()
+            ]
 
     raw_script_id = request.values.get("script_id")
     if raw_script_id and any(str(s["id"]) == str(raw_script_id) for s in scripts_rows):
@@ -1886,18 +2165,28 @@ def scenes(project_id):
             sys_p, user_p = build_scenes_prompt(project, profile, script)
             save_profile_prompt(project["profile_id"], "scenes", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("scenes.html", project=project, profile=profile,
-                                   scripts=scripts_rows, scenes=scenes_rows,
-                                   generated=generated, gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   active_script_id=script_id)
+            return render_template(
+                "scenes.html",
+                project=project,
+                profile=profile,
+                scripts=scripts_rows,
+                scenes=scenes_rows,
+                generated=generated,
+                gen_script_id=script_id,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+                active_script_id=script_id,
+            )
         elif action == "save":
             text = request.form.get("text", "").strip()
             script_id = request.form.get("script_id") or active_script_id
             if text and script_id:
                 parsed = parse_scenes(text)
                 if not parsed:
-                    flash("No se pudo extraer escenas de la respuesta (¿formato TST correcto?)", "error")
+                    flash(
+                        "No se pudo extraer escenas de la respuesta (¿formato TST correcto?)",
+                        "error",
+                    )
                     return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
                 # Estimar duración por escena si el LLM no la incluyó.
                 wpm = (profile.get("narration_speed") if profile else None) or 150
@@ -1907,8 +2196,10 @@ def scenes(project_id):
                         w = count_words(sc.get("narration_segment", ""))
                         sc["duration_seconds"] = max(1, round(w / wpm * 60))
                 with get_db() as conn:
-                    conn.execute("DELETE FROM scenes WHERE project_id=? AND script_id=?",
-                                 (project_id, script_id))
+                    conn.execute(
+                        "DELETE FROM scenes WHERE project_id=? AND script_id=?",
+                        (project_id, script_id),
+                    )
                     for sc in parsed:
                         try:
                             scene_num = int(sc.get("scene_number", 0))
@@ -1921,30 +2212,34 @@ def scenes(project_id):
                         except (TypeError, ValueError) as e:
                             log.debug("duration_seconds no numerico: %s", e)
                             dur = 0
-                        image_prompt = (
-                            sc.get("image_prompt")
-                            or sc.get("visual_description")
-                            or ""
-                        )
-                        conn.execute("""
+                        image_prompt = sc.get("image_prompt") or sc.get("visual_description") or ""
+                        conn.execute(
+                            """
                             INSERT INTO scenes (project_id, script_id, scene_number,
                                 narration, visual_description, camera_movement,
                                 transition, duration_seconds, updated_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            project_id, script_id, scene_num,
-                            sc.get("narration_segment", ""),
-                            image_prompt,
-                            sc.get("camera_movement", "") or "",
-                            sc.get("transition", "") or "",
-                            dur, now_iso(),
-                        ))
-                    conn.execute("UPDATE projects SET status='scenes', updated_at=? WHERE id=?",
-                                  (now_iso(), project_id))
+                        """,
+                            (
+                                project_id,
+                                script_id,
+                                scene_num,
+                                sc.get("narration_segment", ""),
+                                image_prompt,
+                                sc.get("camera_movement", "") or "",
+                                sc.get("transition", "") or "",
+                                dur,
+                                now_iso(),
+                            ),
+                        )
+                    conn.execute(
+                        "UPDATE projects SET status='scenes', updated_at=? WHERE id=?",
+                        (now_iso(), project_id),
+                    )
                 flash(f"Guardadas {len(parsed)} escenas del guion seleccionado", "ok")
             try:
                 sync_project_folder(project_id)
-            except Exception as e:
+            except Exception:
                 log.exception("[sync_project_folder] scenes %s", project_id)
             return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
         elif action == "delete":
@@ -1953,31 +2248,42 @@ def scenes(project_id):
                 conn.execute("DELETE FROM scenes WHERE id=?", (scene_id,))
             return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
 
-    return render_template("scenes.html", project=project, profile=profile,
-                           scripts=scripts_rows, scenes=scenes_rows,
-                           active_script_id=active_script_id)
+    return render_template(
+        "scenes.html",
+        project=project,
+        profile=profile,
+        scripts=scripts_rows,
+        scenes=scenes_rows,
+        active_script_id=active_script_id,
+    )
 
 
 # --- Prompts -----------------------------------------------------------------
 
 # --- Metadata ----------------------------------------------------------------
 
+
 @app.route("/projects/<int:project_id>/metadata", methods=["GET", "POST"])
 def metadata(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-        ).fetchall()]
-        meta_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
-        ).fetchall()]
+        scripts_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        meta_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
 
     meta_by_platform = {m["platform"]: m for m in meta_rows}
 
-    valid_platforms = ("youtube_long", "facebook_long",
-                       "youtube_short", "reels_short")
+    valid_platforms = ("youtube_long", "facebook_long", "youtube_short", "reels_short")
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1991,15 +2297,30 @@ def metadata(project_id):
             sys_p, user_p = build_metadata_prompt(project, profile, script, platform)
             save_profile_prompt(project["profile_id"], f"metadata_{platform}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("metadata.html", project=project, profile=profile,
-                                   scripts=scripts_rows, meta_by_platform=meta_by_platform,
-                                   generated=generated, gen_platform=platform,
-                                   gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p,
-                                   saved_yt_long=list_profile_prompts(project["profile_id"]).get("metadata_youtube_long"),
-                                   saved_fb_long=list_profile_prompts(project["profile_id"]).get("metadata_facebook_long"),
-                                   saved_yt_short=list_profile_prompts(project["profile_id"]).get("metadata_youtube_short"),
-                                   saved_reels_short=list_profile_prompts(project["profile_id"]).get("metadata_reels_short"))
+            return render_template(
+                "metadata.html",
+                project=project,
+                profile=profile,
+                scripts=scripts_rows,
+                meta_by_platform=meta_by_platform,
+                generated=generated,
+                gen_platform=platform,
+                gen_script_id=script_id,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+                saved_yt_long=list_profile_prompts(project["profile_id"]).get(
+                    "metadata_youtube_long"
+                ),
+                saved_fb_long=list_profile_prompts(project["profile_id"]).get(
+                    "metadata_facebook_long"
+                ),
+                saved_yt_short=list_profile_prompts(project["profile_id"]).get(
+                    "metadata_youtube_short"
+                ),
+                saved_reels_short=list_profile_prompts(project["profile_id"]).get(
+                    "metadata_reels_short"
+                ),
+            )
         elif action == "save" and platform in valid_platforms:
             text = request.form.get("text", "").strip()
             if text:
@@ -2007,7 +2328,7 @@ def metadata(project_id):
                 with get_db() as conn:
                     existing = conn.execute(
                         "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
-                        (project_id, platform)
+                        (project_id, platform),
                     ).fetchone()
                     fields = (
                         json.dumps(parsed["titles"], ensure_ascii=False),
@@ -2015,28 +2336,38 @@ def metadata(project_id):
                         json.dumps(parsed["chapters"], ensure_ascii=False),
                         json.dumps(parsed["tags"], ensure_ascii=False),
                         json.dumps(parsed["hashtags"], ensure_ascii=False),
-                        parsed["caption"], parsed["hook"], parsed["cta"],
+                        parsed["caption"],
+                        parsed["hook"],
+                        parsed["cta"],
                         json.dumps(parsed["on_screen_text"], ensure_ascii=False),
                     )
                     if existing:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             UPDATE metadata_records SET titles=?, description=?,
                                 chapters=?, tags=?, hashtags=?, caption=?, hook=?, cta=?,
                                 on_screen_text=?, updated_at=? WHERE id=?
-                        """, (*fields, now_iso(), existing["id"]))
+                        """,
+                            (*fields, now_iso(), existing["id"]),
+                        )
                     else:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             INSERT INTO metadata_records (project_id, platform, titles,
                                 description, chapters, tags, hashtags, caption, hook,
                                 cta, on_screen_text, updated_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (project_id, platform, *fields, now_iso()))
-                    conn.execute("UPDATE projects SET status='metadata', updated_at=? WHERE id=?",
-                                 (now_iso(), project_id))
+                        """,
+                            (project_id, platform, *fields, now_iso()),
+                        )
+                    conn.execute(
+                        "UPDATE projects SET status='metadata', updated_at=? WHERE id=?",
+                        (now_iso(), project_id),
+                    )
                 flash(f"Metadata {platform} guardada", "ok")
             try:
                 sync_project_folder(project_id)
-            except Exception as e:
+            except Exception:
                 log.exception("[sync_project_folder] metadata %s", project_id)
             return redirect(url_for("metadata", project_id=project_id))
 
@@ -2049,8 +2380,11 @@ def metadata(project_id):
 
     saved_prompts = list_profile_prompts(project["profile_id"])
     return render_template(
-        "metadata.html", project=project, profile=profile,
-        scripts=scripts_rows, meta_by_platform=meta_by_platform,
+        "metadata.html",
+        project=project,
+        profile=profile,
+        scripts=scripts_rows,
+        meta_by_platform=meta_by_platform,
         saved_yt_long=saved_prompts.get("metadata_youtube_long"),
         saved_fb_long=saved_prompts.get("metadata_facebook_long"),
         saved_yt_short=saved_prompts.get("metadata_youtube_short"),
@@ -2060,17 +2394,24 @@ def metadata(project_id):
 
 # --- Miniaturas --------------------------------------------------------------
 
+
 @app.route("/projects/<int:project_id>/thumbnails", methods=["GET", "POST"])
 def thumbnails(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-        ).fetchall()]
-        thumb_rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
-        ).fetchall()]
+        scripts_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        thumb_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
 
     thumb_by_type = {t["script_type"]: t for t in thumb_rows}
 
@@ -2084,7 +2425,8 @@ def thumbnails(project_id):
         if action == "generate_prompt":
             script_id = request.form.get("script_id")
             script = next(
-                (s for s in scripts_rows if str(s["id"]) == str(script_id)), None,
+                (s for s in scripts_rows if str(s["id"]) == str(script_id)),
+                None,
             )
             if not script:
                 flash("Selecciona un guion", "error")
@@ -2092,12 +2434,18 @@ def thumbnails(project_id):
             sys_p, user_p = build_thumbnail_prompt(project, profile, script, script_type)
             save_profile_prompt(project["profile_id"], f"thumbnail_{script_type}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
-            return render_template("thumbnails.html", project=project, profile=profile,
-                                   scripts=scripts_rows,
-                                   thumb_by_type=thumb_by_type,
-                                   generated=generated, gen_type=script_type,
-                                   gen_script_id=script_id,
-                                   sys_prompt=sys_p, user_prompt=user_p)
+            return render_template(
+                "thumbnails.html",
+                project=project,
+                profile=profile,
+                scripts=scripts_rows,
+                thumb_by_type=thumb_by_type,
+                generated=generated,
+                gen_type=script_type,
+                gen_script_id=script_id,
+                sys_prompt=sys_p,
+                user_prompt=user_p,
+            )
         elif action == "save":
             text = request.form.get("text", "").strip()
             if text:
@@ -2108,21 +2456,26 @@ def thumbnails(project_id):
                     return redirect(url_for("thumbnails", project_id=project_id))
                 with get_db() as conn:
                     existing = conn.execute(
-                        "SELECT id FROM thumbnail_records "
-                        "WHERE project_id=? AND script_type=?",
+                        "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
                         (project_id, script_type),
                     ).fetchone()
                     if existing:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             UPDATE thumbnail_records SET prompt=?, updated_at=?
                             WHERE id=?
-                        """, (prompt_text, now_iso(), existing["id"]))
+                        """,
+                            (prompt_text, now_iso(), existing["id"]),
+                        )
                     else:
-                        conn.execute("""
+                        conn.execute(
+                            """
                             INSERT INTO thumbnail_records
                             (project_id, script_type, prompt, updated_at)
                             VALUES (?, ?, ?, ?)
-                        """, (project_id, script_type, prompt_text, now_iso()))
+                        """,
+                            (project_id, script_type, prompt_text, now_iso()),
+                        )
                     conn.execute(
                         "UPDATE projects SET status='thumbnails', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
@@ -2130,15 +2483,21 @@ def thumbnails(project_id):
                 flash(f"Miniatura {script_type} guardada", "ok")
                 try:
                     sync_project_folder(project_id)
-                except Exception as e:
+                except Exception:
                     log.exception("[sync_project_folder] thumbnails %s", project_id)
             return redirect(url_for("thumbnails", project_id=project_id))
 
-    return render_template("thumbnails.html", project=project, profile=profile,
-                           scripts=scripts_rows, thumb_by_type=thumb_by_type)
+    return render_template(
+        "thumbnails.html",
+        project=project,
+        profile=profile,
+        scripts=scripts_rows,
+        thumb_by_type=thumb_by_type,
+    )
 
 
 # --- QC ----------------------------------------------------------------------
+
 
 @app.route("/projects/<int:project_id>/qc", methods=["GET", "POST"])
 def qc(project_id):
@@ -2149,8 +2508,10 @@ def qc(project_id):
         if action == "skip":
             with get_db() as conn:
                 conn.execute("DELETE FROM qc_issues WHERE project_id=?", (project_id,))
-                conn.execute("UPDATE projects SET status='ready', updated_at=? WHERE id=?",
-                             (now_iso(), project_id))
+                conn.execute(
+                    "UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+                    (now_iso(), project_id),
+                )
             flash("Análisis omitido: el proyecto se ha marcado como listo para exportar", "ok")
             return redirect(url_for("qc", project_id=project_id, skipped=1))
         issues = run_qc(project_id)
@@ -2158,36 +2519,39 @@ def qc(project_id):
         errors = [i for i in issues if i[1] == "error"]
         with get_db() as conn:
             if errors:
-                conn.execute("UPDATE projects SET updated_at=? WHERE id=?",
-                             (now_iso(), project_id))
+                conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (now_iso(), project_id))
             else:
-                conn.execute("UPDATE projects SET status='ready', updated_at=? WHERE id=?",
-                             (now_iso(), project_id))
+                conn.execute(
+                    "UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+                    (now_iso(), project_id),
+                )
         flash(f"Análisis completado: {len(issues)} avisos", "ok")
         try:
             sync_project_folder(project_id)
-        except Exception as e:
+        except Exception:
             log.exception("[sync_project_folder] qc %s", project_id)
         if not issues:
             return redirect(url_for("qc", project_id=project_id, clean=1))
         return redirect(url_for("qc", project_id=project_id))
     with get_db() as conn:
-        issues = [dict(r) for r in conn.execute(
-            """SELECT * FROM qc_issues WHERE project_id=?
+        issues = [
+            dict(r)
+            for r in conn.execute(
+                """SELECT * FROM qc_issues WHERE project_id=?
                ORDER BY CASE severity
                             WHEN 'error' THEN 0
                             WHEN 'warning' THEN 1
                             ELSE 2
                         END, stage""",
-            (project_id,)
-        ).fetchall()]
+                (project_id,),
+            ).fetchall()
+        ]
         last_run_row = conn.execute(
             "SELECT MAX(created_at) AS last FROM qc_issues WHERE project_id=?",
             (project_id,),
         ).fetchone()
         last_run = last_run_row["last"] if last_run_row else None
-    return render_template("qc.html", project=project, issues=issues,
-                           last_run=last_run)
+    return render_template("qc.html", project=project, issues=issues, last_run=last_run)
 
 
 # --- Export / sincronización de carpeta ---------------------------------------
@@ -2204,12 +2568,36 @@ def export(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        research_obj = fetch_optional_dict(conn, "SELECT * FROM research WHERE project_id=?", (project_id,))
-        concept_obj = fetch_optional_dict(conn, "SELECT * FROM concept WHERE project_id=?", (project_id,))
-        scripts_rows = [dict(r) for r in conn.execute("SELECT * FROM scripts WHERE project_id=?", (project_id,)).fetchall()]
-        scenes_rows = [dict(r) for r in conn.execute("SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)).fetchall()]
-        meta_rows = [dict(r) for r in conn.execute("SELECT * FROM metadata_records WHERE project_id=?", (project_id,)).fetchall()]
-        thumb_rows = [dict(r) for r in conn.execute("SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)).fetchall()]
+        research_obj = fetch_optional_dict(
+            conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
+        )
+        concept_obj = fetch_optional_dict(
+            conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
+        )
+        scripts_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        scenes_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
+            ).fetchall()
+        ]
+        meta_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
+        thumb_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
+            ).fetchall()
+        ]
 
     out_dir = safe_project_dir(project_id, project["name"])
     if request.method == "POST":
@@ -2232,14 +2620,14 @@ def export(project_id):
                     arc = full.relative_to(out_dir.parent)
                     zf.write(full, arc)
         flash(f"ZIP descargado y guardado en {zip_path.name}", "ok")
-        return send_file(zip_path, as_attachment=True,
-                         download_name=zip_path.name)
+        return send_file(zip_path, as_attachment=True, download_name=zip_path.name)
 
     # GET: sincroniza si la carpeta no existe todavía y muestra el estado
     if not out_dir.exists():
         out_dir, written = sync_project_folder(project_id)
-    folder_files = sorted(p.name + ("/" if p.is_dir() else "")
-                          for p in out_dir.rglob("*") if p != out_dir)
+    folder_files = sorted(
+        p.name + ("/" if p.is_dir() else "") for p in out_dir.rglob("*") if p != out_dir
+    )
 
     with get_db() as conn:
         qc_errors = conn.execute(
@@ -2247,16 +2635,20 @@ def export(project_id):
             (project_id,),
         ).fetchone()["n"]
 
-    return render_template("export.html", project=project, profile=profile,
-                           has_research=bool(research_obj.get("content")),
-                           has_concept=bool(concept_obj.get("angle")),
-                           scripts=scripts_rows,
-                           scenes=scenes_rows,
-                           metadata=meta_rows,
-                           thumbnails=thumb_rows,
-                           qc_errors=qc_errors,
-                           folder=out_dir,
-                           folder_files=folder_files)
+    return render_template(
+        "export.html",
+        project=project,
+        profile=profile,
+        has_research=bool(research_obj.get("content")),
+        has_concept=bool(concept_obj.get("angle")),
+        scripts=scripts_rows,
+        scenes=scenes_rows,
+        metadata=meta_rows,
+        thumbnails=thumb_rows,
+        qc_errors=qc_errors,
+        folder=out_dir,
+        folder_files=folder_files,
+    )
 
 
 # --- Perfiles ----------------------------------------------------------------
@@ -2292,17 +2684,29 @@ def llm_mode():
     """Cómo se generará el contenido: a mano o contra una API."""
     provider = CONFIG["llm"].get("provider", "manual")
     if provider == "manual":
-        return {"key": "manual", "label": PROVIDER_NAMES["manual"],
-                "detail": "copias los prompts a tu LLM", "target": "tu LLM"}
+        return {
+            "key": "manual",
+            "label": PROVIDER_NAMES["manual"],
+            "detail": "copias los prompts a tu LLM",
+            "target": "tu LLM",
+        }
     if provider == "custom":
         preset_key = CONFIG["llm"].get("active_preset") or ""
         preset = CONFIG["llm"].get("presets", {}).get(preset_key, {})
         model = preset.get("model", "")
-        return {"key": "api", "label": preset.get("label") or preset_key or "Preset",
-                "detail": model, "target": model or preset.get("label") or "la API"}
+        return {
+            "key": "api",
+            "label": preset.get("label") or preset_key or "Preset",
+            "detail": model,
+            "target": model or preset.get("label") or "la API",
+        }
     model = CONFIG["llm"].get(provider, {}).get("model", "")
-    return {"key": "api", "label": PROVIDER_NAMES.get(provider, provider),
-            "detail": model, "target": model or PROVIDER_NAMES.get(provider, provider)}
+    return {
+        "key": "api",
+        "label": PROVIDER_NAMES.get(provider, provider),
+        "detail": model,
+        "target": model or PROVIDER_NAMES.get(provider, provider),
+    }
 
 
 @app.context_processor

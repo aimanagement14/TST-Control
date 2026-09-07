@@ -4,14 +4,19 @@ Tests automatizados para los componentes críticos:
 - QC engine
 - Counters y estimaciones
 """
-import sys
+
 import json
-import sqlite3
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 import app
+from services.parsers import (
+    estimate_duration_seconds,
+    parse_prompt_json,
+    parse_scenes_json,
+)
 
 # Forzar UTF-8 en stdout/stderr para que los caracteres (✓, á, ó, →) no rompan
 # en consolas Windows con cp1252 por defecto (Python 3.13 mantiene la
@@ -25,6 +30,7 @@ if hasattr(sys.stderr, "reconfigure"):
 # ==========================================================================
 # Tests de parsers
 # ==========================================================================
+
 
 def test_parse_research():
     text = """## RESUMEN
@@ -223,7 +229,7 @@ def test_parse_scenes_json():
 ```
 
 Fin."""
-    r = app.parse_scenes_json(text_with_json)
+    r = parse_scenes_json(text_with_json)
     assert r is not None, "no se pudo parsear"
     assert len(r) == 1
     assert r[0]["scene_number"] == 1
@@ -232,7 +238,7 @@ Fin."""
 
 def test_parse_scenes_json_bare():
     text = 'Some intro [{"scene_number": 1, "narration_segment": "x", "visual_description": "y", "duration_seconds": 5, "camera_movement": "static", "transition": "cut"}] end'
-    r = app.parse_scenes_json(text)
+    r = parse_scenes_json(text)
     assert r is not None
     assert r[0]["scene_number"] == 1
     print("  ✓ parse_scenes_json (JSON sin bloque)")
@@ -253,7 +259,7 @@ def test_parse_prompt_json():
   "full_prompt_es": "Vista aérea del Pentágono"
 }
 ```"""
-    r = app.parse_prompt_json(text)
+    r = parse_prompt_json(text)
     assert r is not None
     assert r["subject"] == "Pentagon"
     assert "Pentagon" in r["full_prompt_en"]
@@ -375,6 +381,7 @@ más texto"""
 # Tests de utilidades
 # ==========================================================================
 
+
 def test_count_words():
     assert app.count_words("Hola mundo") == 2
     assert app.count_words("") == 0
@@ -387,15 +394,16 @@ def test_count_words():
 def test_estimate_duration():
     # 150 palabras por minuto = 2.5 palabras por segundo
     # 300 palabras = 120 segundos
-    assert app.estimate_duration_seconds("") == 0
+    assert estimate_duration_seconds("") == 0
     text = " ".join(["palabra"] * 300)
-    assert app.estimate_duration_seconds(text, wpm=150) == 120
+    assert estimate_duration_seconds(text, wpm=150) == 120
     print("  ✓ estimate_duration_seconds")
 
 
 # ==========================================================================
 # Tests de QC
 # ==========================================================================
+
 
 def _setup_qc_db(tmp_path):
     """Crea una DB temporal con datos para test de QC."""
@@ -415,8 +423,7 @@ def test_qc_detects_missing_research(tmp_path):
         """)
     issues = app.run_qc(1)
     has_research_error = any(
-        i[0] == "research" and i[1] == "error" and "investigación" in i[2].lower()
-        for i in issues
+        i[0] == "research" and i[1] == "error" and "investigación" in i[2].lower() for i in issues
     )
     assert has_research_error, f"Falta error de research: {issues}"
     print("  ✓ QC detecta investigación faltante")
@@ -453,16 +460,19 @@ def test_qc_detects_repetition(tmp_path):
             INSERT INTO projects (id, name, topic, status, created_at, updated_at)
             VALUES (1, 'Test', 'Topic', 'created', '2025-01-01', '2025-01-01')
         """)
-        body = "objetos " * 50 + "otros términos variados para completar el guion y cumplir mil quinientas palabras"
-        conn.execute("""
+        body = (
+            "objetos " * 50
+            + "otros términos variados para completar el guion y cumplir mil quinientas palabras"
+        )
+        conn.execute(
+            """
             INSERT INTO scripts (project_id, type, title, hook, body_full, word_count, updated_at)
             VALUES (1, 'long', 'Test', 'hook', ?, 800, '2025-01-01')
-        """, (body,))
+        """,
+            (body,),
+        )
     issues = app.run_qc(1)
-    has_repetition = any(
-        i[0] == "scripts" and "repetida" in i[2].lower()
-        for i in issues
-    )
+    has_repetition = any(i[0] == "scripts" and "repetida" in i[2].lower() for i in issues)
     assert has_repetition, f"Falta detección de repetición: {issues}"
     print("  ✓ QC detecta repeticiones")
 
@@ -479,10 +489,7 @@ def test_qc_detects_missing_sources(tmp_path):
             VALUES (1, 'algo de contenido', '["s1","s2"]', '2025-01-01')
         """)
     issues = app.run_qc(1)
-    has_sources_warning = any(
-        i[0] == "research" and "fuentes" in i[2].lower()
-        for i in issues
-    )
+    has_sources_warning = any(i[0] == "research" and "fuentes" in i[2].lower() for i in issues)
     assert has_sources_warning, f"Falta warning de fuentes: {issues}"
     print("  ✓ QC detecta pocas fuentes")
 
@@ -505,20 +512,26 @@ def test_qc_passes_complete_project(tmp_path):
         # Guion largo ~750 palabras
         body = " ".join([f"palabra{i}" for i in range(700)])
         body += " hook específico cta final conclusión revelaciones"
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO scripts (project_id, type, title, hook, context, development,
                 revelations, conclusion, cta, body_full, word_count, updated_at)
             VALUES (1, 'long', 'Test', 'hook inicial', 'contexto', 'desarrollo',
                 'revelaciones finales', 'conclusión reflexiva', 'suscríbete',
                 ?, 750, '2025-01-01')
-        """, (body,))
+        """,
+            (body,),
+        )
         # 6 escenas
         for i in range(6):
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO scenes (project_id, scene_number, narration, visual_description,
                     duration_seconds, camera_movement, transition, updated_at)
                 VALUES (1, ?, 'narración escena', 'visual escena', 30, 'zoom', 'fade', '2025-01-01')
-            """, (i + 1,))
+            """,
+                (i + 1,),
+            )
         # Metadata
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, updated_at)
@@ -533,6 +546,7 @@ def test_qc_passes_complete_project(tmp_path):
 # ==========================================================================
 # Tests del flujo de export
 # ==========================================================================
+
 
 def test_export_creates_zip(tmp_path):
     _setup_qc_db(tmp_path)
@@ -555,30 +569,33 @@ def test_export_creates_zip(tmp_path):
                 'cuerpo del guion con suficiente extensión para validar el export', 100, '2025-01-01')
         """)
         for i in range(3):
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO scenes (project_id, scene_number, narration, visual_description,
                     duration_seconds, updated_at)
                 VALUES (1, ?, 'narración', 'visual', 30, '2025-01-01')
-            """, (i + 1,))
+            """,
+                (i + 1,),
+            )
         conn.execute("""
             INSERT INTO metadata_records (project_id, platform, titles, description, updated_at)
             VALUES (1, 'youtube_long', '["t1"]', 'desc', '2025-01-01')
         """)
     # Override projects dir
-    import os
     test_projects = tmp_path / "projects"
     test_projects.mkdir()
     original = app.PROJECTS_DIR
     app.PROJECTS_DIR = test_projects
     try:
-        from app import export
         with app.app.test_client() as c:
             resp = c.post("/projects/1/export", follow_redirects=False)
             assert resp.status_code == 200, f"status: {resp.status_code}"
             import io
+
             data = resp.data
             assert len(data) > 1000, f"zip demasiado pequeño: {len(data)}"
             import zipfile
+
             zf = zipfile.ZipFile(io.BytesIO(data))
             names = zf.namelist()
             assert any("00_RESUMEN.md" in n for n in names)
@@ -605,9 +622,9 @@ def test_new_project_creates_folder(tmp_path):
         )
         assert r.status_code == 302
         with app.get_db() as conn:
-            new_id = conn.execute(
-                "SELECT id FROM projects WHERE name='Carpeta auto'"
-            ).fetchone()["id"]
+            new_id = conn.execute("SELECT id FROM projects WHERE name='Carpeta auto'").fetchone()[
+                "id"
+            ]
         folder = app.safe_project_dir(new_id, "Carpeta auto")
         assert folder.exists(), f"carpeta {folder} no se creó"
         resumen = (folder / "00_RESUMEN.md").read_text(encoding="utf-8")
@@ -688,9 +705,7 @@ def test_metadata_save_syncs_folder(tmp_path):
         )
         assert r.status_code == 200
         folder = app.safe_project_dir(1, "Meta Test")
-        meta = (folder / "05_metadata" / "metadata_youtube_long.md").read_text(
-            encoding="utf-8"
-        )
+        meta = (folder / "05_metadata" / "metadata_youtube_long.md").read_text(encoding="utf-8")
         assert "Uno" in meta
         assert "descripción de prueba" in meta
         print("  ✓ guardar metadata re-sincroniza 05_metadata/")
@@ -747,12 +762,11 @@ def test_export_resync_action(tmp_path):
     app.PROJECTS_DIR = test_projects
     try:
         c = app.app.test_client()
-        r = c.post("/projects/1/export",
-                    data={"action": "resync"},
-                    follow_redirects=False)
+        r = c.post("/projects/1/export", data={"action": "resync"}, follow_redirects=False)
         assert r.status_code == 302
-        assert "resync" not in r.headers.get("Location", "").lower() or \
-               "export" in r.headers.get("Location", "")
+        assert "resync" not in r.headers.get("Location", "").lower() or "export" in r.headers.get(
+            "Location", ""
+        )
         folder = app.safe_project_dir(1, "Resync Test")
         assert (folder / "00_RESUMEN.md").exists()
         assert (folder / "08_paquete_completo.json").exists()
@@ -792,6 +806,7 @@ def test_delete_project_removes_folder(tmp_path):
 # ==========================================================================
 # Tests de prompts por perfil (graph foundation)
 # ==========================================================================
+
 
 def test_resolve_stage_prompt_falls_back_to_config(tmp_path):
     """Sin fila en profile_prompts, devuelve los strings de CONFIG."""
@@ -884,9 +899,7 @@ def test_profiles_update_changes_default(tmp_path):
             INSERT INTO profiles (name, is_default, created_at)
             VALUES ('Alternativo', 0, '2025-01-01')
         """)
-        alt_id = conn.execute(
-            "SELECT id FROM profiles WHERE name='Alternativo'"
-        ).fetchone()["id"]
+        alt_id = conn.execute("SELECT id FROM profiles WHERE name='Alternativo'").fetchone()["id"]
     client = app.app.test_client()
     r = client.post(
         "/profiles",
@@ -943,14 +956,14 @@ def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
     profile_id = 1
     now = "2025-01-01T00:00:00"
     import gc
+
     with app.get_db() as conn:
         # init_db() en una DB fresca marca la migración como aplicada
         # (idempotente cuando la tabla legacy no existe). La "desmarcamos"
         # para simular una instalación previa al refactor y verificar que
         # la migración realmente copia filas y elimina la tabla.
         conn.execute(
-            "DELETE FROM _schema_migrations "
-            "WHERE name='migrate_stage_prompts_to_profile_prompts'"
+            "DELETE FROM _schema_migrations WHERE name='migrate_stage_prompts_to_profile_prompts'"
         )
         conn.execute("""
             CREATE TABLE stage_prompts (
@@ -964,33 +977,44 @@ def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )
         """)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Test', 'Topic', ?, 'research', ?, ?)
-        """, (profile_id, now, now))
-        conn.execute("""
+        """,
+            (profile_id, now, now),
+        )
+        conn.execute(
+            """
             INSERT INTO stage_prompts (project_id, stage, sys_prompt,
                                        user_prompt, updated_at)
             VALUES (1, 'research', 'sys-from-legacy', 'user-from-legacy', ?)
-        """, (now,))
-        conn.execute("""
+        """,
+            (now,),
+        )
+        conn.execute(
+            """
             INSERT INTO stage_prompts (project_id, stage, sys_prompt,
                                        user_prompt, updated_at)
             VALUES (1, 'concept', 'sys-concept', 'user-concept', ?)
-        """, (now,))
+        """,
+            (now,),
+        )
     gc.collect()
     app.init_db()
     gc.collect()
     with app.get_db() as conn:
-        rows = [dict(r) for r in conn.execute(
-            "SELECT stage, sys_prompt, user_prompt FROM profile_prompts "
-            "WHERE profile_id=? ORDER BY stage",
-            (profile_id,),
-        )]
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT stage, sys_prompt, user_prompt FROM profile_prompts "
+                "WHERE profile_id=? ORDER BY stage",
+                (profile_id,),
+            )
+        ]
         legacy_exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' "
-            "AND name='stage_prompts'"
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='stage_prompts'"
         ).fetchone()
     assert legacy_exists is None, "stage_prompts debe haberse eliminado"
     assert len(rows) == 2, f"Esperaba 2 filas migradas, hay {len(rows)}"
@@ -1003,6 +1027,7 @@ def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
 # ==========================================================================
 # Tests del graph CRUD y ejecutor unificado
 # ==========================================================================
+
 
 def _get_default_profile_id(tmp_path):
     _setup_qc_db(tmp_path)
@@ -1032,15 +1057,15 @@ def test_get_or_create_fixed_graph_nodes(tmp_path):
 def test_save_graph_node_and_delete(tmp_path):
     """Custom node: save, update, delete. Fijos no se pueden borrar."""
     pid = _get_default_profile_id(tmp_path)
-    saved = app.save_graph_node(pid, "custom_a", "Custom A", "sys", "user",
-                                "[]", 100, 200, False)
+    saved = app.save_graph_node(pid, "custom_a", "Custom A", "sys", "user", "[]", 100, 200, False)
     assert saved["node_key"] == "custom_a"
     assert saved["is_fixed"] == 0
     assert saved["label"] == "Custom A"
     assert saved["position_x"] == 100
     assert saved["position_y"] == 200
-    saved2 = app.save_graph_node(pid, "custom_a", "Custom A v2", "sys2",
-                                 "user2", '["research"]', 150, 250, False)
+    saved2 = app.save_graph_node(
+        pid, "custom_a", "Custom A v2", "sys2", "user2", '["research"]', 150, 250, False
+    )
     assert saved2["label"] == "Custom A v2"
     assert saved2["position_x"] == 150
     assert saved2["position_y"] == 250
@@ -1066,12 +1091,15 @@ def test_execute_graph_node_fixed_research(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Test', 'Tema de prueba', ?, 'research',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
     original_provider = app.CONFIG["llm"]["provider"]
     app.CONFIG["llm"]["provider"] = "manual"
     try:
@@ -1080,8 +1108,9 @@ def test_execute_graph_node_fixed_research(tmp_path):
         app.CONFIG["llm"]["provider"] = original_provider
     assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
     assert result.get("status") == "ok"
-    assert "Tema de prueba" in result.get("output", ""), \
+    assert "Tema de prueba" in result.get("output", ""), (
         f"manual mode debe contener el tema: {result.get('output')[:200]}"
+    )
     with app.get_db() as conn:
         row = conn.execute(
             "SELECT status, output FROM node_executions "
@@ -1099,15 +1128,26 @@ def test_execute_graph_node_custom(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Custom Test', 'Tema', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
-    app.save_graph_node(pid, "my_node", "My Node", "SYS_PROMPT",
-                        "USER con {{ inputs.research }} metido",
-                        '["research"]', 0, 0, False)
+        """,
+            (pid,),
+        )
+    app.save_graph_node(
+        pid,
+        "my_node",
+        "My Node",
+        "SYS_PROMPT",
+        "USER con {{ inputs.research }} metido",
+        '["research"]',
+        0,
+        0,
+        False,
+    )
     with app.get_db() as conn:
         conn.execute("""
             INSERT INTO node_executions
@@ -1129,8 +1169,9 @@ def test_execute_graph_node_custom(tmp_path):
         ).fetchone()
     assert row["status"] == "ok"
     assert "USER con" in row["output"], row["output"]
-    assert "HECHOS IMPORTANTES" in row["output"], \
+    assert "HECHOS IMPORTANTES" in row["output"], (
         "placeholder {{ inputs.research }} debe haberse interpolado"
+    )
     print("  ✓ execute_graph_node (custom con inputs interpolados)")
 
 
@@ -1139,12 +1180,15 @@ def test_persist_scenes_to_specific_script(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'PScenes', 'T', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
         cur_l = conn.execute("""
             INSERT INTO scripts (project_id, type, title, hook, body_full,
                 word_count, updated_at)
@@ -1165,12 +1209,21 @@ def test_persist_scenes_to_specific_script(tmp_path):
         with app.get_db() as conn:
             app._persist_scenes(conn, 1, "short", parsed, "2025-01-01")
     with app.get_db() as conn:
-        rows_s = [dict(r) for r in conn.execute(
-            "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
-            "AND script_id=? ORDER BY scene_number", (short_id,)).fetchall()]
-        rows_l = [dict(r) for r in conn.execute(
-            "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
-            "AND script_id=?", (long_id,)).fetchall()]
+        rows_s = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
+                "AND script_id=? ORDER BY scene_number",
+                (short_id,),
+            ).fetchall()
+        ]
+        rows_l = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT script_id, scene_number FROM scenes WHERE project_id=1 AND script_id=?",
+                (long_id,),
+            ).fetchall()
+        ]
     assert len(rows_s) == 2, f"debe persistir 2 escenas en short: {rows_s}"
     assert all(r["script_id"] == short_id for r in rows_s)
     assert len(rows_l) == 0, "no debe tocar el guion largo"
@@ -1207,17 +1260,21 @@ def test_update_graph_layout(tmp_path):
 # Runner
 # ==========================================================================
 
+
 def test_runner_renders_for_project(tmp_path):
     """GET /projects/<id>/run renderiza con los 10 nodos fijos."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Runner Test', 'Tema', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
     with app.app.test_client() as c:
         r = c.get("/projects/1/run")
         assert r.status_code == 200
@@ -1233,18 +1290,20 @@ def test_runner_execute_route_returns_json(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Runner Exec', 'Tema runner', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
     original_provider = app.CONFIG["llm"]["provider"]
     app.CONFIG["llm"]["provider"] = "manual"
     try:
         with app.app.test_client() as c:
-            r = c.post("/projects/1/run/execute",
-                       json={"node_key": "research"})
+            r = c.post("/projects/1/run/execute", json={"node_key": "research"})
             assert r.status_code == 200
             data = r.get_json()
             assert data.get("ok") is True, data
@@ -1268,12 +1327,15 @@ def test_runner_reset_node_clears_executions(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Reset', 'Tema', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
         conn.execute("""
             INSERT INTO node_executions
                 (project_id, node_key, output, status, created_at)
@@ -1287,8 +1349,7 @@ def test_runner_reset_node_clears_executions(tmp_path):
         assert data.get("deleted") == 1
     with app.get_db() as conn:
         n = conn.execute(
-            "SELECT COUNT(*) AS n FROM node_executions "
-            "WHERE project_id=1 AND node_key='concept'"
+            "SELECT COUNT(*) AS n FROM node_executions WHERE project_id=1 AND node_key='concept'"
         ).fetchone()["n"]
         assert n == 0
     print("  ✓ runner /run/reset-node borra ejecuciones del nodo")
@@ -1299,21 +1360,23 @@ def test_runner_scenes_short_persists_to_short_script(tmp_path):
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
         pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
             VALUES (1, 'Scenes Short', 'Tema', ?, 'created',
                     '2025-01-01', '2025-01-01')
-        """, (pid,))
+        """,
+            (pid,),
+        )
         # Crear guion corto
-        cur = conn.execute("""
+        conn.execute("""
             INSERT INTO scripts (project_id, type, title, hook, context,
                 development, revelations, conclusion, cta, body_full,
                 word_count, updated_at)
             VALUES (1, 'short', 'Corto', 'h', 'c', 'd', 'r', 'f', 'cta',
                     'uno dos tres cuatro cinco seis siete ocho', 8, '2025-01-01')
         """)
-        short_id = cur.lastrowid
     scenes_text = """\
 ESCENA 1
 TEXTO AUDIO: uno dos tres
@@ -1327,12 +1390,12 @@ ESCENA 3
 TEXTO AUDIO: siete ocho
 IMAGEN: prompt 3
 """
+    _ = scenes_text  # documenta el formato TST que el runner debe generar
     original_provider = app.CONFIG["llm"]["provider"]
     app.CONFIG["llm"]["provider"] = "manual"
     try:
         with app.app.test_client() as c:
-            r = c.post("/projects/1/run/execute",
-                       json={"node_key": "scenes_short"})
+            r = c.post("/projects/1/run/execute", json={"node_key": "scenes_short"})
             assert r.status_code == 200
     finally:
         app.CONFIG["llm"]["provider"] = original_provider
@@ -1347,9 +1410,10 @@ IMAGEN: prompt 3
     assert row is not None and row["status"] == "ok"
     print("  ✓ runner procesa scenes_short como nodo fijo")
 
+
 def main():
-    import tempfile
     import gc
+    import tempfile
     from pathlib import Path
 
     print("\n=== TESTS DE PARSERS ===")
@@ -1413,12 +1477,14 @@ def main():
         gc.collect()
 
     print("\n=== TESTS DE PROMPTS POR PERFIL ===")
-    _run_qc_test(test_resolve_stage_prompt_falls_back_to_config,
-                 "resolve_stage_prompt_falls_back_to_config")
-    _run_qc_test(test_save_profile_prompt_upsert,
-                 "save_profile_prompt_upsert")
-    _run_qc_test(test_migration_copies_stage_prompts_to_profile_prompts,
-                 "migration_copies_stage_prompts_to_profile_prompts")
+    _run_qc_test(
+        test_resolve_stage_prompt_falls_back_to_config, "resolve_stage_prompt_falls_back_to_config"
+    )
+    _run_qc_test(test_save_profile_prompt_upsert, "save_profile_prompt_upsert")
+    _run_qc_test(
+        test_migration_copies_stage_prompts_to_profile_prompts,
+        "migration_copies_stage_prompts_to_profile_prompts",
+    )
 
     print("\n=== TESTS DE EDICIÓN DE PERFILES ===")
     _run_qc_test(test_profiles_page_renders, "profiles_page_renders")
@@ -1427,28 +1493,21 @@ def main():
     _run_qc_test(test_profiles_update_rejects_empty_name, "profiles_update_rejects_empty_name")
 
     print("\n=== TESTS DE GRAPH CRUD ===")
-    _run_qc_test(test_get_or_create_fixed_graph_nodes,
-                 "get_or_create_fixed_graph_nodes")
-    _run_qc_test(test_save_graph_node_and_delete,
-                 "save_graph_node_and_delete")
-    _run_qc_test(test_update_graph_layout,
-                 "update_graph_layout")
-    _run_qc_test(test_execute_graph_node_fixed_research,
-                 "execute_graph_node_fixed_research")
-    _run_qc_test(test_execute_graph_node_custom,
-                 "execute_graph_node_custom")
-    _run_qc_test(test_persist_scenes_to_specific_script,
-                 "persist_scenes_to_specific_script")
+    _run_qc_test(test_get_or_create_fixed_graph_nodes, "get_or_create_fixed_graph_nodes")
+    _run_qc_test(test_save_graph_node_and_delete, "save_graph_node_and_delete")
+    _run_qc_test(test_update_graph_layout, "update_graph_layout")
+    _run_qc_test(test_execute_graph_node_fixed_research, "execute_graph_node_fixed_research")
+    _run_qc_test(test_execute_graph_node_custom, "execute_graph_node_custom")
+    _run_qc_test(test_persist_scenes_to_specific_script, "persist_scenes_to_specific_script")
 
     print("\n=== TESTS DEL RUNNER (E2E) ===")
-    _run_qc_test(test_runner_renders_for_project,
-                 "runner_renders_for_project")
-    _run_qc_test(test_runner_execute_route_returns_json,
-                 "runner_execute_route_returns_json")
-    _run_qc_test(test_runner_reset_node_clears_executions,
-                 "runner_reset_node_clears_executions")
-    _run_qc_test(test_runner_scenes_short_persists_to_short_script,
-                 "runner_scenes_short_persists_to_short_script")
+    _run_qc_test(test_runner_renders_for_project, "runner_renders_for_project")
+    _run_qc_test(test_runner_execute_route_returns_json, "runner_execute_route_returns_json")
+    _run_qc_test(test_runner_reset_node_clears_executions, "runner_reset_node_clears_executions")
+    _run_qc_test(
+        test_runner_scenes_short_persists_to_short_script,
+        "runner_scenes_short_persists_to_short_script",
+    )
 
     print("\n✅ Todos los tests pasaron\n")
 

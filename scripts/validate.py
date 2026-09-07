@@ -18,6 +18,7 @@ Uso:
 
 Equivalente npm del devkit: `npm run validate`.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -88,11 +89,8 @@ def main() -> int:
             ROOT / "test_core.py",
             ROOT / "verify_project.py",
         ]:
-            try:
-                py.resolve(strict=True).read_text(encoding="utf-8")
-            except OSError:
-                pass
             import py_compile
+
             try:
                 py_compile.compile(str(py), doraise=True)
                 print(f"  ✓ {py.relative_to(ROOT)}")

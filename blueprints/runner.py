@@ -38,11 +38,14 @@ def project_run(project_id: int):
     get_or_create_fixed_graph_nodes(profile["id"])
     nodes_rows = fetch_graph_nodes(profile["id"])
     with get_db() as conn:
-        exec_rows = [dict(r) for r in conn.execute(
-            "SELECT node_key, output, status, duration_ms, created_at "
-            "FROM node_executions WHERE project_id=? ORDER BY id DESC",
-            (project_id,),
-        ).fetchall()]
+        exec_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT node_key, output, status, duration_ms, created_at "
+                "FROM node_executions WHERE project_id=? ORDER BY id DESC",
+                (project_id,),
+            ).fetchall()
+        ]
     latest_by_node: dict[str, dict] = {}
     for r in exec_rows:
         latest_by_node.setdefault(r["node_key"], r)
@@ -66,26 +69,32 @@ def project_run(project_id: int):
                 "inputs": json.loads(n["inputs_json"] or "[]"),
                 "status": (
                     latest_by_node[n["node_key"]]["status"]
-                    if n["node_key"] in latest_by_node else "idle"
+                    if n["node_key"] in latest_by_node
+                    else "idle"
                 ),
                 "lastOutput": (
                     latest_by_node[n["node_key"]]["output"]
-                    if n["node_key"] in latest_by_node else ""
+                    if n["node_key"] in latest_by_node
+                    else ""
                 ),
                 "durationMs": (
                     latest_by_node[n["node_key"]]["duration_ms"]
-                    if n["node_key"] in latest_by_node else None
+                    if n["node_key"] in latest_by_node
+                    else None
                 ),
                 "lastRunAt": (
                     latest_by_node[n["node_key"]]["created_at"]
-                    if n["node_key"] in latest_by_node else None
+                    if n["node_key"] in latest_by_node
+                    else None
                 ),
             }
             for n in nodes_rows
         ],
         "edges": fetch_graph_edges_as_eedges(profile["id"]),
     }
-    return render_template("project_run.html", project=project, profile=profile, graph_data=graph_data)
+    return render_template(
+        "project_run.html", project=project, profile=profile, graph_data=graph_data
+    )
 
 
 @runner_bp.route("/<int:project_id>/run/execute", methods=["POST"])
