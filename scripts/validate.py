@@ -114,14 +114,14 @@ def main() -> int:
     ):
         failed.append("e2e")
 
-    # 4. ruff (opcional, informativo: no bloquea el exit code mientras
-    # la base de codigo no este limpia). Para promoverlo a obligatorio
-    # pasar `required=True` en step().
+    # 4. ruff. check es obligatorio (0 errores esperado). format --check
+    # sigue informativo para no romper commits que aún no se han
+    # reformateado.
     if shutil.which("ruff"):
-        step("ruff check .", ["ruff", "check", "."], required=False)
+        step("ruff check .", ["ruff", "check", "."], required=True)
         step("ruff format --check .", ["ruff", "format", "--check", "."], required=False)
     else:
-        print("\n  [skip] ruff no instalado (opcional)")
+        print("\n  [skip] ruff no instalado (recomendado)")
 
     # 5. mypy (opcional, informativo por la misma razon).
     if shutil.which("mypy"):
