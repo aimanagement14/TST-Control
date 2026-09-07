@@ -10,7 +10,7 @@
 <form method="post">
     <input type="hidden" name="action" value="generate_prompt">
     <button class="btn {% if saved_prompt or generated %}btn-ghost{% else %}btn-primary{% endif %}">
-        {% if saved_prompt or generated %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+        {% if saved_prompt or generated %}Regenerar prompt{% else %}Generar prompt{% endif %}
     </button>
 </form>
 {% endcall %}

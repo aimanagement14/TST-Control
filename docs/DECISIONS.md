@@ -354,3 +354,81 @@ el runner.
 - `git revert` de los commits asociados restaura los 9 nodos y el
   form inline roto (que volvería a fallar como antes, sin regresión
   funcional).
+
+## 2026-09-07 — Modo manual exclusivo (v2.0)
+
+**Contexto:** Tras 1.0 la herramienta soportaba cuatro proveedores
+LLM (manual, openai, anthropic, custom) con presets editables desde
+`/settings`. La auditoría 2026-09-07 confirmó que ningún usuario
+activo consumía la API: el modo manual cubre todos los flujos
+(producto verificado en `verify_project.py` y `examples/`) y los
+presets se habían quedado desfasados (URLs placeholder, modelos
+cambiados por los proveedores). Mantener el cableado HTTP de tres
+proveedores + `urllib.request` + parser de presets + página de
+configuración era coste de mantenimiento sin usuario. Además, los
+ADRs previos (2026-08-29 "LLM opcional con modo manual por defecto",
+2026-08-29 "Presets para providers OpenAI-compatible") declaraban
+que el modo manual era el camino feliz; esta decisión lo hace
+explícito eliminando la otra rama.
+
+**Decisión:** Eliminar la integración con OpenAI, Anthropic y los
+presets personalizados. La herramienta es solo modo manual desde
+2.0.0:
+
+- `services/llm.py` se renombra a `services/manual.py` y conserva
+  solo `call_llm` (que ahora es trivial: devuelve el bloque
+  `## [MODO MANUAL]`), `llm_output_is_manual` y `_manual_fallback`
+  (helper privado, ya no representa un fallback de error).
+- `app.py` pierde `llm_mode()` y `PROVIDER_NAMES`; el contexto de
+  plantilla expone una constante `LLM_MODE` con el modo manual
+  único. Los logs de arranque pasan de "LLM provider: manual" a
+  "Modo: manual".
+- `blueprints/settings.py`, `templates/settings.html` y la pestaña
+  "Configuración" del nav desaparecen. La página `/settings`
+  devuelve 404.
+- `config.json` pierde el bloque `llm` entero (provider, openai,
+  anthropic, active_preset, presets, temperature, max_tokens).
+- Las 6 plantillas por etapa eliminan la rama
+  `{% elif llm.key == 'manual' %}` (siempre verdadera) y el botón
+  queda como `{% if saved %}Regenerar prompt{% else %}Generar prompt{% endif %}`.
+- `test_core.py` pierde los 4 toggles
+  `app.CONFIG["llm"]["provider"] = "manual"` — el modo manual es el
+  único modo, no hace falta forzar nada.
+
+**Consecuencias:**
+
+- Quien venía usando la API debe copiar los prompts manualmente a
+  su LLM. El contrato del output (secciones `## RESUMEN`,
+  `## ÁNGULO`, `## HOOK`, `## CONTEXTO`, etc.) no cambia: cualquier
+  LLM moderno lo entiende.
+- `requirements.txt` no cambia: `urllib.request` es stdlib y nunca
+  fue dependencia de runtime; `anthropic` SDK nunca estuvo
+  pinneado (era opcional).
+- Cero secretos en `.env` ni `config.json` que retirar por parte
+  del proyecto (los campos `api_key` están vacíos desde 1.0). Si
+  el usuario tenía claves reales, debe retirarlas manualmente.
+- `app.py` baja ~70 líneas: `llm_mode()` (30 líneas),
+  `PROVIDER_NAMES` (6), import de `blueprints.settings`,
+  `register_blueprint(settings_bp)`, log de provider en arranque.
+- Bump de versión mayor (SemVer 1.x → 2.x) por cambio incompatible.
+
+**Reversibilidad:**
+
+- `git revert` del commit 2 (`feat!: quitar proveedores LLM`)
+  restaura:
+  - `services/llm.py` con todas las ramas API (hay que
+    `git mv services/manual.py services/llm.py` antes).
+  - `blueprints/settings.py` y `templates/settings.html` desde el
+    commit anterior.
+  - Las llamadas a `url_for('settings.view')` en `templates/base.html`.
+  - Las ramas `{% elif llm.key == 'manual' %}` en las 6 plantillas.
+  - Los 4 toggles `app.CONFIG["llm"]["provider"]` en `test_core.py`.
+  - El bloque `llm` de `config.json` (hay que reescribirlo con los
+    valores del commit anterior).
+- El commit 1 (`chore(audit): aplicar limpieza de hallazgos H1-H9`)
+  es independiente y se mantiene: sus cambios (borrar duplicados,
+  limpiar F401, etc.) son útiles incluso con la rama API restaurada.
+- Tras el revert, sería seguro bumpear a `2.0.1` y publicar el
+  revert; o bien quedarse en `2.0.0` y abrir un nuevo sprint que
+  reintroduzca los proveedores con mejor diseño (SDK oficial por
+  proveedor, OAuth en vez de API keys, etc.).

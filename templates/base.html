@@ -19,15 +19,13 @@
         </a>
         <nav class="console-nav" aria-label="Secciones">
             <a href="{{ url_for('dashboard') }}"
-               {% if request.endpoint not in ('profiles', 'settings') %}aria-current="page"{% endif %}>Proyectos</a>
+               {% if request.endpoint != 'profiles' %}aria-current="page"{% endif %}>Proyectos</a>
             <a href="{{ url_for('profiles.view') }}"
                {% if request.endpoint == 'profiles' %}aria-current="page"{% endif %}>Perfiles</a>
-            <a href="{{ url_for('settings.view') }}"
-               {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}>Configuración</a>
         </nav>
-        <a class="mode-chip {% if llm.key == 'api' %}is-api{% endif %}" href="{{ url_for('settings.view') }}">
+        <span class="mode-chip">
             {{ llm.label }}{% if llm.detail %} · {{ llm.detail }}{% endif %}
-        </a>
+        </span>
     </div>
 </header>
 

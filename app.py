@@ -35,7 +35,7 @@ from flask import (
     url_for,
 )
 
-from services.llm import call_llm, llm_output_is_manual
+from services.manual import call_llm, llm_output_is_manual
 from services.parsers import (
     count_words,
     parse_concept,
@@ -95,12 +95,10 @@ app.config["JSON_AS_ASCII"] = False
 from blueprints.graph import graph_bp  # noqa: E402
 from blueprints.profiles import profiles_bp  # noqa: E402
 from blueprints.runner import runner_bp  # noqa: E402
-from blueprints.settings import settings_bp  # noqa: E402
 
 app.register_blueprint(graph_bp)
 app.register_blueprint(runner_bp)
 app.register_blueprint(profiles_bp)
-app.register_blueprint(settings_bp)
 
 
 @app.route("/favicon.ico")
@@ -2672,41 +2670,15 @@ def export(project_id):
 # Contexto de plantilla
 # ---------------------------------------------------------------------------
 
-PROVIDER_NAMES = {
-    "manual": "Modo manual",
-    "openai": "OpenAI-compatible",
-    "anthropic": "Anthropic Claude",
-    "custom": "Preset personalizado",
+# Modo manual exclusivo (>= 2.0). Se mantiene la misma forma del dict
+# para no tocar las plantillas que aún consultan llm.key / llm.label /
+# llm.detail.
+LLM_MODE = {
+    "key": "manual",
+    "label": "Modo manual",
+    "detail": "copias los prompts a tu LLM",
+    "target": "tu LLM",
 }
-
-
-def llm_mode():
-    """Cómo se generará el contenido: a mano o contra una API."""
-    provider = CONFIG["llm"].get("provider", "manual")
-    if provider == "manual":
-        return {
-            "key": "manual",
-            "label": PROVIDER_NAMES["manual"],
-            "detail": "copias los prompts a tu LLM",
-            "target": "tu LLM",
-        }
-    if provider == "custom":
-        preset_key = CONFIG["llm"].get("active_preset") or ""
-        preset = CONFIG["llm"].get("presets", {}).get(preset_key, {})
-        model = preset.get("model", "")
-        return {
-            "key": "api",
-            "label": preset.get("label") or preset_key or "Preset",
-            "detail": model,
-            "target": model or preset.get("label") or "la API",
-        }
-    model = CONFIG["llm"].get(provider, {}).get("model", "")
-    return {
-        "key": "api",
-        "label": PROVIDER_NAMES.get(provider, provider),
-        "detail": model,
-        "target": model or PROVIDER_NAMES.get(provider, provider),
-    }
 
 
 @app.context_processor
@@ -2718,8 +2690,7 @@ def inject_globals():
         "pipeline": pipeline_view,
         "status_label": status_label,
         "timecode": format_timecode,
-        "llm": llm_mode(),
-        "provider_names": PROVIDER_NAMES,
+        "llm": LLM_MODE,
         "is_manual_output": llm_output_is_manual,
         "qc_checks": CONFIG["qc"]["checks"],
     }
@@ -2739,7 +2710,7 @@ if __name__ == "__main__":
     log.info("=" * 60)
     log.info("  Base de datos: %s", DB_PATH)
     log.info("  Exportaciones: %s", PROJECTS_DIR)
-    log.info("  LLM provider: %s", CONFIG["llm"]["provider"])
+    log.info("  Modo: manual (los prompts se copian al LLM externo)")
     log.info("=" * 60)
 
     # Permitir elegir servidor con variable de entorno:

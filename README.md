@@ -98,10 +98,10 @@ se parsea automáticamente.
 
 Cero costos. Cero dependencias externas. Tú controlas qué LLM usas.
 
-### Modo API
-Configura una clave de OpenAI en `Configuración` y la herramienta
-llamará al LLM directamente. Compatible con cualquier endpoint
-OpenAI-compatible (LM Studio, Ollama con shim, etc.).
+> **v2.0:** esta build es solo modo manual. Quien necesite la
+> integración con OpenAI / Anthropic / presets personalizados debe
+> quedarse en la rama 1.x. Ver `CHANGELOG.md` y ADR
+> `2026-09-07` en `docs/DECISIONS.md`.
 
 ## Editor visual de grafo (por perfil)
 

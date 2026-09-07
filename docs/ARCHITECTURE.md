@@ -87,7 +87,7 @@ leer `CONFIG`, `get_db` y compañía, evitando ciclos.
 | Archivo | Funciones |
 |---------|-----------|
 | `services/parsers.py` | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_scenes`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail`, `count_words`, `estimate_duration_seconds`. |
-| `services/llm.py` | `call_llm`, `_manual_fallback`, `llm_output_is_manual`. |
+| `services/llm.py` | `call_llm`, `_manual_fallback`, `llm_output_is_manual`. (Renombrado a `services/manual.py` en v2.0; las ramas API se eliminaron.) |
 | `services/qc.py` | `run_qc`, `save_qc_issues`. |
 
 ### `blueprints/`
@@ -218,9 +218,9 @@ vista enfocada de la misma información.
 ## Límites y dependencias externas
 
 - **LLM opcional**: el modo manual no hace ninguna llamada saliente.
-  En modo API se intenta primero el SDK de Anthropic, si está
-  instalado, y se hace fallback a `urllib.request` contra la API REST
-  de Anthropic o cualquier endpoint OpenAI-compatible.
+  A partir de v2.0 el modo manual es el único modo soportado (ver
+  ADR 2026-09-07); las versiones 1.x incluían OpenAI, Anthropic y
+  presets personalizados.
 - **Sin JS de build**: el único JS embebido está en `research.html` y
   `concept.html` para `navigator.clipboard`. No hay bundler.
 - **Sin base de datos externa**: SQLite, foreign keys activadas.

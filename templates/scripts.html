@@ -34,7 +34,7 @@
             <input type="hidden" name="action" value="generate_prompt">
             <input type="hidden" name="script_type" value="{{ stype }}">
             <button class="btn btn-sm {% if saved %}btn-ghost{% else %}btn-primary{% endif %}">
-                {% if saved %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+                {% if saved %}Regenerar prompt{% else %}Generar prompt{% endif %}
             </button>
         </form>
     </div>

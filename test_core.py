@@ -1100,12 +1100,7 @@ def test_execute_graph_node_fixed_research(tmp_path):
         """,
             (pid,),
         )
-    original_provider = app.CONFIG["llm"]["provider"]
-    app.CONFIG["llm"]["provider"] = "manual"
-    try:
-        result = app.execute_graph_node(1, "research")
-    finally:
-        app.CONFIG["llm"]["provider"] = original_provider
+    result = app.execute_graph_node(1, "research")
     assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
     assert result.get("status") == "ok"
     assert "Tema de prueba" in result.get("output", ""), (
@@ -1154,12 +1149,7 @@ def test_execute_graph_node_custom(tmp_path):
                 (project_id, node_key, output, status, created_at)
             VALUES (1, 'research', 'HECHOS IMPORTANTES', 'ok', '2025-01-01')
         """)
-    original_provider = app.CONFIG["llm"]["provider"]
-    app.CONFIG["llm"]["provider"] = "manual"
-    try:
-        result = app.execute_graph_node(1, "my_node")
-    finally:
-        app.CONFIG["llm"]["provider"] = original_provider
+    result = app.execute_graph_node(1, "my_node")
     assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
     with app.get_db() as conn:
         row = conn.execute(
@@ -1299,26 +1289,21 @@ def test_runner_execute_route_returns_json(tmp_path):
         """,
             (pid,),
         )
-    original_provider = app.CONFIG["llm"]["provider"]
-    app.CONFIG["llm"]["provider"] = "manual"
-    try:
-        with app.app.test_client() as c:
-            r = c.post("/projects/1/run/execute", json={"node_key": "research"})
-            assert r.status_code == 200
-            data = r.get_json()
-            assert data.get("ok") is True, data
-            assert data.get("status") == "ok"
-            assert "Tema runner" in data.get("output", "")
-            assert "node_executions" in data
-        with app.get_db() as conn:
-            row = conn.execute(
-                "SELECT status FROM node_executions "
-                "WHERE project_id=1 AND node_key='research' "
-                "ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-            assert row is not None and row["status"] == "ok"
-    finally:
-        app.CONFIG["llm"]["provider"] = original_provider
+    with app.app.test_client() as c:
+        r = c.post("/projects/1/run/execute", json={"node_key": "research"})
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data.get("ok") is True, data
+        assert data.get("status") == "ok"
+        assert "Tema runner" in data.get("output", "")
+        assert "node_executions" in data
+    with app.get_db() as conn:
+        row = conn.execute(
+            "SELECT status FROM node_executions "
+            "WHERE project_id=1 AND node_key='research' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        assert row is not None and row["status"] == "ok"
     print("  ✓ runner /run/execute persiste ok en node_executions")
 
 
@@ -1377,28 +1362,9 @@ def test_runner_scenes_short_persists_to_short_script(tmp_path):
             VALUES (1, 'short', 'Corto', 'h', 'c', 'd', 'r', 'f', 'cta',
                     'uno dos tres cuatro cinco seis siete ocho', 8, '2025-01-01')
         """)
-    scenes_text = """\
-ESCENA 1
-TEXTO AUDIO: uno dos tres
-IMAGEN: prompt 1
-
-ESCENA 2
-TEXTO AUDIO: cuatro cinco seis
-IMAGEN: prompt 2
-
-ESCENA 3
-TEXTO AUDIO: siete ocho
-IMAGEN: prompt 3
-"""
-    _ = scenes_text  # documenta el formato TST que el runner debe generar
-    original_provider = app.CONFIG["llm"]["provider"]
-    app.CONFIG["llm"]["provider"] = "manual"
-    try:
-        with app.app.test_client() as c:
-            r = c.post("/projects/1/run/execute", json={"node_key": "scenes_short"})
-            assert r.status_code == 200
-    finally:
-        app.CONFIG["llm"]["provider"] = original_provider
+    with app.app.test_client() as c:
+        r = c.post("/projects/1/run/execute", json={"node_key": "scenes_short"})
+        assert r.status_code == 200
     # En modo manual la persistencia no se ejecuta (raw es el prompt,
     # no escenas parseables). Verificamos que se llama al nodo correcto.
     with app.get_db() as conn:

@@ -2,71 +2,8 @@
   "app": {
     "name": "Todo Sobre Todo",
     "tagline": "Centro de producción de contenido",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "secret_key": "dev-local-tst-secret-key-change-in-prod-9f2c1b8e"
-  },
-  "llm": {
-    "provider": "manual",
-    "options": {
-      "manual": "Generar prompts estructurados para usar en cualquier LLM externo (ChatGPT, Claude, Gemini, etc.)",
-      "openai": "API de OpenAI o cualquier endpoint OpenAI-compatible (LM Studio, Ollama, etc.)",
-      "anthropic": "API de Anthropic Claude (usa SDK si está instalado, si no REST directo)",
-      "custom": "Un preset personalizado definido más abajo (útil para MiniMax text API, Azure, etc.)"
-    },
-    "openai": {
-      "api_key": "",
-      "base_url": "https://api.openai.com/v1",
-      "model": "gpt-4o-mini"
-    },
-    "anthropic": {
-      "api_key": "",
-      "model": "claude-3-5-sonnet-20241022"
-    },
-    "active_preset": "minimax-text",
-    "presets": {
-      "minimax-text": {
-        "label": "MiniMax text API",
-        "type": "openai",
-        "api_key": "",
-        "base_url": "https://api.MiniMax.io/v1",
-        "model": "MiniMax-Text-01",
-        "notes": "Si tu plan MiniMax expone text LLM con endpoint OpenAI-compatible, ajusta base_url y model con los valores reales. Si usas solo Token Plan (video H3.0/Hailuo-2.3), este preset no aplica — usa modo manual."
-      },
-      "azure-openai": {
-        "label": "Azure OpenAI",
-        "type": "openai",
-        "api_key": "",
-        "base_url": "https://TU-RECURSO.openai.azure.com/openai/deployments/TU-DEPLOYMENT",
-        "model": "gpt-4o",
-        "notes": "Reemplaza TU-RECURSO y TU-DEPLOYMENT con tus valores de Azure. Puede requerir api-version como query param."
-      },
-      "ollama-local": {
-        "label": "Ollama local",
-        "type": "openai",
-        "api_key": "ollama",
-        "base_url": "http://localhost:11434/v1",
-        "model": "llama3.2",
-        "notes": "Ejecuta Ollama localmente y sirve en :11434. El endpoint /v1 sigue el formato OpenAI."
-      },
-      "lm-studio": {
-        "label": "LM Studio local",
-        "type": "openai",
-        "api_key": "lm-studio",
-        "base_url": "http://localhost:1234/v1",
-        "model": "loaded-model",
-        "notes": "Inicia el servidor local en LM Studio y ajusta el nombre del modelo."
-      },
-      "mi-servidor": {
-        "label": "Mi servidor custom",
-        "type": "openai",
-        "api_key": "sk-test123",
-        "base_url": "https://mi-api.com/v1",
-        "model": "gpt-4o",
-        "notes": "Para pruebas"
-      }
-    },
-    "temperature": 0.7,
-    "max_tokens": 4000
   },
   "prompts": {
     "research": {

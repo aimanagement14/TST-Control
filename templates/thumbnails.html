@@ -33,7 +33,7 @@
             </select>
         </label>
         <button name="action" value="generate_prompt" class="btn">
-            {% if saved %}Regenerar prompt{% elif llm.key == 'manual' %}Generar prompt{% else %}Generar con {{ llm.target }}{% endif %}
+            {% if saved %}Regenerar prompt{% else %}Generar prompt{% endif %}
         </button>
     </form>
 

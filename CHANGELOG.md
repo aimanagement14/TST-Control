@@ -5,6 +5,67 @@ Todos los cambios relevantes de Todo Sobre Todo se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.0.0] - 2026-09-07
+
+### Breaking
+
+- Esta versión elimina la integración con OpenAI, Anthropic y los
+  presets personalizados. La herramienta es **solo modo manual**:
+  prepara los prompts SYS + USER listos para copiar en cualquier LLM
+  externo (ChatGPT, Claude, Gemini, etc.). Quien necesite la
+  integración con API debe quedarse en 1.x.
+
+### Removed
+
+- Proveedores LLM (`openai`, `anthropic`, `custom`) y todo su cableado
+  HTTP en `services/llm.py`. El módulo se renombra a
+  `services/manual.py` y conserva `call_llm`, `llm_output_is_manual`
+  y `_manual_fallback` (este último ya como helper privado, no como
+  fallback de error).
+- Bloque `llm` de `config.json` (`provider`, `openai`, `anthropic`,
+  `active_preset`, `presets`, `temperature`, `max_tokens`).
+- Ruta `/settings`, blueprint `blueprints/settings.py` y plantilla
+  `templates/settings.html`. La pestaña "Configuración" del nav
+  desaparece: no hay nada que configurar en una build manual.
+- Función `llm_mode()` y constante `PROVIDER_NAMES` en `app.py`:
+  el contexto de plantilla ahora expone una constante `LLM_MODE`
+  con el modo manual único.
+- Toggle del provider en `test_core.py` (los 4 bloques
+  `app.CONFIG["llm"]["provider"] = "manual"` ya no tienen razón de
+  ser).
+
+### Changed
+
+- `app.py`: simplificación de `llm_mode()` → constante `LLM_MODE`.
+  Logs de arranque pasan de "LLM provider: manual" a "Modo: manual
+  (los prompts se copian al LLM externo)".
+- `templates/base.html`: el `mode-chip` pasa de ser un enlace a
+  `/settings` a ser un `<span>` (sin href) que muestra "Modo manual
+  · copias los prompts a tu LLM".
+- Las 6 plantillas por etapa (`research`, `concept`, `scripts`,
+  `scenes`, `metadata`, `thumbnails`) eliminan la rama
+  `{% elif llm.key == 'manual' %}` (siempre verdadera) y simplifican
+  la ternaria del botón a `{% if saved %}Regenerar prompt{% else %}Generar prompt{% endif %}`.
+- `test_core.py` importa `parse_scenes_json`, `parse_prompt_json` y
+  `estimate_duration_seconds` directamente desde `services.parsers`,
+  eliminando los re-exports que `app.py` ya no necesita.
+
+### Added
+
+- ADR `2026-09-07 — Modo manual exclusivo` en `docs/DECISIONS.md`
+  con contexto, decisión, consecuencias y reversibilidad.
+- `config.json:app.version` bumpeado a `2.0.0`. `pyproject.toml`
+  igual.
+
+### Migration
+
+- Quien venía usando la API: debe actualizar manualmente sus prompts
+  copiando los bloques `## [MODO MANUAL]` a su LLM externo. El
+  contrato del output (secciones `## RESUMEN`, `## ÁNGULO`,
+  `## HOOK`, etc.) no cambia: cualquier LLM moderno lo entiende.
+- Quien guardaba API keys en `.env` o `config.json`: ya no se leen.
+  Recomendado retirarlas para evitar secretos huérfanos.
+
 ## [Unreleased]
 
 ### Added
