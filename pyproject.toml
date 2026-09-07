@@ -48,6 +48,10 @@ known-first-party = ["services", "blueprints"]
 
 [tool.ruff.format]
 quote-style = "double"
+# docs/archive/ contiene snapshots historicos (sprints, auditorias
+# archivadas). Ruff 0.16 formatea bloques Python dentro de Markdown
+# por defecto; los archives son reference-only y no deben mutar.
+exclude = ["docs/archive/**"]
 
 # ---------------------------------------------------------------------------
 # mypy — type-check opcional. app.py usa anotaciones pero la base sigue
