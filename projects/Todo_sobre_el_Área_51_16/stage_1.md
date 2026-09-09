@@ -99,14 +99,4 @@ El misterio moderno surgió de una combinación particularmente potente: secreti
 * El elemento 115 existe actualmente y se conoce como moscovio.
 * La existencia del elemento 115 no demuestra las afirmaciones de Lazar sobre propulsión extraterrestre.
 * Las investigaciones oficiales no han encontrado evidencia empírica de programas estadounidenses destinados a recuperar o desarrollar tecnología extraterrestre.
-* Algunos casos UAP permanecen sin resolver debido a la falta de datos suficientes.
-
-FUENTES
-CIA, “Ask Molly: What really went on at Area 51?” CIA: Ask Molly - Area 51
-CIA, “Area 51 and the Accidental Test Flight”. CIA: Area 51 and the Accidental Test Flight
-CIA, “The CIA and the U-2 Program, 1954-1974”. CIA: The U-2 Program, 1954-1974
-National Security Archive, “The Area 51 File: Secret Aircraft and Soviet MiGs”. National Security Archive: The Area 51 File
-U.S. Air Force Historical Research Agency, Nevada Test and Training Range. Air Force Historical Research Agency: Nevada Test and Training Range
-AARO, Historical Record Report, Volume I, 2024. AARO Historical Record Report
-AARO, Historical Record Report, Volume I, sección sobre Roswell.
-Transcripción del programa de Billy Goodman con Bob Lazar, diciembre de 1989, como fuente primaria de sus propias afirmaciones. Transcripción de la entrevista de Bob Lazar de 1989
+* Algunos casos UAP permanecen sin resolver debido a la falta de datos suficientes.
