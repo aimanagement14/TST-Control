@@ -52,3 +52,9 @@ static/uploads/
 # debe contaminar `git status`.
 projects/Verificacion_pipeline_*/
 projects/Verificacion_pipeline_*.zip
+projects/Otro_Nombre_Con_Acentos_*/
+projects/Otro_Nombre_Con_Acentos_*.zip
+
+# Snapshots de la BD y del grafo generados por migraciones y recoveries.
+# Viven en disco mientras se valida la operacion; tras el commit se borran.
+backups/
