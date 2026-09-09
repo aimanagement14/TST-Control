@@ -85,22 +85,40 @@
 <h2 class="mt-3">Hoja de ruta</h2>
 <div class="rundown">
     {% for cell in rail.cells %}
-    <a class="rundown-row{% if cell.done %} is-done{% endif %}{% if rail.next and cell.key == rail.next.key %} is-next{% endif %}"
-       href="{{ cell.url }}">
-        <span class="rundown-num">{{ cell.num }}</span>
-        <span>
-            <span class="rundown-label">{{ cell.label }}</span>
-            <span class="rundown-hint"> — {{ cell.hint }}</span>
-        </span>
-        {% if cell.done %}
-        <span class="chip chip-done">Listo</span>
-        {% elif rail.next and cell.key == rail.next.key %}
-        <span class="chip chip-next">Te toca</span>
-        {% else %}
-        <span class="chip">Pendiente</span>
+    <div class="rundown-group{% if cell.done %} is-done{% endif %}{% if rail.next and cell.key == rail.next.key %} is-next{% endif %}{% if cell.per_video and cell.videos %} is-per-video{% endif %}">
+        <a class="rundown-row{% if cell.done %} is-done{% endif %}{% if rail.next and cell.key == rail.next.key %} is-next{% endif %}"
+           href="{{ cell.url }}">
+            <span class="rundown-num">{{ cell.num }}</span>
+            <span>
+                <span class="rundown-label">{{ cell.label }}</span>
+                <span class="rundown-hint"> — {{ cell.hint }}</span>
+                {% if cell.per_video and cell.videos_total %}
+                <span class="rundown-progress">{{ cell.videos_done }}/{{ cell.videos_total }} videos</span>
+                {% endif %}
+            </span>
+            {% if cell.done %}
+            <span class="chip chip-done">Listo</span>
+            {% elif rail.next and cell.key == rail.next.key %}
+            <span class="chip chip-next">Te toca</span>
+            {% else %}
+            <span class="chip">Pendiente</span>
+            {% endif %}
+            <span class="rundown-arrow">&rarr;</span>
+        </a>
+        {% if cell.per_video and cell.videos %}
+        <ul class="rundown-videos">
+            {% for video in cell.videos %}
+            <li class="rundown-video{% if video.done %} is-done{% endif %}">
+                <a href="{{ video.url }}">
+                    <span class="rundown-video-name">{{ video.name }}</span>
+                    <span class="rundown-video-state">{{ 'Listo' if video.done else 'Pendiente' }}</span>
+                    <span class="rundown-arrow">&rarr;</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
         {% endif %}
-        <span class="rundown-arrow">&rarr;</span>
-    </a>
+    </div>
     {% endfor %}
 </div>
 

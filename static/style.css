@@ -525,6 +525,52 @@ code, .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular
 .rundown-arrow { color: var(--paper-3); font-family: var(--font-mono); }
 .rundown-row:hover .rundown-arrow { color: var(--amber); }
 
+.rundown-group { border-top: 1px solid var(--line-soft); }
+.rundown-group:first-child { border-top: 0; }
+.rundown-group .rundown-row { border-top: 0; }
+.rundown-group.is-done .rundown-row { background: color-mix(in srgb, var(--lock) 8%, transparent); }
+.rundown-progress {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    background: var(--slate-2);
+    color: var(--paper-2);
+}
+.rundown-row.is-done .rundown-progress { background: color-mix(in srgb, var(--lock) 22%, transparent); color: var(--lock); }
+.rundown-videos {
+    list-style: none;
+    margin: 0;
+    padding: 0 18px 12px 58px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: color-mix(in srgb, var(--slate) 60%, var(--slate-2) 40%);
+}
+.rundown-videos:empty { display: none; }
+.rundown-video { border-top: 1px dashed var(--line-soft); }
+.rundown-video:first-child { border-top: 0; }
+.rundown-video > a {
+    display: grid;
+    grid-template-columns: 1fr auto 16px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 6px;
+    color: var(--paper-2);
+    font-size: .88rem;
+}
+.rundown-video > a:hover { color: var(--paper); }
+.rundown-video-name { font-family: var(--font-display); }
+.rundown-video-state { font-family: var(--font-mono); font-size: .74rem; color: var(--paper-3); text-transform: uppercase; letter-spacing: .04em; }
+.rundown-video.is-done .rundown-video-state { color: var(--lock); }
+.rundown-video > a:hover .rundown-arrow { color: var(--amber); }
+
+.rail-cell.is-per-video .rail-state { font-family: var(--font-mono); letter-spacing: .02em; }
+
 /* ===== Disposiciones ===== */
 .work { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .work-aside { position: sticky; top: 96px; display: flex; flex-direction: column; gap: 16px; }

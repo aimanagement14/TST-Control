@@ -387,6 +387,7 @@ def init_db():
                 ),
             )
         _migrate_project_videos(conn)
+        _migrate_qc_per_video(conn)
         _migrate_to_roadmap_model(conn)
         _ensure_roadmap_integrity(conn)
         conn.execute("DROP TABLE IF EXISTS profile_graph_nodes")
@@ -581,6 +582,42 @@ def _migrate_project_videos(conn):
 
 _ROADMAP_MIGRATION = "migrate_to_roadmap_model"
 _VIDEOS_MIGRATION = "migrate_project_videos"
+_QC_PER_VIDEO_MIGRATION = "migrate_qc_per_video"
+
+
+def _migrate_qc_per_video(conn):
+    """Añade el control de calidad por video.
+
+    - ``projects.qc_state``: estado global del QC (``analyzed`` cuando
+      se ha ejecutado el análisis con ``run_qc``; ``skipped`` cuando
+      el usuario lo saltó). Permite distinguir un QC sin evaluar de
+      un QC pasado sin issues.
+    - ``qc_issues.video_id``: enlaza cada issue al video al que
+      afecta. Los issues de proyecto (sin video concreto) quedan con
+      ``NULL``.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM _schema_migrations WHERE name=?",
+        (_QC_PER_VIDEO_MIGRATION,),
+    ).fetchone()
+    if row:
+        return
+    project_cols = _table_columns(conn, "projects")
+    if "qc_state" not in project_cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN qc_state TEXT")
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='qc_issues'"
+    ).fetchone():
+        issue_cols = _table_columns(conn, "qc_issues")
+        if "video_id" not in issue_cols:
+            conn.execute(
+                "ALTER TABLE qc_issues ADD COLUMN video_id INTEGER "
+                "REFERENCES videos(id) ON DELETE CASCADE"
+            )
+    conn.execute(
+        "INSERT OR IGNORE INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_QC_PER_VIDEO_MIGRATION, now_iso()),
+    )
 
 BACKUP_DIR = BASE_DIR / "backups"
 
@@ -2211,9 +2248,19 @@ def recompute_project_status(conn, project_id: int) -> None:
 
 
 def project_stage_status(project):
-    """Devuelve ``{stage_name: True/False}`` con el estado de cada etapa activa del proyecto."""
+    """Devuelve ``{stage_name: True/False}`` con el estado de cada etapa activa del proyecto.
+
+    Las etapas 01 (Investigación) y 02 (Concepto) son de proyecto; las
+    etapas 03-07 (Guiones, Escenas, Metadata, Miniaturas, QC) viven por
+    video: la etapa está hecha sólo cuando **todos** los videos del
+    proyecto la tienen completa. Si el proyecto no tiene filas en la
+    tabla ``videos`` se cae a la lógica legacy basada en respuesta.
+    """
+    from services.stages import video_stage_status
+
     pid = project["id"]
     stages: dict[str, bool] = {}
+    active_stages: set[str] = set()
     with get_db() as conn:
         rows = conn.execute(
             """
@@ -2225,6 +2272,7 @@ def project_stage_status(project):
             (pid,),
         ).fetchall()
     for r in rows:
+        active_stages.add(r["name"])
         stages[r["name"]] = bool((r["response"] or "").strip())
 
     def _has(query: str, params: tuple) -> bool:
@@ -2241,61 +2289,76 @@ def project_stage_status(project):
             "SELECT 1 FROM concept WHERE project_id=? AND angle IS NOT NULL AND angle != ''",
             (pid,),
         )
-    if not stages.get("scripts"):
-        videos = load_project_videos(pid)
-        with get_db() as conn:
-            complete = conn.execute(
-                """
-                SELECT COUNT(DISTINCT COALESCE(v.key, s.type)) AS n
-                FROM scripts s
-                LEFT JOIN videos v ON v.id=s.video_id
-                WHERE s.project_id=? AND (s.body_full IS NOT NULL AND TRIM(s.body_full) != '')
-                """,
-                (pid,),
-            ).fetchone()["n"]
-        stages["scripts"] = bool(videos) and complete == len(videos)
-    if not stages.get("scenes"):
-        videos = load_project_videos(pid)
-        with get_db() as conn:
-            complete = conn.execute(
-                """
-                SELECT COUNT(DISTINCT CASE WHEN sc.id IS NULL THEN 'legacy'
-                                              ELSE COALESCE(v.key, sc.type) END) AS n
-                FROM scenes s
-                LEFT JOIN scripts sc ON sc.id=s.script_id
-                LEFT JOIN videos v ON v.id=sc.video_id
-                WHERE s.project_id=?
-                """,
-                (pid,),
-            ).fetchone()["n"]
-        stages["scenes"] = bool(videos) and complete == len(videos)
-    if not stages.get("metadata"):
-        videos = load_project_videos(pid)
-        with get_db() as conn:
-            complete = conn.execute(
-                """
-                SELECT COUNT(DISTINCT COALESCE(v.key,
-                    CASE WHEN m.platform LIKE '%short%' THEN 'short' ELSE 'long' END)) AS n
-                FROM metadata_records m
-                LEFT JOIN videos v ON v.id=m.video_id
-                WHERE m.project_id=?
-                """,
-                (pid,),
-            ).fetchone()["n"]
-        stages["metadata"] = bool(videos) and complete == len(videos)
-    if not stages.get("thumbnails"):
-        videos = load_project_videos(pid)
-        with get_db() as conn:
-            complete = conn.execute(
-                """
-                SELECT COUNT(DISTINCT COALESCE(v.key, t.script_type)) AS n
-                FROM thumbnail_records t
-                LEFT JOIN videos v ON v.id=t.video_id
-                WHERE t.project_id=? AND t.prompt IS NOT NULL AND TRIM(t.prompt) != ''
-                """,
-                (pid,),
-            ).fetchone()["n"]
-        stages["thumbnails"] = bool(videos) and complete == len(videos)
+
+    videos_state = video_stage_status(pid)
+    has_videos = bool(videos_state)
+    for stage_key in ("scripts", "scenes", "metadata", "thumbnails", "qc"):
+        if stage_key not in active_stages:
+            continue
+        if stages.get(stage_key):
+            continue
+        if has_videos:
+            stages[stage_key] = all(
+                v["stages"][stage_key] for v in videos_state
+            )
+            continue
+        # Fallback legacy: la fila de ``videos`` se siembra más adelante
+        # o el proyecto es sintético; conservar el cálculo histórico.
+        if stage_key == "scripts":
+            videos = load_project_videos(pid)
+            with get_db() as conn:
+                complete = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT COALESCE(v.key, s.type)) AS n
+                    FROM scripts s
+                    LEFT JOIN videos v ON v.id=s.video_id
+                    WHERE s.project_id=? AND (s.body_full IS NOT NULL AND TRIM(s.body_full) != '')
+                    """,
+                    (pid,),
+                ).fetchone()["n"]
+            stages["scripts"] = bool(videos) and complete == len(videos)
+        elif stage_key == "scenes":
+            videos = load_project_videos(pid)
+            with get_db() as conn:
+                complete = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT CASE WHEN sc.id IS NULL THEN 'legacy'
+                                                  ELSE COALESCE(v.key, sc.type) END) AS n
+                    FROM scenes s
+                    LEFT JOIN scripts sc ON sc.id=s.script_id
+                    LEFT JOIN videos v ON v.id=sc.video_id
+                    WHERE s.project_id=?
+                    """,
+                    (pid,),
+                ).fetchone()["n"]
+            stages["scenes"] = bool(videos) and complete == len(videos)
+        elif stage_key == "metadata":
+            videos = load_project_videos(pid)
+            with get_db() as conn:
+                complete = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT COALESCE(v.key,
+                        CASE WHEN m.platform LIKE '%short%' THEN 'short' ELSE 'long' END)) AS n
+                    FROM metadata_records m
+                    LEFT JOIN videos v ON v.id=m.video_id
+                    WHERE m.project_id=?
+                    """,
+                    (pid,),
+                ).fetchone()["n"]
+            stages["metadata"] = bool(videos) and complete == len(videos)
+        elif stage_key == "thumbnails":
+            videos = load_project_videos(pid)
+            with get_db() as conn:
+                complete = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT COALESCE(v.key, t.script_type)) AS n
+                    FROM thumbnail_records t
+                    LEFT JOIN videos v ON v.id=t.video_id
+                    WHERE t.project_id=? AND t.prompt IS NOT NULL AND TRIM(t.prompt) != ''
+                    """,
+                    (pid,),
+                ).fetchone()["n"]
+            stages["thumbnails"] = bool(videos) and complete == len(videos)
     return stages
 
 
@@ -2455,8 +2518,17 @@ def pipeline_view(project, current=None):
     `current` es el ``id`` de la ``project_stage`` activa (no el nombre
     de la página). Las celdas se construyen dinámicamente desde las
     ``roadmap_stages`` activas del perfil del proyecto y enlazan a la
-    ruta genérica ``project_stage``.
+    ruta genérica ``project_stage``. Para etapas per-video (Guiones,
+    Escenas, Metadata, Miniaturas y QC) la celda adjunta
+    ``cell.videos`` con el desglose por video, que es lo que alimenta
+    el contador ``X/Y`` del stepper y la Hoja de ruta expandida.
     """
+    from services.stages import (
+        PER_VIDEO_STAGES,
+        attach_breakdown_urls,
+        stage_breakdown_for,
+    )
+
     stages_dict = dict(project.get("stages") or project_stage_status(project))
     profile_id = project.get("profile_id")
     roadmap = load_roadmap_stages(profile_id)
@@ -2478,6 +2550,9 @@ def pipeline_view(project, current=None):
     for idx, rs in enumerate(roadmap):
         stage_id = ps_index.get(rs["id"])
         label = ROADMAP_STAGE_LABELS.get(rs["name"], rs["name"])
+        is_per_video = rs["name"] in PER_VIDEO_STAGES
+        breakdown = stage_breakdown_for(project["id"], rs["name"]) if is_per_video else []
+        attach_breakdown_urls(project["id"], breakdown)
         cell = {
             "id": stage_id,
             "key": rs["name"],
@@ -2487,6 +2562,10 @@ def pipeline_view(project, current=None):
             "hint": "",
             "done": bool(stages_dict.get(rs["name"])),
             "current": stage_id is not None and stage_id == current,
+            "per_video": is_per_video,
+            "videos": breakdown,
+            "videos_done": sum(1 for v in breakdown if v["done"]),
+            "videos_total": len(breakdown),
             "url": (
                 url_for("project_stage", project_id=project["id"], stage_id=stage_id)
                 if stage_id is not None
@@ -3923,7 +4002,7 @@ def qc(project_id):
             with get_db() as conn:
                 conn.execute("DELETE FROM qc_issues WHERE project_id=?", (project_id,))
                 conn.execute(
-                    "UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+                    "UPDATE projects SET status='ready', qc_state='skipped', updated_at=? WHERE id=?",
                     (now_iso(), project_id),
                 )
             flash("Análisis omitido: el proyecto se ha marcado como listo para exportar", "ok")
@@ -3933,10 +4012,13 @@ def qc(project_id):
         errors = [i for i in issues if i[1] == "error"]
         with get_db() as conn:
             if errors:
-                conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (now_iso(), project_id))
+                conn.execute(
+                    "UPDATE projects SET updated_at=?, qc_state='analyzed' WHERE id=?",
+                    (now_iso(), project_id),
+                )
             else:
                 conn.execute(
-                    "UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+                    "UPDATE projects SET status='ready', qc_state='analyzed', updated_at=? WHERE id=?",
                     (now_iso(), project_id),
                 )
         flash(f"Análisis completado: {len(issues)} avisos", "ok")

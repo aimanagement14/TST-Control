@@ -1414,6 +1414,198 @@ def test_non_empty_response_marks_stage_done(tmp_path):
     print("  ✓ respuesta no vacía marca la etapa como hecha en project_stage_status")
 
 
+# ==========================================================================
+# Tests de estado por video (stepper y Hoja de ruta)
+# ==========================================================================
+
+
+def test_video_stage_status_per_video_breakdown(tmp_path):
+    """``video_stage_status`` devuelve el estado de cada etapa por video."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'P', 'tema', 1, 'research',
+                    '2025-01-01', '2025-01-01')
+        """
+            )
+    app.sync_project_stages_for_project(1)
+    app.ensure_default_project_videos(1)
+    with app.get_db() as conn:
+        long_video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='long'"
+        ).fetchone()
+        long_id = long_video["id"]
+        short_video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='short'"
+        ).fetchone()
+        short_id = short_video["id"]
+        conn.execute(
+            """
+            INSERT INTO scripts (project_id, video_id, type, title, hook, body_full,
+                word_count, updated_at)
+            VALUES (1, ?, 'long', 'T', 'h',
+                'palabra1 palabra2 palabra3', 3, '2025-01-01')
+            """,
+            (long_id,),
+        )
+
+    from services.stages import video_stage_status
+    state = video_stage_status(1)
+    assert [v["key"] for v in state] == ["long", "short"], state
+    long_state = next(v for v in state if v["key"] == "long")
+    short_state = next(v for v in state if v["key"] == "short")
+    assert long_state["stages"]["scripts"] is True
+    assert short_state["stages"]["scripts"] is False
+    assert long_state["stages"]["scenes"] is False
+    assert long_state["stages"]["metadata"] is False
+    assert short_state["id"] == short_id
+    print("  ✓ video_stage_status expone scripts/escenas/metadata/qc por video")
+
+
+def test_project_stage_status_aggregates_per_video(tmp_path):
+    """``project_stage_status`` agrega por video: si uno no está listo, la etapa no lo está."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'P', 'tema', 1, 'research',
+                    '2025-01-01', '2025-01-01')
+        """
+            )
+    app.sync_project_stages_for_project(1)
+    app.ensure_default_project_videos(1)
+    with app.get_db() as conn:
+        long_id = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='long'"
+        ).fetchone()["id"]
+        conn.execute(
+            """
+            INSERT INTO scripts (project_id, video_id, type, title, hook, body_full,
+                word_count, updated_at)
+            VALUES (1, ?, 'long', 'T', 'h',
+                'palabra1 palabra2 palabra3', 3, '2025-01-01')
+            """,
+            (long_id,),
+        )
+
+    project = {"id": 1}
+    status = app.project_stage_status(project)
+    assert status["scripts"] is False, f"short sin guion → scripts False: {status}"
+    assert status["scenes"] is False
+    assert status["metadata"] is False
+    assert status["thumbnails"] is False
+
+    with app.get_db() as conn:
+        short_id = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='short'"
+        ).fetchone()["id"]
+        conn.execute(
+            """
+            INSERT INTO scripts (project_id, video_id, type, title, hook, body_full,
+                word_count, updated_at)
+            VALUES (1, ?, 'short', 'T2', 'h',
+                'palabra1 palabra2 palabra3', 3, '2025-01-01')
+            """,
+            (short_id,),
+        )
+
+    status = app.project_stage_status(project)
+    assert status["scripts"] is True, f"ambos con guion → scripts True: {status}"
+    print("  ✓ project_stage_status agrega etapas per-video (todos los videos)")
+
+
+def test_qc_state_pending_analyzed_skipped(tmp_path):
+    """qc_state distingue pendiente, analizado y saltado para el QC per-video."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'P', 'tema', 1, 'research',
+                    '2025-01-01', '2025-01-01')
+        """
+            )
+    app.sync_project_stages_for_project(1)
+    app.ensure_default_project_videos(1)
+    with app.get_db() as conn:
+        long_id = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='long'"
+        ).fetchone()["id"]
+        short_id = conn.execute(
+            "SELECT id FROM videos WHERE project_id=1 AND key='short'"
+        ).fetchone()["id"]
+
+    from services.stages import video_stage_status
+
+    pending = video_stage_status(1)
+    assert len(pending) == 2
+    assert all(v["stages"]["qc"] is False for v in pending), pending
+
+    with app.get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO qc_issues (project_id, stage, severity, message, field,
+                video_id, created_at)
+            VALUES (1, 'scripts', 'error', 'Falta el guion de Video 5 min', 'long',
+                ?, '2025-01-01')
+            """,
+            (long_id,),
+        )
+        conn.execute(
+            "UPDATE projects SET qc_state='analyzed' WHERE id=1"
+        )
+
+    state = video_stage_status(1)
+    long_state = next(v for v in state if v["key"] == "long")
+    short_state = next(v for v in state if v["key"] == "short")
+    assert long_state["stages"]["qc"] is False, "long con error debe ser False"
+    assert short_state["stages"]["qc"] is True, "short sin error debe ser True"
+
+    with app.get_db() as conn:
+        conn.execute("DELETE FROM qc_issues WHERE project_id=1")
+        conn.execute("UPDATE projects SET qc_state='skipped' WHERE id=1")
+
+    state = video_stage_status(1)
+    assert all(v["stages"]["qc"] is True for v in state), state
+    print("  ✓ QC per-video: pendiente, analizado, saltado")
+
+
+def test_pipeline_view_exposes_per_video_breakdown(tmp_path):
+    """``pipeline_view`` adjunta ``videos`` en cada etapa per-video."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO projects (id, name, topic, profile_id, status,
+                                  created_at, updated_at)
+            VALUES (1, 'P', 'tema', 1, 'research',
+                    '2025-01-01', '2025-01-01')
+        """
+            )
+    app.sync_project_stages_for_project(1)
+    app.ensure_default_project_videos(1)
+
+    client = app.app.test_client()
+    client.get("/projects/1")
+    with app.app.test_request_context():
+        view = app.pipeline_view({"id": 1, "profile_id": 1})
+    scripts_cell = next(c for c in view["cells"] if c["key"] == "scripts")
+    research_cell = next(c for c in view["cells"] if c["key"] == "research")
+    assert scripts_cell["per_video"] is True, scripts_cell
+    assert scripts_cell["videos_total"] == 2, scripts_cell
+    assert scripts_cell["videos_done"] == 0
+    assert all(v["stage_key"] == "scripts" for v in scripts_cell["videos"])
+    assert research_cell["per_video"] is False
+    assert research_cell["videos_total"] == 0
+    print("  ✓ pipeline_view expone desglose per-video en Guiones/Escenas/etc.")
+
+
 def test_update_stage_renames_reorders_activates_deactivates(tmp_path):
     """POST /profiles action=update_stage renombra, reordena, activa y desactiva."""
     _setup_qc_db(tmp_path)
@@ -1800,6 +1992,12 @@ def main():
     _with_tmp("stage_file_stable_id", test_stage_file_uses_stable_roadmap_id)
     _with_tmp("export_uses_stage_files", test_new_project_export_uses_stage_files)
     _with_tmp("legacy_export_keeps_layout", test_legacy_project_export_keeps_legacy_layout)
+
+    print("\n=== TESTS DE ESTADO POR VIDEO ===")
+    _with_tmp("video_stage_status_breakdown", test_video_stage_status_per_video_breakdown)
+    _with_tmp("project_stage_status_per_video", test_project_stage_status_aggregates_per_video)
+    _with_tmp("qc_state_pending_analyzed_skipped", test_qc_state_pending_analyzed_skipped)
+    _with_tmp("pipeline_view_per_video", test_pipeline_view_exposes_per_video_breakdown)
 
     if failures:
         print(f"\n❌ Fallos restantes ({len(failures)}):")

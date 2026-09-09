@@ -3,6 +3,10 @@
 La comprobación recorre todos los videos del proyecto; los dos videos base
 se conservan como referencias compatibles y los videos añadidos heredan
 el mismo flujo de guion, escenas, metadata y miniatura.
+
+Cada issue lleva el ``video_id`` al que afecta (o ``None`` para issues
+de proyecto). La UI del stepper lo usa para reflejar el estado de QC
+por video.
 """
 
 from __future__ import annotations
@@ -12,10 +16,14 @@ import re
 from collections import Counter
 
 
-def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
-    """Ejecuta todos los checks y devuelve la lista de issues."""
+def run_qc(project_id: int) -> list[tuple[str, str, str, str, int | None]]:
+    """Ejecuta todos los checks y devuelve la lista de issues.
+
+    Cada issue es ``(stage, severity, message, field, video_id)``. Los
+    issues de proyecto (sin video concreto) llevan ``video_id=None``.
+    """
     from app import CONFIG, format_timecode, get_db
-    issues: list[tuple[str, str, str, str]] = []
+    issues: list[tuple[str, str, str, str, int | None]] = []
     with get_db() as conn:
         project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
         if not project:
@@ -93,7 +101,7 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
     narration_speed = profile["narration_speed"] if profile and profile["narration_speed"] else 150
 
     if not research or not research["content"]:
-        issues.append(("research", "error", "Falta la investigación", "content"))
+        issues.append(("research", "error", "Falta la investigación", "content", None))
     else:
         sources = json.loads(research["sources"] or "[]")
         if len(sources) < cfg["min_sources"]:
@@ -103,11 +111,12 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     "warning",
                     f"Solo {len(sources)} fuentes (mínimo recomendado: {cfg['min_sources']})",
                     "sources",
+                    None,
                 )
             )
 
     if not concept or not concept["angle"]:
-        issues.append(("concept", "error", "Falta el concepto", "angle"))
+        issues.append(("concept", "error", "Falta el concepto", "angle", None))
 
     scripts_by_video: dict[int | None, dict] = {}
     for script in scripts:
@@ -118,7 +127,7 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
         prompt_type = video["script_type"]
         if not selected_script:
             label = video["name"] or video["key"]
-            issues.append(("scripts", "info", f"Falta el guion de {label}", video["key"]))
+            issues.append(("scripts", "info", f"Falta el guion de {label}", video["key"], video_id))
             continue
         label = "guion long (5 min)" if video["key"] == "long" else "guion short (1 min)" if video["key"] == "short" else video["name"]
         min_words = cfg[f"min_words_{prompt_type}"]
@@ -132,6 +141,7 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     "warning",
                     f"Guion {label} tiene {word_count} palabras (mínimo {min_words})",
                     video["key"],
+                    video_id,
                 )
             )
         elif word_count > max_words:
@@ -141,6 +151,7 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     "warning",
                     f"Guion {label} tiene {word_count} palabras (máximo {max_words})",
                     video["key"],
+                    video_id,
                 )
             )
         estimated = int(word_count / narration_speed * 60) if word_count else 0
@@ -152,10 +163,11 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     f"Duración estimada del guion {label}: {format_timecode(estimated)} "
                     f"(objetivo {format_timecode(target)})",
                     video["key"],
+                    video_id,
                 )
             )
         if not selected_script["hook"]:
-            issues.append(("scripts", "error", f"Guion {label} sin hook definido", "hook"))
+            issues.append(("scripts", "error", f"Guion {label} sin hook definido", "hook", video_id))
         full = selected_script["body_full"] or ""
         words = re.findall(r"\b\w{6,}\b", full.lower())
         counts = Counter(words)
@@ -167,16 +179,17 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                         "warning",
                         f"Palabra repetida {number}× en el guion {label}: «{word}»",
                         video["key"],
+                        video_id,
                     )
                 )
                 break
         if not selected_script["cta"]:
-            issues.append(("scripts", "warning", f"Guion {label} sin CTA", "cta"))
+            issues.append(("scripts", "warning", f"Guion {label} sin CTA", "cta", video_id))
 
         script_scenes = scenes_by_script.get(selected_script["id"], [])
         min_scenes = cfg[f"min_scenes_{prompt_type}"]
         if not script_scenes:
-            issues.append(("scenes", "warning", f"Faltan escenas para {label}", video["key"]))
+            issues.append(("scenes", "warning", f"Faltan escenas para {label}", video["key"], video_id))
         elif len(script_scenes) < min_scenes:
             issues.append(
                 (
@@ -184,13 +197,14 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     "warning",
                     f"Solo {len(script_scenes)} escenas en {label} (mínimo recomendado: {min_scenes})",
                     video["key"],
+                    video_id,
                 )
             )
 
     if scripts and not scenes:
-        issues.append(("scenes", "error", "No hay escenas", "scenes"))
+        issues.append(("scenes", "error", "No hay escenas", "scenes", None))
     if scripts and not metadata:
-        issues.append(("metadata", "info", "No se ha generado metadata", "metadata"))
+        issues.append(("metadata", "info", "No se ha generado metadata", "metadata", None))
 
     if research:
         unverified = json.loads(research["unverified"] or "[]")
@@ -201,23 +215,24 @@ def run_qc(project_id: int) -> list[tuple[str, str, str, str]]:
                     "warning",
                     f"Hay {len(unverified)} afirmaciones que requieren verificación en la investigación",
                     "unverified",
+                    None,
                 )
             )
 
     return issues
 
 
-def save_qc_issues(project_id: int, issues: list[tuple[str, str, str, str]]) -> None:
+def save_qc_issues(project_id: int, issues: list[tuple[str, str, str, str, int | None]]) -> None:
     """Persiste los issues en `qc_issues` (DELETE + INSERT por issue)."""
     from app import get_db, now_iso
 
     with get_db() as conn:
         conn.execute("DELETE FROM qc_issues WHERE project_id=?", (project_id,))
-        for stage, severity, message, field in issues:
+        for stage, severity, message, field, video_id in issues:
             conn.execute(
                 """
-                INSERT INTO qc_issues (project_id, stage, severity, message, field, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO qc_issues (project_id, stage, severity, message, field, video_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-                (project_id, stage, severity, message, field, now_iso()),
+                (project_id, stage, severity, message, field, video_id, now_iso()),
             )

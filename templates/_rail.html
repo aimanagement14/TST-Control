@@ -4,12 +4,18 @@
     <div class="rail-inner">
         <ol class="rail-strip">
             {% for cell in nav.cells %}
-            <li class="rail-cell{% if cell.done %} is-done{% endif %}{% if cell.current %} is-current{% endif %}"
+            <li class="rail-cell{% if cell.done %} is-done{% endif %}{% if cell.current %} is-current{% endif %}{% if cell.per_video %} is-per-video{% endif %}"
                 style="--i: {{ loop.index0 }}">
                 <a href="{{ cell.url }}" {% if cell.current %}aria-current="step"{% endif %}>
                     <span class="rail-num">{{ cell.num }}</span>
                     <span class="rail-label">{{ cell.short or cell.label }}</span>
-                    <span class="rail-state">{{ 'listo' if cell.done else 'pendiente' }}</span>
+                    <span class="rail-state">
+                        {% if cell.per_video and cell.videos_total %}
+                            {{ cell.videos_done }}/{{ cell.videos_total }} {{ 'listo' if cell.done else 'pendiente' }}
+                        {% else %}
+                            {{ 'listo' if cell.done else 'pendiente' }}
+                        {% endif %}
+                    </span>
                 </a>
             </li>
             {% endfor %}
