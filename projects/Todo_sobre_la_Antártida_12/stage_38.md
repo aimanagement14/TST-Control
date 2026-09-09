@@ -1,0 +1,231 @@
+# metadata
+
+**Etapa:** metadata
+
+## Instrucción
+
+# metadata_facebook_long
+
+Eres experto en copywriting para Facebook especializado en videos horizontales de 5 minutos sobre misterio, conspiraciones y temáticas alternativas. En Facebook la descripción es el post completo: prosa continua, sin listas, sin negritas, sin caracteres markdown raros. Tono cercano, párrafos cortos, gancho emocional al principio y llamada a la acción al final.
+
+Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown, sin listas con viñetas, prosa limpia con párrafos cortos separados por una línea en blanco:
+
+## DESCRIPCION
+[400-600 palabras de prosa continua en 4-6 párrafos cortos. Primer párrafo con gancho emocional. Segundo y tercero con el contexto y los datos clave del tema. Cuarto con la pregunta que deja el vídeo. Quinto con la llamada a la acción (comentar, compartir, seguir la página). Sexto opcional con las fuentes mencionadas en el vídeo. Texto limpio, sin **negritas**, sin *cursivas*, sin listas con guiones, sin emojis decorativos. Solo texto plano y párrafos.]
+
+---
+
+# metadata_reels_short
+
+Eres experto en copy para Facebook Reels verticales de 1 minuto sobre misterio y temáticas alternativas. En Reels la descripción es lo que el usuario ve bajo el vídeo: prosa continua, sin negritas, sin listas, sin caracteres markdown. Texto limpio, gancho emocional al principio, contexto al medio y cierre con pregunta o llamada a la acción.
+
+Tema: La Especie Humana Perdida De Asia Que Desapareció Sin Dejar Rastro
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown, sin listas con viñetas, prosa limpia con párrafos cortos separados por una línea en blanco:
+
+## DESCRIPCION
+[120-180 palabras en 2-3 párrafos cortos. Primer párrafo con gancho emocional que funcione también sin audio. Segundo párrafo con el dato clave o la pregunta que plantea el vídeo. Tercer párrafo con la llamada a la acción (comentar, seguir la página, ver el vídeo completo). Texto plano, sin **negritas**, sin *cursivas*, sin guiones decorativos, sin emojis innecesarios.]
+
+## HASHTAGS (5-8)
+#[hashtag1] #[hashtag2] #[hashtag3] ...
+
+## CTA
+[1 frase breve, llamada a comentar o seguir]
+
+---
+
+# metadata_shorts
+
+Eres experto en copy para videos verticales cortos (YouTube Shorts, Instagram Reels, TikTok). Escribes ganchos textuales que se ven sin audio y funcionan con audio.
+
+Tema: se encontró un fossil en nepal después de la tragedia del glaciar
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, tiktok, instagram, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato:
+
+## CAPTION (con gancho textual)
+[3-4 líneas máximo, primera línea = gancho visual]
+
+## HOOK (5 segundos)
+[frase exacta que detiene el scroll]
+
+## HASHTAGS (8-12)
+#[hashtag1] #[hashtag2] ...
+
+## CTA
+[1 frase, llamada a seguir/comentar/compartir]
+
+## TEXTO EN PANTALLA (3 piezas)
+1. [texto corto para superponer al inicio]
+2. [texto en el momento clave]
+3. [texto en el cierre]
+
+---
+
+# metadata_youtube
+
+Eres experto en SEO y copywriting para YouTube especializado en contenido de misterio, conspiraciones y temáticas alternativas. Escribes para que el video se encuentre, se clique y se retenga.
+
+Tema: se encontró un fossil en nepal después de la tragedia del glaciar
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, tiktok, instagram, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato:
+
+## TITULOS (5 opciones)
+1. [título 1, máximo 60 caracteres]
+2. [título 2]
+3. [título 3]
+4. [título 4]
+5. [título 5]
+
+## DESCRIPCIÓN
+[200-300 palabras, con resumen del tema, gancho, palabras clave naturales, y al final fuentes mencionadas]
+
+## CAPÍTULOS
+00:00 [nombre del capítulo]
+01:00 [nombre del capítulo]
+[uno por cada bloque principal del guion]
+
+## TAGS (15)
+[tag1, tag2, ... sin #]
+
+## HASHTAGS (5)
+#[hashtag1] #[hashtag2] ...
+
+## CTA
+[llamada a la acción, 1-2 frases]
+
+---
+
+# metadata_youtube_long
+
+Eres experto en SEO y copywriting para YouTube especializado en videos horizontales de 5 minutos sobre misterio, conspiraciones y temáticas alternativas. Escribes para que el video se encuentre, se clique y se retenga.
+
+Tema: Todo sobre la Antártida, teorias, las conspiraciones, lo oculto, leyendas.
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown extra, solo los encabezados ## listados y su contenido:
+
+## TITULOS (5 opciones)
+1. [título 1, máximo 60 caracteres]
+2. [título 2]
+3. [título 3]
+4. [título 4]
+5. [título 5]
+
+## DESCRIPCION
+[200-300 palabras escritas en prosa continua, sin listas ni negritas. Resumen del tema, gancho natural en el primer párrafo, 2-3 párrafos centrales con datos clave, párrafo final con llamada a la acción y lista de fuentes mencionadas]
+
+## TAGS (15)
+[tag1, tag2, tag3, ... sin numeral, sin #]
+
+## CTA
+[1-2 frases, llamada a suscribirse o ver el siguiente vídeo]
+
+---
+
+# metadata_youtube_short
+
+Eres experto en copy para YouTube Shorts verticales de 1 minuto sobre misterio y temáticas alternativas. Combinas un caption con gancho textual, hashtags y etiquetas para SEO de Shorts.
+
+Tema: La Especie Humana Perdida De Asia Que Desapareció Sin Dejar Rastro
+Título del guion: 
+Hook: 
+Tipo de contenido: Documental de misterio
+Plataformas objetivo: youtube, shorts, facebook
+
+Guion completo:
+
+
+Devuelve en este formato:
+
+Devuelve SIEMPRE en este formato exacto. Sin negritas, sin markdown extra, solo los encabezados ## listados y su contenido:
+
+## TITULOS (3 opciones)
+1. [título 1, máximo 40 caracteres]
+2. [título 2]
+3. [título 3]
+
+## DESCRIPCION
+[2-3 frases cortas en prosa continua, sin negritas, sin listas. Primera frase con gancho textual que funcione también sin audio. Segunda y tercera con el dato clave y la promesa del vídeo.]
+
+## HASHTAGS (8-12)
+#[hashtag1] #[hashtag2] #[hashtag3] ...
+
+## TAGS (10)
+[tag1, tag2, tag3, ... sin numeral, sin #]
+
+## CTA
+[1 frase breve, llamada a suscribirse o ver el vídeo completo]
+
+## Respuesta
+
+# youtube_long
+
+## Títulos
+
+1. La Antártida: Lo Que Oculta Bajo el Hielo
+2. Los Misterios Más Inquietantes de la Antártida
+3. Antártida: Pirámides, Bases Secretas y Leyendas
+4. ¿Qué Hay Bajo el Hielo de la Antártida?
+5. La Antártida y las Teorías que Nadie Puede Probar
+
+## Descripción
+
+¿Qué se esconde realmente bajo casi dos kilómetros de hielo en la Antártida? Este continente extremo ha alimentado durante décadas algunas de las teorías más inquietantes sobre lugares ocultos, expediciones secretas, pirámides, civilizaciones perdidas y visitantes de otros mundos. Pero detrás de las leyendas existen hechos científicos que resultan todavía más sorprendentes.
+Bajo la superficie congelada de la Antártida existen montañas, profundos valles, ríos y cientos de lagos descubiertos mediante radar y estudios geofísicos. El continente contiene cerca del 90% del hielo terrestre y alrededor del 70% del agua dulce del planeta. Además, allí se registró la temperatura más baja jamás medida en la Tierra: -89,2 °C.
+Su aislamiento también ayudó a crear un terreno perfecto para las conspiraciones. La expedición alemana de 1938-1939, las supuestas bases secretas, las imágenes de montañas que parecen pirámides y las historias sobre civilizaciones ocultas se mezclan con datos reales y enormes dosis de especulación. En este documental exploramos qué está confirmado, qué ha sido exagerado y qué preguntas todavía permanecen abiertas.
+Fuentes mencionadas: datos geográficos y climáticos de la Antártida, estudios geofísicos sobre estructuras bajo el hielo, Tratado Antártico, registros históricos de la expedición alemana de 1938-1939 y análisis de las formaciones conocidas como “pirámides”.
+Suscríbete a Todo Sobre Todo y descubre más misterios donde los hechos terminan y comienzan las leyendas.
+
+## Tags
+
+antartida, misterios, de, la, antartida, antartida, misteriosa, secretos, de, la, antartida, conspiraciones, antartida, teorias, antartida, que, hay, bajo, el, hielo, hielo, antartico, bases, secretas, piramides, antartida, civilizaciones, perdidas, expediciones, antartida, misterios, inexplicables, lugares, misteriosos, todo, sobre, todo
+
+## CTA
+
+Suscríbete a Todo Sobre Todo y descubre los misterios que se esconden entre los hechos y las leyendas.
