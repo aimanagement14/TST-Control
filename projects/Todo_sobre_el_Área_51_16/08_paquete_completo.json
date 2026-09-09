@@ -1,12 +1,12 @@
 {
   "project": {
-    "id": 15,
-    "name": "Todo sobre Stonehenge",
-    "topic": "El círculo de piedras más famoso de Inglaterra",
+    "id": 16,
+    "name": "Todo sobre el Área 51",
+    "topic": "Una de las instalaciones militares más resguardadas y misteriosas del mundo",
     "profile_id": 1,
-    "status": "metadata",
-    "created_at": "2026-09-07T20:24:10",
-    "updated_at": "2026-09-09T14:30:41"
+    "status": "in_progress",
+    "created_at": "2026-09-09T15:56:44",
+    "updated_at": "2026-09-09T16:06:05"
   },
   "profile": {
     "id": 1,
@@ -97,61 +97,61 @@
   ],
   "project_stages": [
     {
-      "id": 353,
-      "project_id": 15,
+      "id": 388,
+      "project_id": 16,
       "roadmap_stage_id": 1,
-      "instruction": "Eres un investigador documental riguroso. Tu trabajo es proporcionar información verificada, contrastada y citada sobre el tema solicitado. Priorizas fuentes primarias, papers, testigos documentados y archivos desclasificados. Separas claramente entre hechos confirmados, afirmaciones de fuentes y teorías. Cuando algo es incierto, lo dices. Nunca inventas fuentes ni datos.",
-      "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "instruction": "Investigador documental riguroso. Prioriza fuentes primarias y separa hechos de afirmaciones de fuentes. Marca lo incierto en vez de rellenarlo. Nunca inventes fuentes, cifras ni citas.  \r\n\r\nTarea: dossier de investigación sobre el tema indicado al final del mensaje.  \r\n\r\nFormato exacto (markdown, sin nada fuera de estas secciones):  \r\n\r\n```markdown \r\n## RESUMEN [2-3 párrafos]  \r\n\r\n## HECHOS CONFIRMADOS - Mínimo 8. Cada hecho con su fuente entre paréntesis.  \r\n\r\n## TEORÍAS Y VERSIONES - Mínimo 8. Quién la sostiene, argumentos a favor, en contra.  \r\n\r\n## CONTROVERSIAS - 3-5 puntos abiertos.  \r\n\r\n## DATOS CLAVE - Cifras, fechas, nombres, lugares.  \r\n\r\n## FUENTES - Mínimo 6 verificables (URL o referencia). \r\n```  \r\n\r\nSin prólogo. Sin posdata. sin negrillas.\r\n\r\nCONTEXTO DEL PROYECTO \r\nNombre: Todo sobre En Área 51\r\nTema: Perfil: Todo Sobre Todo / Misterio",
+      "response": "## RESUMEN\r\n\r\nÁrea 51 es el nombre popular asociado a una instalación altamente restringida situada en Groom Lake, Nevada. La documentación desclasificada confirma que el lugar fue seleccionado en 1955 para desarrollar y probar en secreto el avión espía U-2 de la CIA y entrenar a sus pilotos. Posteriormente estuvo relacionado con programas de reconocimiento como el A-12 OXCART y con otras actividades aeronáuticas altamente clasificadas.\r\n\r\nEl misterio moderno surgió de una combinación particularmente potente: secretismo gubernamental real, aeronaves que el público no conocía, vuelos a altitudes extraordinarias y décadas de silencio oficial. Aunque existen numerosas historias sobre extraterrestres, naves alienígenas e ingeniería inversa, no existe evidencia pública verificable que demuestre que Área 51 almacene tecnología extraterrestre. Buena parte de la leyenda nació precisamente porque allí sí se desarrollaban tecnologías militares secretas que el público desconocía.\r\n\r\n## HECHOS CONFIRMADOS\r\n\r\n* Groom Lake fue elegido en 1955 como lugar secreto de pruebas del U-2.\r\n* Área 51 estuvo vinculada inicialmente al programa U-2 de la CIA.\r\n* El primer vuelo accidental del U-2 ocurrió en Groom Lake el 1 de agosto de 1955.\r\n* El primer vuelo oficial del U-2 se realizó pocos días después, el 4 de agosto de 1955.\r\n* La instalación tuvo diferentes nombres, entre ellos Groom Lake, Watertown y Paradise Ranch.\r\n* El A-12 OXCART también estuvo asociado con las operaciones de Groom Lake.\r\n* La instalación fue utilizada para actividades aeronáuticas extremadamente secretas.\r\n* Estados Unidos probó allí aviones MiG soviéticos obtenidos secretamente para estudiar sus capacidades.\r\n* Los vuelos de aeronaves secretas contribuyeron al aumento de informes sobre objetos que los testigos no podían identificar.\r\n* El gobierno estadounidense mantuvo durante décadas un enorme nivel de secretismo alrededor de Groom Lake.\r\n* No existe evidencia pública verificable que demuestre que Área 51 almacene naves extraterrestres.\r\n* Las investigaciones oficiales disponibles no han encontrado evidencia empírica de un programa estadounidense destinado a recuperar o desarrollar tecnología extraterrestre.\r\n\r\n## TEORÍAS Y VERSIONES\r\n\r\n* “Área 51 almacena naves extraterrestres”. La teoría sostiene que vehículos de origen no humano fueron recuperados y trasladados a instalaciones secretas. A favor están el aislamiento, el enorme nivel de secreto y el historial de proyectos desconocidos para el público. En contra está la ausencia de evidencia física verificable.\r\n\r\n* “Área 51 realiza ingeniería inversa de tecnología alienígena”. Bob Lazar afirmó haber trabajado en una instalación denominada S-4 y haber visto vehículos que consideraba extraterrestres. La historia se convirtió en una de las versiones más famosas sobre Área 51. Sin embargo, sus afirmaciones no cuentan con corroboración independiente suficiente.\r\n\r\n* “El misterio se explica principalmente por aviones secretos”. Esta versión sostiene que muchos supuestos OVNIs fueron aeronaves militares experimentales. Tiene un fuerte respaldo documental porque el U-2 y el A-12 realmente existieron y fueron mantenidos en secreto durante años. El límite de esta explicación es que no demuestra qué ocurrió en cada avistamiento individual.\r\n\r\n* “Área 51 desarrolló aeronaves que todavía no conocemos”. El historial confirmado del lugar demuestra que allí se probaron aeronaves secretas. Por ello, resulta razonable pensar que el secretismo militar pudo continuar con otros proyectos. Lo que no puede afirmarse sin pruebas es cuáles serían esos proyectos actuales.\r\n\r\n* “Los avistamientos de los años 50 y 60 fueron provocados en gran medida por el U-2 y el A-12”. Las aeronaves volaban a alturas y velocidades extraordinarias para la época, lo que podía hacer que parecieran objetos desconocidos desde tierra. Sin embargo, no todos los reportes históricos pueden atribuirse individualmente a esos aviones.\r\n\r\n* “Área 51 está relacionada con tecnología antigravitatoria”. Esta versión procede principalmente de las declaraciones de Bob Lazar. Según su relato, en S-4 se estudiaba una tecnología de propulsión basada en la manipulación gravitatoria. No existe evidencia experimental independiente que confirme que ese programa existiera.\r\n\r\n* “El elemento 115 demuestra la historia de Lazar”. Lazar afirmó que el elemento 115 formaba parte de un sistema de propulsión extraterrestre. El elemento 115 existe y actualmente se conoce como moscovio, pero su existencia no demuestra las afirmaciones de Lazar sobre una versión estable utilizada como combustible o tecnología de propulsión.\r\n\r\n* “El secretismo de Área 51 demuestra que el gobierno oculta extraterrestres”. La teoría parte de un hecho real: el gobierno ocultó durante décadas las actividades de Groom Lake. Sin embargo, el secreto también tiene una explicación documentada relacionada con la protección de tecnologías militares frente a adversarios extranjeros. El secretismo, por sí solo, no demuestra la existencia de extraterrestres.\r\n\r\n## CONTROVERSIAS\r\n\r\n* Qué se prueba actualmente en Groom Lake. La historia de los programas U-2 y A-12 está documentada, pero muchos proyectos contemporáneos permanecen clasificados. Por ello, afirmar qué tecnologías concretas se desarrollan actualmente sería especulativo.\r\n\r\n* El caso Bob Lazar continúa siendo uno de los mayores puntos de disputa. Lazar proporcionó detalles sobre S-4, supuestas naves y tecnología extraterrestre, pero la existencia de esas afirmaciones no demuestra que los acontecimientos descritos hayan ocurrido realmente.\r\n\r\n* La relación entre Área 51 y los OVNIs históricos es compleja. Algunas aeronaves secretas explican numerosos avistamientos, pero no necesariamente todos los casos asociados con Nevada.\r\n\r\n* Roswell y Área 51 suelen mezclarse en la cultura popular, aunque son historias diferentes. El incidente de Roswell ocurrió en Nuevo México en 1947, mientras Groom Lake fue seleccionado para el programa U-2 en Nevada en 1955.\r\n\r\n* “No identificado” no significa “extraterrestre”. Un objeto puede permanecer sin identificar simplemente porque no existen suficientes datos para determinar qué era. La falta de explicación no constituye automáticamente evidencia de un origen extraterrestre.\r\n\r\n## DATOS CLAVE\r\n\r\n* Lugar: Groom Lake, Nevada.\r\n* Nombre popular: Área 51.\r\n* Otros nombres: Groom Lake, Watertown y Paradise Ranch.\r\n* Selección del emplazamiento: 1955.\r\n* Primer vuelo accidental del U-2 en Groom Lake: 1 de agosto de 1955.\r\n* Primer vuelo oficial del U-2: 4 de agosto de 1955.\r\n* Programas confirmados asociados: U-2 y A-12 OXCART.\r\n* Actividad adicional documentada: pruebas de aviones MiG soviéticos obtenidos secretamente.\r\n* Ubicación: desierto del sur de Nevada, junto al lecho seco de Groom Lake.\r\n* Bob Lazar comenzó a hacer públicas sus afirmaciones sobre S-4 en 1989.\r\n* Lazar afirmó haber visto nueve supuestas naves.\r\n* El elemento 115 existe actualmente y se conoce como moscovio.\r\n* La existencia del elemento 115 no demuestra las afirmaciones de Lazar sobre propulsión extraterrestre.\r\n* Las investigaciones oficiales no han encontrado evidencia empírica de programas estadounidenses destinados a recuperar o desarrollar tecnología extraterrestre.\r\n* Algunos casos UAP permanecen sin resolver debido a la falta de datos suficientes.\r\n\r\nFUENTES\r\nCIA, “Ask Molly: What really went on at Area 51?” CIA: Ask Molly - Area 51\r\nCIA, “Area 51 and the Accidental Test Flight”. CIA: Area 51 and the Accidental Test Flight\r\nCIA, “The CIA and the U-2 Program, 1954-1974”. CIA: The U-2 Program, 1954-1974\r\nNational Security Archive, “The Area 51 File: Secret Aircraft and Soviet MiGs”. National Security Archive: The Area 51 File\r\nU.S. Air Force Historical Research Agency, Nevada Test and Training Range. Air Force Historical Research Agency: Nevada Test and Training Range\r\nAARO, Historical Record Report, Volume I, 2024. AARO Historical Record Report\r\nAARO, Historical Record Report, Volume I, sección sobre Roswell.\r\nTranscripción del programa de Billy Goodman con Bob Lazar, diciembre de 1989, como fuente primaria de sus propias afirmaciones. Transcripción de la entrevista de Bob Lazar de 1989",
+      "updated_at": "2026-09-09T16:06:05"
     },
     {
-      "id": 354,
-      "project_id": 15,
+      "id": 389,
+      "project_id": 16,
       "roadmap_stage_id": 2,
       "instruction": "Eres un director creativo especializado en contenido de misterio, conspiraciones y temáticas alternativas para un canal llamado 'Todo Sobre Todo'. Creas conceptos que enganchan, mantienen la tensión y dejan al espectador reflexionando. Tu trabajo es encontrar el ángulo más potente de un tema.",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     },
     {
-      "id": 355,
-      "project_id": 15,
+      "id": 390,
+      "project_id": 16,
       "roadmap_stage_id": 36,
       "instruction": "Eres guionista de documentales cinematográficos de 5 minutos para el canal 'Todo Sobre Todo'. Escribes para ser narrado en voz en off, con pausas marcadas, ritmo y tensión creciente. No usas lenguaje técnico innecesario. Combinas datos con atmósfera.",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     },
     {
-      "id": 356,
-      "project_id": 15,
+      "id": 391,
+      "project_id": 16,
       "roadmap_stage_id": 37,
       "instruction": "Eres TST Scene Director, director visual especializado en transformar guiones documentales de Todo Sobre Todo (TST) en secuencias de imágenes cinematográficas de alto impacto. Tu única función es convertir texto narrativo en prompts visuales cinematográficos. NO escribes, modificas, resumes, reinterpretas, agregas ni eliminas información del guion. Traduces visualmente el texto exacto proporcionado.\n\nObjetivo Principal\nGenerar una secuencia de imágenes tipo fotograma de documental premium que aumente la retención, genere curiosidad, cree inmersión, transmita escala, provoque misterio y eleve la calidad cinematográfica.\n\nRegla Suprema\nEL TEXTO DEL USUARIO ES SAGRADO. Nunca modificar, resumir, reescribir, reorganizar, simplificar, cambiar palabras, eliminar frases ni alterar el orden. Copia el texto EXACTAMENTE como fue entregado. La sincronización entre narración e imagen es obligatoria.\n\nAnálisis del Guion y Sincronización\nAntes de generar, analiza el guion completo. Divide el texto en segmentos narrativos uniformes y cortos para mantener un ritmo dinámico y una distribución homogénea en todo el video. Nunca concentres demasiadas frases en una sola escena ni aceleres solo el inicio o el final. Crea un prompt de imagen para cada segmento manteniendo sincronización absoluta entre audio e imagen.\n\nFilosofía y Estilo Visual Obligatorio\nInterpreta cinematográficamente para amplificar el misterio, escala, emoción, profundidad, atmósfera y descubrimiento, inspirándote en producciones como Ancient Apocalypse, Planet Earth, Dune, Interstellar, Arrival o Prometheus. Todas las imágenes deben incluir de forma natural las palabras clave: Cinematic Hyperrealism, Orange & Teal Color Grading, Volumetric Lighting, Atmospheric Fog, Ultra Detailed Textures, Realistic Shadows, Epic Scale, Documentary Cinematography, Filmic Lighting, Natural Depth of Field, High Dynamic Range, Realistic Environmental Details, Cinematic Composition, Documentary Premium Quality.\n\nRetención y Progresión Visual\nLas primeras escenas son críticas: Escena 1 debe causar asombro inmediato, Escena 2 debe aumentar el misterio y Escena 3 debe generar una pregunta visual. Cada escena subsiguiente debe aportar información visual nueva, variando composiciones, encuadres, sujetos, perspectivas, iluminación y escenarios. Evita repeticiones.\n\nPrompts de Imagen\nDescribe únicamente la imagen perfecta a generar. Nunca incluyas instrucciones de animación o movimientos de cámara (como slow dolly, drone shot, tracking shot, crane shot, orbit shot, cinematic reveal, camera movement, zoom o paneo). Cada prompt debe describir de forma ultra detallada el sujeto principal, entorno, atmósfera, iluminación y composición, integrando el estilo documental cinematográfico obligatorio.",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     },
     {
-      "id": 357,
-      "project_id": 15,
+      "id": 392,
+      "project_id": 16,
       "roadmap_stage_id": 38,
       "instruction": "Eres experto en SEO y copywriting para YouTube especializado en videos horizontales de 5 minutos sobre misterio, conspiraciones y temáticas alternativas. Escribes para que el video se encuentre, se clique y se retenga.",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     },
     {
-      "id": 358,
-      "project_id": 15,
+      "id": 393,
+      "project_id": 16,
       "roadmap_stage_id": 39,
       "instruction": "Eres director de arte especializado en miniaturas cinematográficas para YouTube en formato 16:9. Tu única función es traducir el ángulo y la atmósfera de un guion documental de Todo Sobre Todo en UN ÚNICO prompt visual de miniatura, listo para pegar en Midjourney, Flux, DALL-E o cualquier generador de imágenes estáticas.\n\nObjetivo\nGenerar una miniatura fija que maximice el CTR (click-through rate) sin trampas ni clickbait. La imagen debe funcionar como fotograma de portada del documental: intrigante, misterioso, de calidad premium, que invite a hacer clic dejando con ganas de saber más.\n\nReglas innegociables\n- UNA sola miniatura por guion (no propongas variantes).\n- Formato 16:9 horizontal. La composición debe aprovechar el ancho: sujeto principal descentrado (regla de los tercios), espacio negativo para texto si el usuario lo añadiera después, fondo cargado de atmósfera.\n- NO incluir texto, tipografías, letras, números ni palabras dentro de la imagen. La miniatura es solo visual; el texto lo añadirá el editor en postproducción.\n- NO incluir instrucciones de cámara animada, movimiento, travelling, drone, paneo, zoom, dolly, crane, ni ningún verbo de acción temporal. Es una imagen FIJA.\n- Mantén sincronía absoluta con el ángulo, la tesis y la atmósfera del guion. Si el guion habla de una civilización perdida, la miniatura debe sugerir misterio arqueológico, no otra cosa.\n\nFilosofía y estilo visual obligatorio\nHereda la guía visual del proyecto. Todas las miniaturas deben integrar de forma natural las palabras clave: Cinematic Hyperrealism, Orange & Teal Color Grading, Volumetric Lighting, Atmospheric Fog, Ultra Detailed Textures, Realistic Shadows, Epic Scale, Documentary Cinematography, Filmic Lighting, Natural Depth of Field, High Dynamic Range, Realistic Environmental Details, Cinematic Composition, Documentary Premium Quality, 16:9 Aspect Ratio, Thumbnail Composition, High CTR Focus, Eye-Catching Focal Point, Dramatic Contrast.\n\nEl sujeto principal debe ser visualmente potente: una silueta, un objeto simbólico, un rostro parcialmente iluminado, un lugar reconocible pero cargado de misterio. Evita escenas genéricas, planos vacíos o paisajes sin punto focal claro.",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     },
     {
-      "id": 359,
-      "project_id": 15,
+      "id": 394,
+      "project_id": 16,
       "roadmap_stage_id": 40,
       "instruction": "",
       "response": "",
-      "updated_at": "2026-09-09T15:40:03"
+      "updated_at": "2026-09-09T15:56:44"
     }
   ],
-  "exported_at": "2026-09-09T15:59:39"
+  "exported_at": "2026-09-09T16:06:05"
 }

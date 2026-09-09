@@ -1,6 +1,6 @@
-# research
+# Investigacion
 
-**Etapa:** research
+**Etapa:** Investigacion
 
 ## Instrucción
 
