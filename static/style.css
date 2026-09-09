@@ -463,6 +463,29 @@ code, .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular
     color: var(--amber);
 }
 
+.video-manager { margin-top: 28px; }
+.section-head {
+    display: flex; justify-content: space-between; align-items: end; gap: 16px;
+    margin-bottom: 12px;
+}
+.section-head h2 { margin-bottom: 2px; }
+.section-head .lede { font-size: .9rem; }
+.video-list {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;
+}
+.video-card {
+    background: var(--slate);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 16px;
+}
+.video-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.video-card-head h3 { margin: 0; font-size: 1.05rem; }
+.video-links { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.video-links a { font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+.add-video { margin-top: 12px; }
+.add-video form { padding: 14px 0 2px; }
+
 /* ===== Hoja de ruta del proyecto ===== */
 .slate-head {
     display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start;

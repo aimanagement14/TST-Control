@@ -6,11 +6,10 @@
 
 {% set wpm = (profile.narration_speed if profile else 0) or qc_checks.default_wpm %}
 
-{% macro script_section(stype, num, label, lede, script, saved, sys_value, user_value,
-                        is_open, min_words, max_words, graph_url=none) %}
+{% macro script_section(video, script, saved, is_open, min_words, max_words, graph_url=none) %}
 {% set words = (script.word_count if script else 0) or 0 %}
 {% set state = '' if not words else ('is-over' if words > max_words else ('is-warn' if words < min_words else 'is-ok')) %}
-{% set is_short = (stype == 'short') %}
+{% set duration_label = '5 min' if video.script_type == 'long' else '1 min' %}
 {% set section_order = [
     ('hook', 'Hook'),
     ('context', 'Contexto'),
@@ -22,8 +21,8 @@
 <section class="panel">
     <div class="panel-head">
         <div>
-            <p class="eyebrow">Etapa <span class="num">{{ num }}</span></p>
-            <h2>{{ label }}</h2>
+            <p class="eyebrow">Video <span class="num">{{ video.name }}</span></p>
+            <h2>{{ video.name }} <span class="muted small">{{ video.format }}</span></h2>
         </div>
         <p class="spec {{ state }}">
             <span><b>{{ words }}</b> palabras</span>
@@ -32,22 +31,25 @@
         </p>
         <form method="post" class="inline-form">
             <input type="hidden" name="action" value="generate_prompt">
-            <input type="hidden" name="script_type" value="{{ stype }}">
+            <input type="hidden" name="video_id" value="{{ video.id }}">
             <button class="btn btn-sm {% if saved %}btn-ghost{% else %}btn-primary{% endif %}">
                 {% if saved %}Regenerar prompt{% else %}Generar prompt{% endif %}
             </button>
         </form>
     </div>
 
-    <p class="hint">{{ lede }}</p>
+    <p class="hint">Narración en off del video {{ video.name }}{% if duration_label %}, con tensión creciente y cierre claro{% endif %}.</p>
 
-    {% if saved or sys_value %}
+    {% if saved or is_open %}
     <details class="fold" data-prompt {% if is_open %}open{% endif %}>
         <summary>Prompt para el LLM{% if saved %} · guardado{% endif %}</summary>
-        {{ ui.prompt_editor(sys_value, user_value, saved,
-                            hidden={'script_type': stype},
-                            title='Prompt del guion ' ~ ('5 min' if stype == 'long' else '1 min'),
-                            graph_url=graph_url) }}
+        {{ ui.prompt_editor(
+            sys_prompt if is_open else (saved.sys_prompt if saved else ''),
+            user_prompt if is_open else (saved.user_prompt if saved else ''),
+            saved,
+            hidden={'video_id': video.id},
+            title='Prompt del guion ' ~ video.name,
+            graph_url=graph_url) }}
     </details>
     {% endif %}
 
@@ -57,7 +59,7 @@
             <h4 class="title-plain">{{ script.title or 'Guion guardado' }}</h4>
             <span class="chip chip-done">Guardado {{ script.updated_at[11:16] }}</span>
             <button type="button" class="btn btn-sm" data-copy-script
-                    data-script-type="{{ stype }}">
+                    data-script-type="{{ video.id }}">
                 Copiar guion
             </button>
         </div>
@@ -65,7 +67,7 @@
             or script.revelations or script.conclusion or script.cta
             or script.body_full %}
         {% if has_any_section %}
-        <div class="script-preview" id="script-{{ stype }}">
+        <div class="script-preview" id="script-{{ video.id }}">
             {% if script.title %}<h5 class="script-title">{{ script.title }}</h5>{% endif %}
             {% for key, label in section_order %}
                 {% set value = script[key] %}
@@ -79,7 +81,7 @@
             {% if not (script.hook or script.context or script.development
                 or script.revelations or script.conclusion or script.cta)
                 and script.body_full %}
-            <pre class="code">{{ script.body_full }}</pre>
+                <pre class="code">{{ script.body_full }}</pre>
             {% endif %}
         </div>
         {% endif %}
@@ -90,9 +92,9 @@
         <summary>{% if script %}Pegar una versión nueva{% else %}Respuesta del LLM{% endif %}</summary>
         <form method="post">
             <input type="hidden" name="action" value="save">
-            <input type="hidden" name="script_type" value="{{ stype }}">
+            <input type="hidden" name="video_id" value="{{ video.id }}">
             <label class="field">
-                <span class="sr-only">Guion en texto</span>
+                <span class="sr-only">Guion de {{ video.name }}</span>
                 <textarea name="text" rows="12"
                           placeholder="Pega aquí el guion completo, con sus encabezados ## HOOK, ## CONTEXTO…">{% if is_open and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
             </label>
@@ -114,21 +116,26 @@
 
 {% block content %}
 {{ ui.stage_head(project, '03–04', 'Guiones',
-    'La versión documental de 5 minutos y la versión vertical de 1 minuto, las dos desde la misma base.') }}
+    'Cada video tiene su propio guion, escenas, metadata y miniatura.') }}
 
-{{ script_section('long', '03', 'Guion 5 min',
-    'Narración en off con tensión creciente: hook, contexto, bloques, revelaciones y cierre.',
-    long_s, saved_long,
-    sys_prompt if gen_type == 'long' else (saved_long.sys_prompt if saved_long else ''),
-    user_prompt if gen_type == 'long' else (saved_long.user_prompt if saved_long else ''),
-    gen_type == 'long',
-    qc_checks.min_words_long, qc_checks.max_words_long, graph_url) }}
-
-{{ script_section('short', '04', 'Guion 1 min',
-    'Formato vertical: el hook entra en los primeros cinco segundos y el remate deja pensando.',
-    short_s, saved_short,
-    sys_prompt if gen_type == 'short' else (saved_short.sys_prompt if saved_short else ''),
-    user_prompt if gen_type == 'short' else (saved_short.user_prompt if saved_short else ''),
-    gen_type == 'short',
-    qc_checks.min_words_short, qc_checks.max_words_short, graph_url) }}
+{% if not videos %}
+<div class="empty">
+    <h2>Añade el primer video</h2>
+    <p>Desde la vista del proyecto puedes crear y eliminar videos.</p>
+    <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-primary">Ir al proyecto</a>
+</div>
+{% else %}
+{% for video in videos %}
+    {% set script = scripts_by_video.get(video.id) %}
+    {% set saved = profile_prompts.get('script_' ~ video.script_type) %}
+    {% if video.script_type == 'long' %}
+        {% set min_words = qc_checks.min_words_long %}
+        {% set max_words = qc_checks.max_words_long %}
+    {% else %}
+        {% set min_words = qc_checks.min_words_short %}
+        {% set max_words = qc_checks.max_words_short %}
+    {% endif %}
+    {{ script_section(video, script, saved, gen_video_id == video.id, min_words, max_words, graph_url) }}
+{% endfor %}
+{% endif %}
 {% endblock %}

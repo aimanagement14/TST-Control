@@ -6,42 +6,41 @@
 
 {% block content %}
 {{ ui.stage_head(project, '05', 'Escenas',
-    'El guion convertido en secuencia visual. Cada escena tiene que sostenerse por sí sola.') }}
+    'Cada guion se convierte en su propia secuencia visual, lista para rodar.') }}
 
-{% if not scripts %}
+{% if not videos or not scripts_by_video %}
 <div class="empty">
     <h2>Primero hace falta un guion</h2>
-    <p>Las escenas se derivan del texto narrado. Escribe o pega un guion y vuelve aquí.</p>
+    <p>Crea un guion desde la etapa Guiones para poder generar sus escenas.</p>
     <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-primary">Ir a guiones</a>
 </div>
 {% else %}
 
-{% set ns = namespace(active_script=none) %}
-{% for s in scripts %}
-    {% if active_script_id and s.id == active_script_id %}{% set ns.active_script = s %}{% endif %}
+{% set ns = namespace(active_video=none) %}
+{% for video in videos %}
+    {% if active_video_id and video.id == active_video_id %}{% set ns.active_video = video %}{% endif %}
 {% endfor %}
-{% if gen_script_id %}
-    {% for s in scripts %}
-        {% if s.id|string == gen_script_id|string %}{% set ns.active_script = s %}{% endif %}
+{% if not ns.active_video %}
+    {% for video in videos %}
+        {% if not ns.active_video and video.id in scripts_by_video %}{% set ns.active_video = video %}{% endif %}
     {% endfor %}
 {% endif %}
-{% if not ns.active_script %}
-    {% for s in scripts %}
-        {% if not ns.active_script and s.type == 'long' %}{% set ns.active_script = s %}{% endif %}
+{% if not ns.active_video %}
+    {% for video in videos %}
+        {% if not ns.active_video %}{% set ns.active_video = video %}{% endif %}
     {% endfor %}
 {% endif %}
-{% if not ns.active_script %}{% set ns.active_script = scripts|first %}{% endif %}
-{% set active_script = ns.active_script %}
-
+{% set active_video = ns.active_video %}
+{% set active_script = scripts_by_video.get(active_video.id) %}
 {% set total_seconds = scenes|sum(attribute='duration_seconds') %}
-{% set min_recomendado = qc_checks.min_scenes_long if active_script and active_script.type == 'long' else qc_checks.min_scenes_short %}
+{% set min_recomendado = qc_checks.min_scenes_long if active_video.script_type == 'long' else qc_checks.min_scenes_short %}
 
-<nav class="tabs" aria-label="Cambiar de guion">
-    {% for s in scripts %}
-    <a class="tab {% if active_script and s.id == active_script.id %}active{% endif %}"
-       href="{{ url_for('scenes', project_id=project.id, script_id=s.id) }}">
-        {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
-        <span class="tab-meta">{{ s.word_count }} palabras</span>
+<nav class="tabs" aria-label="Cambiar de video">
+    {% for video in videos %}
+    <a class="tab {% if video.id == active_video.id %}active{% endif %}"
+       href="{{ url_for('scenes', project_id=project.id, video_id=video.id) }}">
+        {{ video.name }}
+        <span class="tab-meta">{{ video.format }} · {{ scripts_by_video.get(video.id).word_count if scripts_by_video.get(video.id) else 0 }} palabras</span>
     </a>
     {% endfor %}
 </nav>
@@ -55,12 +54,11 @@
             </div>
             <div class="field-row">
                 <label class="field">
-                    <span class="label">Guion de referencia</span>
-                    <select name="script_id">
-                        {% for s in scripts %}
-                        <option value="{{ s.id }}" {% if active_script and s.id == active_script.id %}selected{% endif %}>
-                            {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
-                            — {{ s.title or 'sin título' }} ({{ s.word_count }} palabras)
+                    <span class="label">Video de referencia</span>
+                    <select name="video_id">
+                        {% for video in videos %}
+                        <option value="{{ video.id }}" {% if video.id == active_video.id %}selected{% endif %}>
+                            {{ video.name }} — {{ video.format }}
                         </option>
                         {% endfor %}
                     </select>
@@ -75,19 +73,19 @@
         {{ ui.prompt_editor(
             sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
             user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
-            saved_prompt, graph_url=graph_url) }}
+            saved_prompt,
+            hidden={'video_id': active_video.id},
+            graph_url=graph_url) }}
         {% endif %}
 
         <div class="panel">
             <div class="panel-head">
                 <h3>Respuesta del LLM</h3>
-                {% if active_script %}
-                <span class="chip chip-info">Basado en {% if active_script.type == 'long' %}guion 5 min{% else %}guion 1 min{% endif %}: {{ active_script.title or 'sin título' }}</span>
-                {% endif %}
+                <span class="chip chip-info">Basado en {{ active_video.name }}: {{ active_script.title or 'sin título' }}</span>
             </div>
             <form method="post">
                 <input type="hidden" name="action" value="save">
-                <input type="hidden" name="script_id" value="{{ active_script.id if active_script }}">
+                <input type="hidden" name="video_id" value="{{ active_video.id }}">
                 <label class="field">
                     <span class="sr-only">Escenas en JSON</span>
                     <textarea name="text" rows="18"
@@ -102,7 +100,7 @@ IMAGEN: …'>{% if not is_manual_output(generated) %}{{ generated or '' }}{% end
                 <p class="hint">
                     Se esperan bloques <code>ESCENA N</code> con <code>TEXTO AUDIO</code> e <code>IMAGEN</code>
                     (formato TST). La duración se estima automáticamente a partir del texto narrado.
-                    Al guardar se reemplazan solo las escenas del guion activo.
+                    Al guardar se reemplazan solo las escenas del video activo.
                 </p>
                 <div class="actions">
                     <button type="submit" class="btn btn-primary">Guardar escenas</button>
@@ -113,7 +111,7 @@ IMAGEN: …'>{% if not is_manual_output(generated) %}{{ generated or '' }}{% end
 
     <aside class="work-aside">
         <div class="panel">
-            <h4>Secuencia · {% if active_script and active_script.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}</h4>
+            <h4>Secuencia · {{ active_video.name }}</h4>
             <ul class="data-list mt-1">
                 <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
                 <li><span>Duración sumada</span><b>{{ timecode(total_seconds) }}</b></li>
@@ -122,11 +120,7 @@ IMAGEN: …'>{% if not is_manual_output(generated) %}{{ generated or '' }}{% end
             {% if scenes and scenes|length < min_recomendado %}
             <p class="hint mt-2">
                 <span class="chip chip-next">Pocas escenas</span>
-                {% if active_script and active_script.type == 'long' %}
-                Un guion de 5 minutos suele necesitar {{ min_recomendado }} o más.
-                {% else %}
-                Un guion de 1 minuto suele necesitar {{ min_recomendado }} o más.
-                {% endif %}
+                Un video de {{ active_video.format }} suele necesitar {{ min_recomendado }} o más.
             </p>
             {% endif %}
         </div>
@@ -135,18 +129,19 @@ IMAGEN: …'>{% if not is_manual_output(generated) %}{{ generated or '' }}{% end
         <div class="panel">
             <h4>Escenas guardadas</h4>
             <ul class="scene-list mt-1">
-                {% for s in scenes %}
+                {% for scene in scenes %}
                 <li>
-                    <span class="num">{{ '%02d'|format(s.scene_number) }}</span>
+                    <span class="num">{{ '%02d'|format(scene.scene_number) }}</span>
                     <span>
-                        <span class="mono small">{{ s.duration_seconds }}s · TST</span>
-                        <p class="mt-1"><b>Audio:</b> {{ s.narration[:80] }}{% if s.narration|length > 80 %}…{% endif %}</p>
-                        <p class="mt-1"><b>Imagen:</b> {{ s.visual_description[:120] }}{% if s.visual_description|length > 120 %}…{% endif %}</p>
+                        <span class="mono small">{{ scene.duration_seconds }}s · TST</span>
+                        <p class="mt-1"><b>Audio:</b> {{ scene.narration[:80] }}{% if scene.narration|length > 80 %}…{% endif %}</p>
+                        <p class="mt-1"><b>Imagen:</b> {{ scene.visual_description[:120] }}{% if scene.visual_description|length > 120 %}…{% endif %}</p>
                     </span>
-                    <form method="post" onsubmit="return confirm('Se elimina la escena {{ s.scene_number }}.')">
+                    <form method="post" onsubmit="return confirm('Se elimina la escena {{ scene.scene_number }}.')">
                         <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="scene_id" value="{{ s.id }}">
-                        <button class="btn btn-danger btn-sm" aria-label="Eliminar escena {{ s.scene_number }}">&times;</button>
+                        <input type="hidden" name="video_id" value="{{ active_video.id }}">
+                        <input type="hidden" name="scene_id" value="{{ scene.id }}">
+                        <button class="btn btn-danger btn-sm" aria-label="Eliminar escena {{ scene.scene_number }}">&times;</button>
                     </form>
                 </li>
                 {% endfor %}

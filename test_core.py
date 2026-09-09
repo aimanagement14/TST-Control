@@ -817,6 +817,163 @@ def test_delete_project_removes_folder(tmp_path):
         app.PROJECTS_DIR = original
 
 
+def test_project_video_lifecycle(tmp_path):
+    """Los videos se pueden añadir, usar y quitar con sus datos asociados."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, topic, status, created_at, updated_at)
+                VALUES (1, 'Videos Test', 'Tema', 'research', '2025-01-01', '2025-01-01')
+                """
+            )
+        app.ensure_default_project_videos(1)
+        client = app.app.test_client()
+        page = client.get("/projects/1")
+        assert page.status_code == 200
+        assert "Videos del proyecto" in page.data.decode("utf-8")
+        assert "Añadir video" in page.data.decode("utf-8")
+
+        response = client.post(
+            "/projects/1/videos",
+            data={"action": "add", "name": "Video extra", "script_type": "short"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        with app.get_db() as conn:
+            video = conn.execute(
+                "SELECT * FROM videos WHERE project_id=1 AND name='Video extra'"
+            ).fetchone()
+            assert video is not None
+            video_id = video["id"]
+
+        response = client.post(
+            "/projects/1/scripts",
+            data={
+                "action": "save",
+                "video_id": str(video_id),
+                "text": "## TITULO\nExtra\n\n## HOOK\nGancho\n\n## CTA\nSuscríbete",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        scripts_page = client.get(f"/projects/1/scripts?video_id={video_id}")
+        assert scripts_page.status_code == 200
+        assert "Video extra" in scripts_page.data.decode("utf-8")
+        with app.get_db() as conn:
+            script = conn.execute(
+                "SELECT * FROM scripts WHERE video_id=?", (video_id,)
+            ).fetchone()
+            assert script is not None
+            script_id = script["id"]
+
+        response = client.post(
+            "/projects/1/scenes",
+            data={
+                "action": "save",
+                "video_id": str(video_id),
+                "text": "ESCENA 1\nTEXTO AUDIO: Extra\nIMAGEN: Imagen extra",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        scenes_page = client.get(f"/projects/1/scenes?video_id={video_id}")
+        assert scenes_page.status_code == 200
+        assert "Video extra" in scenes_page.data.decode("utf-8")
+        response = client.post(
+            "/projects/1/metadata",
+            data={
+                "action": "save",
+                "video_id": str(video_id),
+                "platform": "youtube_short",
+                "script_id": str(script_id),
+                "text": "## TITULOS\n1. Extra\n\n## DESCRIPCION\nDescripción extra",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        response = client.post(
+            "/projects/1/thumbnails",
+            data={
+                "action": "save",
+                "video_id": str(video_id),
+                "script_id": str(script_id),
+                "text": "## MINIATURA\nPrompt extra",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        metadata_page = client.get(f"/projects/1/metadata?video_id={video_id}")
+        assert metadata_page.status_code == 200
+        assert "Video extra" in metadata_page.data.decode("utf-8")
+        thumbnails_page = client.get(f"/projects/1/thumbnails?video_id={video_id}")
+        assert thumbnails_page.status_code == 200
+        assert "Video extra" in thumbnails_page.data.decode("utf-8")
+        with app.get_db() as conn:
+            assert conn.execute(
+                "SELECT COUNT(*) AS n FROM scenes WHERE script_id=?", (script_id,)
+            ).fetchone()["n"] == 1
+            assert conn.execute(
+                "SELECT COUNT(*) AS n FROM metadata_records WHERE video_id=?",
+                (video_id,),
+            ).fetchone()["n"] == 1
+            assert conn.execute(
+                "SELECT COUNT(*) AS n FROM thumbnail_records WHERE video_id=?",
+                (video_id,),
+            ).fetchone()["n"] == 1
+
+        response = client.post(
+            "/projects/1/videos",
+            data={"action": "delete", "video_id": str(video_id)},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        page = client.get("/projects/1")
+        assert page.status_code == 200
+        with app.get_db() as conn:
+            assert conn.execute(
+                "SELECT COUNT(*) AS n FROM videos WHERE id=?", (video_id,)
+            ).fetchone()["n"] == 0
+            long_video = conn.execute(
+                "SELECT id FROM videos WHERE project_id=1 AND key='long'"
+            ).fetchone()
+        response = client.post(
+            "/projects/1/videos",
+            data={"action": "delete", "video_id": str(long_video["id"])},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        with app.get_db() as conn:
+            short_video = conn.execute(
+                "SELECT id FROM videos WHERE project_id=1 AND key='short'"
+            ).fetchone()
+        response = client.post(
+            "/projects/1/videos",
+            data={"action": "delete", "video_id": str(short_video["id"])},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        page = client.get("/projects/1")
+        assert "Añadir video" in page.data.decode("utf-8")
+        app.init_db()
+        with app.get_db() as conn:
+            assert conn.execute(
+                "SELECT COUNT(*) AS n FROM videos WHERE key='long' AND project_id=1"
+            ).fetchone()["n"] == 0
+            assert conn.execute("SELECT COUNT(*) AS n FROM videos WHERE id=?", (video_id,)).fetchone()["n"] == 0
+            assert conn.execute("SELECT COUNT(*) AS n FROM scripts WHERE video_id=?", (video_id,)).fetchone()["n"] == 0
+            assert conn.execute("SELECT COUNT(*) AS n FROM metadata_records WHERE video_id=?", (video_id,)).fetchone()["n"] == 0
+            assert conn.execute("SELECT COUNT(*) AS n FROM thumbnail_records WHERE video_id=?", (video_id,)).fetchone()["n"] == 0
+        print("  ✓ ciclo de vida de videos del proyecto")
+    finally:
+        app.PROJECTS_DIR = original
+
+
 # ==========================================================================
 # Tests de prompts por perfil (graph foundation)
 # ==========================================================================
@@ -1611,6 +1768,7 @@ def main():
     _with_tmp("export_get_renders_folder", test_export_get_renders_folder)
     _with_tmp("export_resync_action", test_export_resync_action)
     _with_tmp("delete_project_removes_folder", test_delete_project_removes_folder)
+    _with_tmp("project_video_lifecycle", test_project_video_lifecycle)
 
     print("\n=== TESTS DE PROMPTS POR PERFIL ===")
     _with_tmp(

@@ -52,6 +52,7 @@
             <ul class="data-list mt-1">
                 <li><span>Investigación</span><b>{% if has_research %}lista{% else %}falta{% endif %}</b></li>
                 <li><span>Concepto</span><b>{% if has_concept %}listo{% else %}falta{% endif %}</b></li>
+                <li><span>Videos</span><b>{{ videos|length }}</b></li>
                 <li><span>Guiones</span><b>{{ scripts|length }}</b></li>
                 <li><span>Escenas</span><b>{{ scenes|length }}</b></li>
                 <li><span>Plataformas</span><b>{{ metadata|length }}</b></li>

@@ -27,6 +27,61 @@
     </div>
 </section>
 
+<section class="video-manager">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">Paquete de producción</p>
+            <h2>Videos del proyecto</h2>
+            <p class="lede">Añade o quita videos; cada uno conserva su guion, escenas, metadata y miniatura.</p>
+        </div>
+        <span class="chip chip-info">{{ videos|length }} video{% if videos|length != 1 %}s{% endif %}</span>
+    </div>
+    <div class="video-list">
+        {% for video in videos %}
+        <article class="video-card">
+            <div class="video-card-head">
+                <div>
+                    <h3>{{ video.name }}</h3>
+                    <p class="small muted">{{ video.format }} · {{ 'horizontal' if video.script_type == 'long' else 'vertical' }}</p>
+                </div>
+                <span class="chip {% if video.key in ('long', 'short') %}chip-info{% else %}chip-next{% endif %}">
+                    {{ 'Base' if video.key in ('long', 'short') else 'Personalizado' }}
+                </span>
+            </div>
+            <div class="video-links">
+                <a href="{{ url_for('scripts', project_id=project.id, video_id=video.id) }}">Guion</a>
+                <a href="{{ url_for('scenes', project_id=project.id, video_id=video.id) }}">Escenas</a>
+                <a href="{{ url_for('metadata', project_id=project.id, video_id=video.id) }}">Metadata</a>
+                <a href="{{ url_for('thumbnails', project_id=project.id, video_id=video.id) }}">Miniatura</a>
+            </div>
+            <form method="post" action="{{ url_for('manage_project_videos', project_id=project.id) }}"
+                  onsubmit="return confirm('Se eliminarán también el guion, las escenas, la metadata y la miniatura de «{{ video.name }}».')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="video_id" value="{{ video.id }}">
+                <button class="btn btn-danger btn-sm">Quitar video</button>
+            </form>
+        </article>
+        {% endfor %}
+    </div>
+    <details class="add-video fold">
+        <summary><span class="btn-label">+</span> Añadir video</summary>
+        <form method="post" action="{{ url_for('manage_project_videos', project_id=project.id) }}" class="field-row">
+            <label class="field">
+                <span class="label">Nombre</span>
+                <input type="text" name="name" maxlength="80" placeholder="Video 3" required>
+            </label>
+            <label class="field">
+                <span class="label">Formato</span>
+                <select name="script_type">
+                    <option value="short">1 min · vertical</option>
+                    <option value="long">5 min · horizontal</option>
+                </select>
+            </label>
+            <button class="btn btn-primary" name="action" value="add">Añadir</button>
+        </form>
+    </details>
+</section>
+
 <h2 class="mt-3">Hoja de ruta</h2>
 <div class="rundown">
     {% for cell in rail.cells %}

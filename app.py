@@ -131,6 +131,20 @@ CREATE TABLE IF NOT EXISTS projects (
     FOREIGN KEY (profile_id) REFERENCES profiles(id)
 );
 
+CREATE TABLE IF NOT EXISTS videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    script_type TEXT NOT NULL DEFAULT 'short',
+    format TEXT NOT NULL DEFAULT '9:16 vertical',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT,
+    UNIQUE(project_id, key),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS research (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER UNIQUE,
@@ -160,6 +174,7 @@ CREATE TABLE IF NOT EXISTS concept (
 CREATE TABLE IF NOT EXISTS scripts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER,
+    video_id INTEGER,
     type TEXT,
     title TEXT,
     hook TEXT,
@@ -172,7 +187,8 @@ CREATE TABLE IF NOT EXISTS scripts (
     structure_json TEXT,
     word_count INTEGER DEFAULT 0,
     updated_at TEXT,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS scenes (
@@ -216,6 +232,7 @@ CREATE TABLE IF NOT EXISTS prompts (
 CREATE TABLE IF NOT EXISTS metadata_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER,
+    video_id INTEGER,
     platform TEXT,
     titles TEXT,
     description TEXT,
@@ -227,17 +244,20 @@ CREATE TABLE IF NOT EXISTS metadata_records (
     cta TEXT,
     on_screen_text TEXT,
     updated_at TEXT,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS thumbnail_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER,
+    video_id INTEGER,
     script_type TEXT,
     prompt TEXT,
     updated_at TEXT,
     UNIQUE(project_id, script_type),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS qc_issues (
@@ -366,6 +386,7 @@ def init_db():
                     now,
                 ),
             )
+        _migrate_project_videos(conn)
         _migrate_to_roadmap_model(conn)
         _ensure_roadmap_integrity(conn)
         conn.execute("DROP TABLE IF EXISTS profile_graph_nodes")
@@ -418,11 +439,148 @@ def _migrate_stage_prompts_to_profile_prompts(conn):
     )
 
 
+def _table_columns(conn, table):
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _migrate_project_videos(conn):
+    migration_exists = bool(
+        conn.execute(
+            "SELECT 1 FROM _schema_migrations WHERE name=?", (_VIDEOS_MIGRATION,)
+        ).fetchone()
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS videos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            script_type TEXT NOT NULL DEFAULT 'short',
+            format TEXT NOT NULL DEFAULT '9:16 vertical',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT,
+            UNIQUE(project_id, key),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+    """
+    )
+
+    table_columns = {
+        "scripts": _table_columns(conn, "scripts"),
+        "metadata_records": _table_columns(conn, "metadata_records"),
+        "thumbnail_records": _table_columns(conn, "thumbnail_records"),
+    }
+    if "video_id" not in table_columns["scripts"]:
+        conn.execute("ALTER TABLE scripts ADD COLUMN video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE")
+    if "video_id" not in table_columns["metadata_records"]:
+        conn.execute(
+            "ALTER TABLE metadata_records ADD COLUMN video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE"
+        )
+    if "video_id" not in table_columns["thumbnail_records"]:
+        conn.execute(
+            "ALTER TABLE thumbnail_records ADD COLUMN video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE"
+        )
+
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_metadata_video_platform
+        ON metadata_records(project_id, video_id, platform)
+        WHERE video_id IS NOT NULL
+    """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_thumbnail_video_script_type
+        ON thumbnail_records(project_id, video_id, script_type)
+        WHERE video_id IS NOT NULL
+    """
+    )
+
+    if not migration_exists:
+        project_ids = [
+            row["id"]
+            for row in conn.execute("SELECT id FROM projects ORDER BY id").fetchall()
+        ]
+        defaults = (
+            ("long", "Video 5 min", "long", "16:9 horizontal"),
+            ("short", "Video 1 min", "short", "9:16 vertical"),
+        )
+        for project_id in project_ids:
+            next_order = conn.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM videos WHERE project_id=?",
+                (project_id,),
+            ).fetchone()["n"]
+            for key, name, script_type, video_format in defaults:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO videos
+                        (project_id, key, name, script_type, format, sort_order, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        project_id,
+                        key,
+                        name,
+                        script_type,
+                        video_format,
+                        next_order,
+                        now_iso(),
+                        now_iso(),
+                    ),
+                )
+                next_order += 1
+
+    for script in conn.execute(
+        "SELECT id, project_id, type, video_id FROM scripts WHERE video_id IS NULL"
+    ).fetchall():
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (script["project_id"], script["type"]),
+        ).fetchone()
+        if video:
+            conn.execute("UPDATE scripts SET video_id=? WHERE id=?", (video["id"], script["id"]))
+
+    legacy_metadata_video = {
+        "youtube_long": "long",
+        "facebook_long": "long",
+        "youtube_short": "short",
+        "reels_short": "short",
+    }
+    for record in conn.execute(
+        "SELECT id, project_id, platform, video_id FROM metadata_records WHERE video_id IS NULL"
+    ).fetchall():
+        key = legacy_metadata_video.get(record["platform"])
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (record["project_id"], key),
+        ).fetchone() if key else None
+        if video:
+            conn.execute("UPDATE metadata_records SET video_id=? WHERE id=?", (video["id"], record["id"]))
+
+    for record in conn.execute(
+        "SELECT id, project_id, script_type, video_id FROM thumbnail_records WHERE video_id IS NULL"
+    ).fetchall():
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (record["project_id"], record["script_type"]),
+        ).fetchone()
+        if video:
+            conn.execute("UPDATE thumbnail_records SET video_id=? WHERE id=?", (video["id"], record["id"]))
+
+    conn.execute(
+        "INSERT OR IGNORE INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_VIDEOS_MIGRATION, now_iso()),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Roadmap genérico (migración opt-in desde el esquema por etapa)
 # ---------------------------------------------------------------------------
 
 _ROADMAP_MIGRATION = "migrate_to_roadmap_model"
+_VIDEOS_MIGRATION = "migrate_project_videos"
 
 BACKUP_DIR = BASE_DIR / "backups"
 
@@ -568,8 +726,14 @@ def _build_legacy_response(conn, project: dict, stage_name: str) -> str:
         rows = [
             dict(r)
             for r in conn.execute(
-                "SELECT type, title, hook, context, development, revelations, conclusion, cta, body_full "
-                "FROM scripts WHERE project_id=?",
+                """
+                SELECT s.type, s.title, s.hook, s.context, s.development,
+                       s.revelations, s.conclusion, s.cta, s.body_full,
+                       v.name AS video_name
+                FROM scripts s
+                LEFT JOIN videos v ON v.id=s.video_id
+                WHERE s.project_id=?
+                """,
                 (pid,),
             ).fetchall()
         ]
@@ -577,7 +741,7 @@ def _build_legacy_response(conn, project: dict, stage_name: str) -> str:
             return ""
         parts = ["# Guiones", ""]
         for s in rows:
-            label = "Guion 5 min" if s["type"] == "long" else "Guion 1 min"
+            label = s["video_name"] or ("Guion 5 min" if s["type"] == "long" else "Guion 1 min")
             parts.append(f"## {label}")
             parts.append("")
             if s.get("body_full"):
@@ -1350,8 +1514,16 @@ def _persist_scenes(conn, project_id: int, script_type: str, parsed: list, now: 
     if not parsed:
         return
     target = conn.execute(
-        "SELECT id FROM scripts WHERE project_id=? AND type=?",
-        (project_id, script_type),
+        """
+        SELECT s.id
+        FROM scripts s
+        LEFT JOIN videos v ON v.id=s.video_id
+        WHERE s.project_id=?
+          AND (v.key=? OR (v.id IS NULL AND s.type=?))
+        ORDER BY v.sort_order, s.id
+        LIMIT 1
+        """,
+        (project_id, script_type, script_type),
     ).fetchone()
     sid = target["id"] if target else None
     if sid is None:
@@ -1471,30 +1643,36 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
             )
         elif node_key in ("script_long", "script_short"):
             stype = "long" if node_key == "script_long" else "short"
-            parsed = parse_script(raw, stype)
-            body = parsed["body_full"] or raw
+            script_data = parse_script(raw, stype)
+            body = script_data["body_full"] or raw
             wc = count_words(body)
-            existing = conn.execute(
-                "SELECT id FROM scripts WHERE project_id=? AND type=?",
+            video = conn.execute(
+                "SELECT id FROM videos WHERE project_id=? AND key=?",
                 (project_id, stype),
+            ).fetchone()
+            video_id = video["id"] if video else None
+            existing = conn.execute(
+                "SELECT id FROM scripts WHERE project_id=? AND video_id=?",
+                (project_id, video_id),
             ).fetchone()
             if existing:
                 conn.execute(
                     """
                     UPDATE scripts SET title=?, hook=?, context=?, development=?,
                         revelations=?, conclusion=?, cta=?, body_full=?,
-                        word_count=?, updated_at=? WHERE id=?
+                        word_count=?, video_id=?, updated_at=? WHERE id=?
                 """,
                     (
-                        parsed["title"],
-                        parsed["hook"],
-                        parsed["context"],
-                        parsed["development"],
-                        parsed["revelations"],
-                        parsed["conclusion"],
-                        parsed["cta"],
+                        script_data["title"],
+                        script_data["hook"],
+                        script_data["context"],
+                        script_data["development"],
+                        script_data["revelations"],
+                        script_data["conclusion"],
+                        script_data["cta"],
                         body,
                         wc,
+                        video_id,
                         now,
                         existing["id"],
                     ),
@@ -1502,21 +1680,22 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
             else:
                 conn.execute(
                     """
-                    INSERT INTO scripts (project_id, type, title, hook, context,
+                    INSERT INTO scripts (project_id, video_id, type, title, hook, context,
                         development, revelations, conclusion, cta, body_full,
                         word_count, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         project_id,
+                        video_id,
                         stype,
-                        parsed["title"],
-                        parsed["hook"],
-                        parsed["context"],
-                        parsed["development"],
-                        parsed["revelations"],
-                        parsed["conclusion"],
-                        parsed["cta"],
+                        script_data["title"],
+                        script_data["hook"],
+                        script_data["context"],
+                        script_data["development"],
+                        script_data["revelations"],
+                        script_data["conclusion"],
+                        script_data["cta"],
                         body,
                         wc,
                         now,
@@ -1541,62 +1720,72 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
                 "metadata_facebook_long": "facebook_long",
                 "metadata_reels_short": "reels_short",
             }[node_key]
-            parsed = parse_metadata(raw, platform)
+            metadata_data = parse_metadata(raw, platform)
+            video = conn.execute(
+                "SELECT id FROM videos WHERE project_id=? AND key=?",
+                (project_id, "long" if "long" in platform else "short"),
+            ).fetchone()
+            video_id = video["id"] if video else None
             existing = conn.execute(
-                "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
-                (project_id, platform),
+                "SELECT id FROM metadata_records WHERE project_id=? AND video_id=? AND platform=?",
+                (project_id, video_id, platform),
             ).fetchone()
             fields = (
-                json.dumps(parsed["titles"], ensure_ascii=False),
-                parsed["description"],
-                json.dumps(parsed["chapters"], ensure_ascii=False),
-                json.dumps(parsed["tags"], ensure_ascii=False),
-                json.dumps(parsed["hashtags"], ensure_ascii=False),
-                parsed["caption"],
-                parsed["hook"],
-                parsed["cta"],
-                json.dumps(parsed["on_screen_text"], ensure_ascii=False),
+                json.dumps(metadata_data["titles"], ensure_ascii=False),
+                metadata_data["description"],
+                json.dumps(metadata_data["chapters"], ensure_ascii=False),
+                json.dumps(metadata_data["tags"], ensure_ascii=False),
+                json.dumps(metadata_data["hashtags"], ensure_ascii=False),
+                metadata_data["caption"],
+                metadata_data["hook"],
+                metadata_data["cta"],
+                json.dumps(metadata_data["on_screen_text"], ensure_ascii=False),
             )
             if existing:
                 conn.execute(
                     """
                     UPDATE metadata_records SET titles=?, description=?,
                         chapters=?, tags=?, hashtags=?, caption=?, hook=?, cta=?,
-                        on_screen_text=?, updated_at=? WHERE id=?
+                        on_screen_text=?, video_id=?, updated_at=? WHERE id=?
                 """,
-                    (*fields, now, existing["id"]),
+                    (*fields, video_id, now, existing["id"]),
                 )
             else:
                 conn.execute(
                     """
-                    INSERT INTO metadata_records (project_id, platform, titles,
-                        description, chapters, tags, hashtags, caption, hook,
-                        cta, on_screen_text, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO metadata_records (project_id, video_id, platform,
+                        titles, description, chapters, tags, hashtags, caption,
+                        hook, cta, on_screen_text, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                    (project_id, platform, *fields, now),
+                    (project_id, video_id, platform, *fields, now),
                 )
         elif node_key in ("thumbnail_long", "thumbnail_short"):
             stype = "long" if node_key == "thumbnail_long" else "short"
-            parsed = parse_thumbnail(raw, stype)
-            prompt_text = (parsed.get("prompt") or "").strip() or raw.strip()
-            existing = conn.execute(
-                "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
+            thumbnail_data = parse_thumbnail(raw, stype)
+            prompt_text = (thumbnail_data.get("prompt") or "").strip() or raw.strip()
+            video = conn.execute(
+                "SELECT id FROM videos WHERE project_id=? AND key=?",
                 (project_id, stype),
+            ).fetchone()
+            video_id = video["id"] if video else None
+            existing = conn.execute(
+                "SELECT id FROM thumbnail_records WHERE project_id=? AND video_id=?",
+                (project_id, video_id),
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE thumbnail_records SET prompt=?, updated_at=? WHERE id=?",
-                    (prompt_text, now, existing["id"]),
+                    "UPDATE thumbnail_records SET prompt=?, script_type=?, video_id=?, updated_at=? WHERE id=?",
+                    (prompt_text, stype, video_id, now, existing["id"]),
                 )
             else:
                 conn.execute(
                     """
                     INSERT INTO thumbnail_records
-                        (project_id, script_type, prompt, updated_at)
-                    VALUES (?, ?, ?, ?)
+                        (project_id, video_id, script_type, prompt, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
                 """,
-                    (project_id, stype, prompt_text, now),
+                    (project_id, video_id, stype, prompt_text, now),
                 )
 
 
@@ -1604,8 +1793,16 @@ def _load_first_script(project_id: int, script_type: str) -> dict:
     """Devuelve el primer guion del tipo pedido o un dict vacío con campos clave."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM scripts WHERE project_id=? AND type=? LIMIT 1",
-            (project_id, script_type),
+            """
+            SELECT s.*
+            FROM scripts s
+            LEFT JOIN videos v ON v.id=s.video_id
+            WHERE s.project_id=?
+              AND (v.key=? OR (v.id IS NULL AND s.type=?))
+            ORDER BY v.sort_order, s.id
+            LIMIT 1
+            """,
+            (project_id, script_type, script_type),
         ).fetchone()
         if row:
             return dict(row)
@@ -1954,7 +2151,7 @@ def generate_stage_response(project_id: int, stage_id: int) -> tuple[str, str, s
     label = ROADMAP_STAGE_LABELS.get(current["stage_name"], current["stage_name"])
     user_parts = [
         f"Tema: {project['topic']}",
-        f"Canal: Todo Sobre Todo",
+        "Canal: Todo Sobre Todo",
     ]
     if profile:
         user_parts.append(f"Tipo de contenido: {profile.get('content_type', '') or 'documental'}")
@@ -2045,26 +2242,60 @@ def project_stage_status(project):
             (pid,),
         )
     if not stages.get("scripts"):
-        stages["scripts"] = _has(
-            "SELECT 1 FROM scripts WHERE project_id=?",
-            (pid,),
-        )
+        videos = load_project_videos(pid)
+        with get_db() as conn:
+            complete = conn.execute(
+                """
+                SELECT COUNT(DISTINCT COALESCE(v.key, s.type)) AS n
+                FROM scripts s
+                LEFT JOIN videos v ON v.id=s.video_id
+                WHERE s.project_id=? AND (s.body_full IS NOT NULL AND TRIM(s.body_full) != '')
+                """,
+                (pid,),
+            ).fetchone()["n"]
+        stages["scripts"] = bool(videos) and complete == len(videos)
     if not stages.get("scenes"):
-        stages["scenes"] = _has(
-            "SELECT 1 FROM scenes WHERE project_id=?",
-            (pid,),
-        )
+        videos = load_project_videos(pid)
+        with get_db() as conn:
+            complete = conn.execute(
+                """
+                SELECT COUNT(DISTINCT CASE WHEN sc.id IS NULL THEN 'legacy'
+                                              ELSE COALESCE(v.key, sc.type) END) AS n
+                FROM scenes s
+                LEFT JOIN scripts sc ON sc.id=s.script_id
+                LEFT JOIN videos v ON v.id=sc.video_id
+                WHERE s.project_id=?
+                """,
+                (pid,),
+            ).fetchone()["n"]
+        stages["scenes"] = bool(videos) and complete == len(videos)
     if not stages.get("metadata"):
-        stages["metadata"] = _has(
-            "SELECT 1 FROM metadata_records WHERE project_id=?",
-            (pid,),
-        )
+        videos = load_project_videos(pid)
+        with get_db() as conn:
+            complete = conn.execute(
+                """
+                SELECT COUNT(DISTINCT COALESCE(v.key,
+                    CASE WHEN m.platform LIKE '%short%' THEN 'short' ELSE 'long' END)) AS n
+                FROM metadata_records m
+                LEFT JOIN videos v ON v.id=m.video_id
+                WHERE m.project_id=?
+                """,
+                (pid,),
+            ).fetchone()["n"]
+        stages["metadata"] = bool(videos) and complete == len(videos)
     if not stages.get("thumbnails"):
-        stages["thumbnails"] = _has(
-            "SELECT 1 FROM thumbnail_records WHERE project_id=? "
-            "AND prompt IS NOT NULL AND prompt != ''",
-            (pid,),
-        )
+        videos = load_project_videos(pid)
+        with get_db() as conn:
+            complete = conn.execute(
+                """
+                SELECT COUNT(DISTINCT COALESCE(v.key, t.script_type)) AS n
+                FROM thumbnail_records t
+                LEFT JOIN videos v ON v.id=t.video_id
+                WHERE t.project_id=? AND t.prompt IS NOT NULL AND TRIM(t.prompt) != ''
+                """,
+                (pid,),
+            ).fetchone()["n"]
+        stages["thumbnails"] = bool(videos) and complete == len(videos)
     return stages
 
 
@@ -2182,9 +2413,28 @@ def project_runtime(project, profile=None):
     target = checks["target_duration_long_seconds"]
     with get_db() as conn:
         row = conn.execute(
-            "SELECT word_count FROM scripts WHERE project_id=? AND type='long'",
+            """
+            SELECT s.word_count
+            FROM scripts s
+            LEFT JOIN videos v ON v.id=s.video_id
+            WHERE s.project_id=? AND (v.key='long' OR (v.id IS NULL AND s.type='long'))
+            ORDER BY v.sort_order, s.id
+            LIMIT 1
+            """,
             (project["id"],),
         ).fetchone()
+        if row is None:
+            row = conn.execute(
+                """
+                SELECT s.word_count
+                FROM scripts s
+                LEFT JOIN videos v ON v.id=s.video_id
+                WHERE s.project_id=?
+                ORDER BY v.sort_order, s.id
+                LIMIT 1
+                """,
+                (project["id"],),
+            ).fetchone()
     words = (row["word_count"] if row else 0) or 0
     seconds = int(round(words / wpm * 60)) if words else 0
     return {
@@ -2296,10 +2546,192 @@ def get_or_create_concept(project_id):
         return dict(row) if row else {"project_id": project_id}
 
 
+def _ensure_project_videos(conn, project_id, seed_defaults=False):
+    if not conn.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
+        return []
+    now = now_iso()
+    next_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM videos WHERE project_id=?",
+        (project_id,),
+    ).fetchone()["n"]
+    defaults = (
+        ("long", "Video 5 min", "long", "16:9 horizontal"),
+        ("short", "Video 1 min", "short", "9:16 vertical"),
+    )
+    if seed_defaults:
+        for key, name, script_type, video_format in defaults:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO videos
+                    (project_id, key, name, script_type, format, sort_order, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    project_id,
+                    key,
+                    name,
+                    script_type,
+                    video_format,
+                    next_order,
+                    now,
+                    now,
+                ),
+            )
+            next_order += 1
+    for script in conn.execute(
+        "SELECT id, project_id, type, video_id FROM scripts WHERE project_id=? AND video_id IS NULL",
+        (project_id,),
+    ).fetchall():
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (project_id, script["type"]),
+        ).fetchone()
+        if video:
+            conn.execute("UPDATE scripts SET video_id=? WHERE id=?", (video["id"], script["id"]))
+    metadata_keys = {
+        "youtube_long": "long",
+        "facebook_long": "long",
+        "youtube_short": "short",
+        "reels_short": "short",
+    }
+    for record in conn.execute(
+        "SELECT id, project_id, platform, video_id FROM metadata_records "
+        "WHERE project_id=? AND video_id IS NULL",
+        (project_id,),
+    ).fetchall():
+        key = metadata_keys.get(record["platform"])
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (project_id, key),
+        ).fetchone() if key else None
+        if video:
+            conn.execute("UPDATE metadata_records SET video_id=? WHERE id=?", (video["id"], record["id"]))
+    for record in conn.execute(
+        "SELECT id, project_id, script_type, video_id FROM thumbnail_records "
+        "WHERE project_id=? AND video_id IS NULL",
+        (project_id,),
+    ).fetchall():
+        video = conn.execute(
+            "SELECT id FROM videos WHERE project_id=? AND key=?",
+            (project_id, record["script_type"]),
+        ).fetchone()
+        if video:
+            conn.execute("UPDATE thumbnail_records SET video_id=? WHERE id=?", (video["id"], record["id"]))
+    return load_project_videos(project_id, conn)
+
+
+def ensure_project_videos(project_id):
+    with get_db() as conn:
+        return _ensure_project_videos(conn, project_id, seed_defaults=False)
+
+
+def ensure_default_project_videos(project_id):
+    with get_db() as conn:
+        return _ensure_project_videos(conn, project_id, seed_defaults=True)
+
+
+def load_project_videos(project_id, conn=None):
+    if conn is None:
+        with get_db() as own_conn:
+            return load_project_videos(project_id, own_conn)
+    return [
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM videos WHERE project_id=? ORDER BY sort_order, id",
+            (project_id,),
+        ).fetchall()
+    ]
+
+
+def get_project_video(project_id, video_id, conn=None):
+    if conn is None:
+        with get_db() as own_conn:
+            return get_project_video(project_id, video_id, own_conn)
+    row = conn.execute(
+        "SELECT * FROM videos WHERE project_id=? AND id=?",
+        (project_id, video_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def create_project_video(project_id, name, script_type="short", conn=None):
+    if conn is None:
+        with get_db() as own_conn:
+            return create_project_video(project_id, name, script_type, own_conn)
+    clean_name = (name or "").strip() or "Nuevo video"
+    script_type = script_type if script_type in ("long", "short") else "short"
+    now = now_iso()
+    next_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM videos WHERE project_id=?",
+        (project_id,),
+    ).fetchone()["n"]
+    cursor = conn.execute(
+        """
+        INSERT INTO videos
+            (project_id, key, name, script_type, format, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            project_id,
+            f"video_{next_order + 1}",
+            clean_name,
+            script_type,
+            "16:9 horizontal" if script_type == "long" else "9:16 vertical",
+            next_order,
+            now,
+            now,
+        ),
+    )
+    row = conn.execute("SELECT * FROM videos WHERE id=?", (cursor.lastrowid,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_project_video(project_id, video_id, conn=None):
+    if conn is None:
+        with get_db() as own_conn:
+            return delete_project_video(project_id, video_id, own_conn)
+    cur = conn.execute(
+        "DELETE FROM videos WHERE project_id=? AND id=?",
+        (project_id, video_id),
+    )
+    return cur.rowcount > 0
+
+
+def get_script_for_video(project_id, video_id, conn=None):
+    if conn is None:
+        with get_db() as own_conn:
+            return get_script_for_video(project_id, video_id, own_conn)
+    row = conn.execute(
+        "SELECT * FROM scripts WHERE project_id=? AND video_id=?",
+        (project_id, video_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def script_prompt_type(conn, script):
+    video_id = script.get("video_id")
+    if video_id is not None:
+        video = conn.execute(
+            "SELECT script_type FROM videos WHERE id=?", (video_id,)
+        ).fetchone()
+        if video:
+            return video["script_type"]
+    return script.get("type") if script.get("type") in ("long", "short") else "short"
+
+
 def get_script(project_id, script_type):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM scripts WHERE project_id=? AND type=?", (project_id, script_type)
+            """
+            SELECT s.*
+            FROM scripts s
+            LEFT JOIN videos v ON v.id=s.video_id
+            WHERE s.project_id=?
+              AND (v.key=? OR (v.id IS NULL AND s.type=?))
+            ORDER BY v.sort_order, s.id
+            LIMIT 1
+            """,
+            (project_id, script_type, script_type),
         ).fetchone()
         return dict(row) if row else None
 
@@ -2544,6 +2976,7 @@ def new_project():
             )
             new_id = cur.lastrowid
         assert new_id is not None
+        ensure_default_project_videos(new_id)
         try:
             sync_project_stages_for_project(new_id)
         except Exception:
@@ -2566,11 +2999,59 @@ def view_project(project_id):
             abort(404)
         project = dict(project)
         profile = get_profile(project["profile_id"])
+        videos = load_project_videos(project_id, conn)
     project["stages"] = project_stage_status(project)
     saved_prompts = list_profile_prompts(project["profile_id"])
     return render_template(
-        "project.html", project=project, profile=profile, saved_prompts=saved_prompts
+        "project.html",
+        project=project,
+        profile=profile,
+        saved_prompts=saved_prompts,
+        videos=videos,
     )
+
+
+@app.route("/projects/<int:project_id>/videos", methods=["POST"])
+def manage_project_videos(project_id):
+    with get_db() as conn:
+        project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+        if not project:
+            abort(404)
+        action = request.form.get("action")
+        if action == "add":
+            video = create_project_video(
+                project_id,
+                request.form.get("name", ""),
+                request.form.get("script_type", "short"),
+                conn,
+            )
+            if video:
+                conn.execute(
+                    "UPDATE projects SET updated_at=? WHERE id=?",
+                    (now_iso(), project_id),
+                )
+                flash(f"Video «{video['name']}» añadido", "ok")
+            else:
+                flash("No se pudo añadir el video", "error")
+        elif action == "delete":
+            video_id = request.form.get("video_id")
+            video = get_project_video(project_id, video_id, conn)
+            deleted = delete_project_video(project_id, video_id, conn)
+            if deleted:
+                conn.execute(
+                    "UPDATE projects SET updated_at=? WHERE id=?",
+                    (now_iso(), project_id),
+                )
+                flash(f"Video «{video['name'] if video else ''}» eliminado", "ok")
+            else:
+                flash("No se encontró el video", "error")
+        else:
+            flash("Acción no válida", "error")
+    try:
+        sync_project_folder(project_id)
+    except Exception:
+        log.exception("[sync_project_folder] videos %s", project_id)
+    return redirect(url_for("view_project", project_id=project_id))
 
 
 @app.route("/projects/<int:project_id>/delete", methods=["POST"])
@@ -2838,19 +3319,34 @@ def scripts(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
+        videos = load_project_videos(project_id, conn)
         research_obj = fetch_optional_dict(
             conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
         )
         concept_obj = fetch_optional_dict(
             conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
         )
-        long_s = get_script(project_id, "long")
-        short_s = get_script(project_id, "short")
+        scripts_by_video = {
+            row["video_id"]: dict(row)
+            for row in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND video_id IS NOT NULL",
+                (project_id,),
+            ).fetchall()
+        }
 
     if request.method == "POST":
         action = request.form.get("action")
-        stype = request.form.get("script_type")
-        if action == "generate_prompt" and stype in ("long", "short"):
+        video_id = request.form.get("video_id")
+        video = next((v for v in videos if str(v["id"]) == str(video_id)), None) if video_id else None
+        if video is None:
+            legacy_type = request.form.get("script_type", "long")
+            video = next((v for v in videos if v["key"] == legacy_type), videos[0] if videos else None)
+        if video is None:
+            flash("Selecciona un video", "error")
+            return redirect(url_for("scripts", project_id=project_id))
+        stype = video["script_type"]
+
+        if action == "generate_prompt":
             if not concept_obj or not concept_obj.get("angle"):
                 flash("Necesitas un concepto antes de generar el guion", "error")
                 return redirect(url_for("concept", project_id=project_id))
@@ -2861,79 +3357,76 @@ def scripts(project_id):
                 "scripts.html",
                 project=project,
                 profile=profile,
-                long_s=long_s,
-                short_s=short_s,
+                videos=videos,
+                scripts_by_video=scripts_by_video,
+                profile_prompts=list_profile_prompts(project["profile_id"]),
                 generated=generated,
+                gen_video_id=video["id"],
                 gen_type=stype,
                 sys_prompt=sys_p,
                 user_prompt=user_p,
             )
-        elif action == "save" and stype in ("long", "short"):
+        elif action == "save":
             text = request.form.get("text", "").strip()
             if text:
                 parsed = parse_script(text, stype)
                 wc = count_words(parsed["body_full"] or text)
                 with get_db() as conn:
-                    existing = conn.execute(
-                        "SELECT id FROM scripts WHERE project_id=? AND type=?", (project_id, stype)
-                    ).fetchone()
+                    existing = get_script_for_video(project_id, video["id"], conn)
+                    values = (
+                        parsed["title"],
+                        parsed["hook"],
+                        parsed["context"],
+                        parsed["development"],
+                        parsed["revelations"],
+                        parsed["conclusion"],
+                        parsed["cta"],
+                        parsed["body_full"],
+                        wc,
+                        now_iso(),
+                    )
                     if existing:
                         conn.execute(
                             """
                             UPDATE scripts SET title=?, hook=?, context=?, development=?,
                                 revelations=?, conclusion=?, cta=?, body_full=?,
-                                word_count=?, updated_at=? WHERE id=?
+                                word_count=?, updated_at=?, video_id=? WHERE id=?
                         """,
-                            (
-                                parsed["title"],
-                                parsed["hook"],
-                                parsed["context"],
-                                parsed["development"],
-                                parsed["revelations"],
-                                parsed["conclusion"],
-                                parsed["cta"],
-                                parsed["body_full"],
-                                wc,
-                                now_iso(),
-                                existing["id"],
-                            ),
+                            (*values, video["id"], existing["id"]),
                         )
                     else:
                         conn.execute(
                             """
-                            INSERT INTO scripts (project_id, type, title, hook, context,
+                            INSERT INTO scripts (project_id, video_id, type, title, hook, context,
                                 development, revelations, conclusion, cta, body_full,
                                 word_count, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                             (
                                 project_id,
-                                stype,
-                                parsed["title"],
-                                parsed["hook"],
-                                parsed["context"],
-                                parsed["development"],
-                                parsed["revelations"],
-                                parsed["conclusion"],
-                                parsed["cta"],
-                                parsed["body_full"],
-                                wc,
-                                now_iso(),
+                                video["id"],
+                                video["key"],
+                                *values,
                             ),
                         )
                     conn.execute(
                         "UPDATE projects SET status='scripts', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
                     )
-                flash(f"Guion {stype} guardado", "ok")
+                flash(f"Guion «{video['name']}» guardado", "ok")
             try:
                 sync_project_folder(project_id)
             except Exception:
                 log.exception("[sync_project_folder] scripts %s", project_id)
-            return redirect(url_for("scripts", project_id=project_id))
+            return redirect(url_for("scripts", project_id=project_id, video_id=video["id"]))
 
     return render_template(
-        "scripts.html", project=project, profile=profile, long_s=long_s, short_s=short_s
+        "scripts.html",
+        project=project,
+        profile=profile,
+        videos=videos,
+        scripts_by_video=scripts_by_video,
+        profile_prompts=list_profile_prompts(project["profile_id"]),
     )
 
 
@@ -2945,44 +3438,64 @@ def scenes(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        videos = load_project_videos(project_id, conn)
+        scripts_by_video = {
+            row["video_id"]: dict(row)
+            for row in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND video_id IS NOT NULL",
+                (project_id,),
             ).fetchall()
-        ]
+        }
 
-    def default_script_id():
-        long_s = next((s for s in scripts_rows if s["type"] == "long"), None)
-        return long_s["id"] if long_s else (scripts_rows[0]["id"] if scripts_rows else None)
+    def default_video():
+        for key in ("long", "short"):
+            video = next((v for v in videos if v["key"] == key), None)
+            if video and video["id"] in scripts_by_video:
+                return video
+        video = next((v for v in videos if v["id"] in scripts_by_video), None)
+        return video or (videos[0] if videos else None)
 
-    def fetch_scenes_for(sid):
-        if sid is None:
-            return []
+    raw_video_id = request.values.get("video_id")
+    if not raw_video_id:
+        raw_script_id = request.values.get("script_id")
+        if raw_script_id:
+            matching = next(
+                (s for s in scripts_by_video.values() if str(s["id"]) == str(raw_script_id)),
+                None,
+            )
+            raw_video_id = matching["video_id"] if matching else None
+    active_video = next(
+        (v for v in videos if str(v["id"]) == str(raw_video_id)), None
+    ) or default_video()
+    active_script = scripts_by_video.get(active_video["id"]) if active_video else None
+    active_script_id = active_script["id"] if active_script else None
+    scenes_rows = []
+    if active_script_id is not None:
         with get_db() as conn:
-            return [
-                dict(r)
-                for r in conn.execute(
+            scenes_rows = [
+                dict(row)
+                for row in conn.execute(
                     "SELECT * FROM scenes WHERE project_id=? AND script_id=? ORDER BY scene_number",
-                    (project_id, sid),
+                    (project_id, active_script_id),
                 ).fetchall()
             ]
 
-    raw_script_id = request.values.get("script_id")
-    if raw_script_id and any(str(s["id"]) == str(raw_script_id) for s in scripts_rows):
-        active_script_id = int(raw_script_id)
-    else:
-        active_script_id = default_script_id()
-    scenes_rows = fetch_scenes_for(active_script_id)
-
     if request.method == "POST":
         action = request.form.get("action")
+        video_id = request.form.get("video_id")
+        if not video_id and request.form.get("script_id"):
+            script = next(
+                (s for s in scripts_by_video.values() if str(s["id"]) == str(request.form["script_id"])),
+                None,
+            )
+            video_id = script["video_id"] if script else None
+        video = next((v for v in videos if str(v["id"]) == str(video_id)), None) or active_video
+        script = scripts_by_video.get(video["id"]) if video else None
+        if not video or not script:
+            flash("Selecciona un guion", "error")
+            return redirect(url_for("scenes", project_id=project_id))
+
         if action == "generate_prompt":
-            script_id = request.form.get("script_id") or active_script_id
-            script = next((s for s in scripts_rows if str(s["id"]) == str(script_id)), None)
-            if not script:
-                flash("Selecciona un guion", "error")
-                return redirect(url_for("scenes", project_id=project_id))
             sys_p, user_p = build_scenes_prompt(project, profile, script)
             save_profile_prompt(project["profile_id"], "scenes", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
@@ -2990,50 +3503,50 @@ def scenes(project_id):
                 "scenes.html",
                 project=project,
                 profile=profile,
-                scripts=scripts_rows,
+                videos=videos,
+                scripts_by_video=scripts_by_video,
                 scenes=scenes_rows,
                 generated=generated,
-                gen_script_id=script_id,
+                saved_prompt=list_profile_prompts(project["profile_id"]).get("scenes"),
+                gen_video_id=video["id"],
+                active_video_id=video["id"],
+                active_script_id=script["id"],
                 sys_prompt=sys_p,
                 user_prompt=user_p,
-                active_script_id=script_id,
             )
         elif action == "save":
             text = request.form.get("text", "").strip()
-            script_id = request.form.get("script_id") or active_script_id
-            if text and script_id:
+            if text:
                 parsed = parse_scenes(text)
                 if not parsed:
                     flash(
                         "No se pudo extraer escenas de la respuesta (¿formato TST correcto?)",
                         "error",
                     )
-                    return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
-                # Estimar duración por escena si el LLM no la incluyó.
+                    return redirect(url_for("scenes", project_id=project_id, video_id=video["id"]))
                 wpm = (profile.get("narration_speed") if profile else None) or 150
                 total_words = sum(count_words(sc.get("narration_segment", "")) for sc in parsed)
-                for sc in parsed:
-                    if not sc.get("duration_seconds") and total_words > 0:
-                        w = count_words(sc.get("narration_segment", ""))
-                        sc["duration_seconds"] = max(1, round(w / wpm * 60))
+                for scene in parsed:
+                    if not scene.get("duration_seconds") and total_words > 0:
+                        words = count_words(scene.get("narration_segment", ""))
+                        scene["duration_seconds"] = max(1, round(words / wpm * 60))
                 with get_db() as conn:
                     conn.execute(
                         "DELETE FROM scenes WHERE project_id=? AND script_id=?",
-                        (project_id, script_id),
+                        (project_id, script["id"]),
                     )
-                    for sc in parsed:
+                    for scene in parsed:
                         try:
-                            scene_num = int(sc.get("scene_number", 0))
+                            scene_num = int(scene.get("scene_number", 0))
                         except (TypeError, ValueError) as e:
-                            # expected: scene_number puede no ser numerico.
                             log.debug("scene_number no numerico: %s", e)
                             scene_num = 0
                         try:
-                            dur = int(sc.get("duration_seconds", 0))
+                            duration = int(scene.get("duration_seconds", 0))
                         except (TypeError, ValueError) as e:
                             log.debug("duration_seconds no numerico: %s", e)
-                            dur = 0
-                        image_prompt = sc.get("image_prompt") or sc.get("visual_description") or ""
+                            duration = 0
+                        image_prompt = scene.get("image_prompt") or scene.get("visual_description") or ""
                         conn.execute(
                             """
                             INSERT INTO scenes (project_id, script_id, scene_number,
@@ -3043,13 +3556,13 @@ def scenes(project_id):
                         """,
                             (
                                 project_id,
-                                script_id,
+                                script["id"],
                                 scene_num,
-                                sc.get("narration_segment", ""),
+                                scene.get("narration_segment", ""),
                                 image_prompt,
-                                sc.get("camera_movement", "") or "",
-                                sc.get("transition", "") or "",
-                                dur,
+                                scene.get("camera_movement", "") or "",
+                                scene.get("transition", "") or "",
+                                duration,
                                 now_iso(),
                             ),
                         )
@@ -3057,24 +3570,34 @@ def scenes(project_id):
                         "UPDATE projects SET status='scenes', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
                     )
-                flash(f"Guardadas {len(parsed)} escenas del guion seleccionado", "ok")
+                flash(f"Guardadas {len(parsed)} escenas de {video['name']}", "ok")
             try:
                 sync_project_folder(project_id)
             except Exception:
                 log.exception("[sync_project_folder] scenes %s", project_id)
-            return redirect(url_for("scenes", project_id=project_id, script_id=script_id))
+            return redirect(url_for("scenes", project_id=project_id, video_id=video["id"]))
         elif action == "delete":
             scene_id = request.form.get("scene_id")
             with get_db() as conn:
-                conn.execute("DELETE FROM scenes WHERE id=?", (scene_id,))
-            return redirect(url_for("scenes", project_id=project_id, script_id=active_script_id))
+                conn.execute(
+                    "DELETE FROM scenes WHERE id=? AND project_id=? AND script_id=?",
+                    (scene_id, project_id, script["id"]),
+                )
+            return redirect(url_for("scenes", project_id=project_id, video_id=video["id"]))
 
     return render_template(
         "scenes.html",
         project=project,
         profile=profile,
-        scripts=scripts_rows,
+        videos=videos,
+        scripts_by_video=scripts_by_video,
         scenes=scenes_rows,
+        saved_prompt=list_profile_prompts(project["profile_id"]).get("scenes"),
+        generated="",
+        sys_prompt="",
+        user_prompt="",
+        gen_video_id=None,
+        active_video_id=active_video["id"] if active_video else None,
         active_script_id=active_script_id,
     )
 
@@ -3089,67 +3612,122 @@ def metadata(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        videos = load_project_videos(project_id, conn)
+        scripts_by_video = {
+            row["video_id"]: dict(row)
+            for row in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND video_id IS NOT NULL",
+                (project_id,),
             ).fetchall()
-        ]
+        }
+        scripts_by_id = {
+            script["id"]: script
+            for script in scripts_by_video.values()
+        }
         meta_rows = [
-            dict(r)
-            for r in conn.execute(
+            dict(row)
+            for row in conn.execute(
                 "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
             ).fetchall()
         ]
 
-    meta_by_platform = {m["platform"]: m for m in meta_rows}
+    metadata_platforms = {
+        "long": ("youtube_long", "facebook_long"),
+        "short": ("youtube_short", "reels_short"),
+    }
+    platform_by_video = {
+        video["id"]: metadata_platforms.get(video["script_type"], metadata_platforms["long"])
+        for video in videos
+    }
+    metadata_by_video: dict[int, dict[str, dict]] = {
+        video["id"]: {} for video in videos
+    }
+    for record in meta_rows:
+        video_id = record.get("video_id")
+        if video_id in metadata_by_video:
+            metadata_by_video[video_id][record["platform"]] = record
+            continue
+        for video in videos:
+            if record.get("platform") in platform_by_video[video["id"]]:
+                metadata_by_video[video["id"]][record["platform"]] = record
+                break
+    for platform_map in metadata_by_video.values():
+        for record in platform_map.values():
+            record["titles_list"] = json.loads(record.get("titles") or "[]")
+            record["chapters_list"] = json.loads(record.get("chapters") or "[]")
+            record["tags_list"] = json.loads(record.get("tags") or "[]")
+            record["hashtags_list"] = json.loads(record.get("hashtags") or "[]")
+            record["on_screen_list"] = json.loads(record.get("on_screen_text") or "[]")
 
-    valid_platforms = ("youtube_long", "facebook_long", "youtube_short", "reels_short")
+    saved_prompts = list_profile_prompts(project["profile_id"])
 
     if request.method == "POST":
         action = request.form.get("action")
+        video_id = request.form.get("video_id")
         platform = request.form.get("platform")
-        if action == "generate_prompt" and platform in valid_platforms:
-            script_id = request.form.get("script_id")
-            script = next((s for s in scripts_rows if str(s["id"]) == str(script_id)), None)
+        video = next((v for v in videos if str(v["id"]) == str(video_id)), None)
+        if not video and platform:
+            fallback_key = "long" if "long" in platform else "short" if "short" in platform else None
+            video = next((v for v in videos if v["key"] == fallback_key), None)
+        if not video and platform:
+            fallback_key = "long" if "long" in platform else "short" if "short" in platform else None
+            video = {
+                "id": None,
+                "key": fallback_key or "long",
+                "name": "Video 5 min" if fallback_key == "long" else "Video 1 min",
+                "script_type": fallback_key or "long",
+            }
+        if not video:
+            flash("Selecciona un video", "error")
+            return redirect(url_for("metadata", project_id=project_id))
+        available_platforms = platform_by_video.get(video["id"])
+        if available_platforms is None:
+            available_platforms = platform_by_video.get(video["script_type"], ("youtube_long", "facebook_long"))
+            platform_by_video[video["id"]] = available_platforms
+        if platform not in available_platforms:
+            platform = available_platforms[0]
+        requested_script = request.form.get("script_id")
+        script = (
+            scripts_by_id.get(int(requested_script))
+            if requested_script and requested_script.isdigit()
+            else None
+        ) or scripts_by_video.get(video["id"])
+        if action == "generate_prompt":
             if not script:
                 flash("Selecciona un guion", "error")
-                return redirect(url_for("metadata", project_id=project_id))
+                return redirect(url_for("metadata", project_id=project_id, video_id=video["id"]))
             sys_p, user_p = build_metadata_prompt(project, profile, script, platform)
-            save_profile_prompt(project["profile_id"], f"metadata_{platform}", sys_p, user_p)
+            prompt_key = (
+                f"metadata_{platform}"
+                if video["key"] in ("long", "short")
+                else f"metadata_{platform}_{video['id']}"
+            )
+            save_profile_prompt(project["profile_id"], prompt_key, sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template(
                 "metadata.html",
                 project=project,
                 profile=profile,
-                scripts=scripts_rows,
-                meta_by_platform=meta_by_platform,
+                videos=videos,
+                scripts_by_video=scripts_by_video,
+                metadata_by_video=metadata_by_video,
+                metadata_platforms=platform_by_video,
+                saved_prompts=saved_prompts,
                 generated=generated,
+                gen_video_id=video["id"],
                 gen_platform=platform,
-                gen_script_id=script_id,
+                gen_script_id=script["id"],
                 sys_prompt=sys_p,
                 user_prompt=user_p,
-                saved_yt_long=list_profile_prompts(project["profile_id"]).get(
-                    "metadata_youtube_long"
-                ),
-                saved_fb_long=list_profile_prompts(project["profile_id"]).get(
-                    "metadata_facebook_long"
-                ),
-                saved_yt_short=list_profile_prompts(project["profile_id"]).get(
-                    "metadata_youtube_short"
-                ),
-                saved_reels_short=list_profile_prompts(project["profile_id"]).get(
-                    "metadata_reels_short"
-                ),
             )
-        elif action == "save" and platform in valid_platforms:
+        if action == "save":
             text = request.form.get("text", "").strip()
             if text:
                 parsed = parse_metadata(text, platform)
                 with get_db() as conn:
                     existing = conn.execute(
-                        "SELECT id FROM metadata_records WHERE project_id=? AND platform=?",
-                        (project_id, platform),
+                        "SELECT id FROM metadata_records WHERE project_id=? AND video_id=? AND platform=?",
+                        (project_id, video["id"], platform),
                     ).fetchone()
                     fields = (
                         json.dumps(parsed["titles"], ensure_ascii=False),
@@ -3167,49 +3745,40 @@ def metadata(project_id):
                             """
                             UPDATE metadata_records SET titles=?, description=?,
                                 chapters=?, tags=?, hashtags=?, caption=?, hook=?, cta=?,
-                                on_screen_text=?, updated_at=? WHERE id=?
+                                on_screen_text=?, video_id=?, updated_at=? WHERE id=?
                         """,
-                            (*fields, now_iso(), existing["id"]),
+                            (*fields, video["id"], now_iso(), existing["id"]),
                         )
                     else:
                         conn.execute(
                             """
-                            INSERT INTO metadata_records (project_id, platform, titles,
-                                description, chapters, tags, hashtags, caption, hook,
-                                cta, on_screen_text, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            INSERT INTO metadata_records (project_id, video_id, platform,
+                                titles, description, chapters, tags, hashtags, caption,
+                                hook, cta, on_screen_text, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                            (project_id, platform, *fields, now_iso()),
+                            (project_id, video["id"], platform, *fields, now_iso()),
                         )
                     conn.execute(
                         "UPDATE projects SET status='metadata', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
                     )
-                flash(f"Metadata {platform} guardada", "ok")
+                flash(f"Metadata de {video['name']} guardada", "ok")
             try:
                 sync_project_folder(project_id)
             except Exception:
                 log.exception("[sync_project_folder] metadata %s", project_id)
-            return redirect(url_for("metadata", project_id=project_id))
+            return redirect(url_for("metadata", project_id=project_id, video_id=video["id"]))
 
-    for m in meta_by_platform.values():
-        m["titles_list"] = json.loads(m.get("titles") or "[]")
-        m["chapters_list"] = json.loads(m.get("chapters") or "[]")
-        m["tags_list"] = json.loads(m.get("tags") or "[]")
-        m["hashtags_list"] = json.loads(m.get("hashtags") or "[]")
-        m["on_screen_list"] = json.loads(m.get("on_screen_text") or "[]")
-
-    saved_prompts = list_profile_prompts(project["profile_id"])
     return render_template(
         "metadata.html",
         project=project,
         profile=profile,
-        scripts=scripts_rows,
-        meta_by_platform=meta_by_platform,
-        saved_yt_long=saved_prompts.get("metadata_youtube_long"),
-        saved_fb_long=saved_prompts.get("metadata_facebook_long"),
-        saved_yt_short=saved_prompts.get("metadata_youtube_short"),
-        saved_reels_short=saved_prompts.get("metadata_reels_short"),
+        videos=videos,
+        scripts_by_video=scripts_by_video,
+        metadata_by_video=metadata_by_video,
+        metadata_platforms=platform_by_video,
+        saved_prompts=saved_prompts,
     )
 
 
@@ -3221,99 +3790,123 @@ def thumbnails(project_id):
     with get_db() as conn:
         project = fetch_project_or_404(project_id)
         profile = get_profile(project["profile_id"])
-        scripts_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        videos = load_project_videos(project_id, conn)
+        scripts_by_video = {
+            row["video_id"]: dict(row)
+            for row in conn.execute(
+                "SELECT * FROM scripts WHERE project_id=? AND video_id IS NOT NULL",
+                (project_id,)
             ).fetchall()
-        ]
+        }
+        scripts_by_id = {
+            script["id"]: script
+            for script in scripts_by_video.values()
+        }
         thumb_rows = [
-            dict(r)
-            for r in conn.execute(
+            dict(row)
+            for row in conn.execute(
                 "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
             ).fetchall()
         ]
 
-    thumb_by_type = {t["script_type"]: t for t in thumb_rows}
+    thumbnail_by_video = {
+        video["id"]: next(
+            (row for row in thumb_rows if row.get("video_id") == video["id"] or
+             (row.get("video_id") is None and row.get("script_type") == video["key"])),
+            None,
+        )
+        for video in videos
+    }
+    saved_prompts = list_profile_prompts(project["profile_id"])
 
     if request.method == "POST":
         action = request.form.get("action")
-        script_type = request.form.get("script_type")
-        if script_type not in ("long", "short"):
-            flash("Tipo de miniatura no válido", "error")
+        video_id = request.form.get("video_id")
+        video = next((v for v in videos if str(v["id"]) == str(video_id)), None)
+        if not video:
+            flash("Selecciona un video", "error")
             return redirect(url_for("thumbnails", project_id=project_id))
-
+        requested_script = request.form.get("script_id")
+        script = (
+            scripts_by_id.get(int(requested_script))
+            if requested_script and requested_script.isdigit()
+            else None
+        ) or scripts_by_video.get(video["id"])
+        if not script:
+            flash("Selecciona un guion", "error")
+            return redirect(url_for("thumbnails", project_id=project_id, video_id=video["id"]))
+        sys_p, user_p = build_thumbnail_prompt(project, profile, script, video["script_type"])
+        prompt_key = (
+            f"thumbnail_{video['script_type']}"
+            if video["key"] in ("long", "short")
+            else f"thumbnail_{video['script_type']}_{video['id']}"
+        )
+        save_profile_prompt(project["profile_id"], prompt_key, sys_p, user_p)
         if action == "generate_prompt":
-            script_id = request.form.get("script_id")
-            script = next(
-                (s for s in scripts_rows if str(s["id"]) == str(script_id)),
-                None,
-            )
-            if not script:
-                flash("Selecciona un guion", "error")
-                return redirect(url_for("thumbnails", project_id=project_id))
-            sys_p, user_p = build_thumbnail_prompt(project, profile, script, script_type)
-            save_profile_prompt(project["profile_id"], f"thumbnail_{script_type}", sys_p, user_p)
             generated = call_llm(sys_p, user_p)
             return render_template(
                 "thumbnails.html",
                 project=project,
                 profile=profile,
-                scripts=scripts_rows,
-                thumb_by_type=thumb_by_type,
+                videos=videos,
+                scripts_by_video=scripts_by_video,
+                thumbnail_by_video=thumbnail_by_video,
+                saved_prompts=saved_prompts,
                 generated=generated,
-                gen_type=script_type,
-                gen_script_id=script_id,
+                gen_video_id=video["id"],
+                active_video_id=video["id"],
                 sys_prompt=sys_p,
                 user_prompt=user_p,
             )
-        elif action == "save":
+        if action == "save":
             text = request.form.get("text", "").strip()
             if text:
-                parsed = parse_thumbnail(text, script_type)
+                parsed = parse_thumbnail(text, video["script_type"])
                 prompt_text = parsed["prompt"].strip()
                 if not prompt_text:
                     flash("No se pudo extraer la miniatura (¿formato correcto?)", "error")
-                    return redirect(url_for("thumbnails", project_id=project_id))
+                    return redirect(url_for("thumbnails", project_id=project_id, video_id=video["id"]))
                 with get_db() as conn:
                     existing = conn.execute(
-                        "SELECT id FROM thumbnail_records WHERE project_id=? AND script_type=?",
-                        (project_id, script_type),
+                        "SELECT id FROM thumbnail_records WHERE project_id=? AND video_id=?",
+                        (project_id, video["id"]),
                     ).fetchone()
                     if existing:
                         conn.execute(
                             """
-                            UPDATE thumbnail_records SET prompt=?, updated_at=?
+                            UPDATE thumbnail_records SET prompt=?, script_type=?, video_id=?, updated_at=?
                             WHERE id=?
                         """,
-                            (prompt_text, now_iso(), existing["id"]),
+                            (prompt_text, video["key"], video["id"], now_iso(), existing["id"]),
                         )
                     else:
                         conn.execute(
                             """
                             INSERT INTO thumbnail_records
-                            (project_id, script_type, prompt, updated_at)
-                            VALUES (?, ?, ?, ?)
+                            (project_id, video_id, script_type, prompt, updated_at)
+                            VALUES (?, ?, ?, ?, ?)
                         """,
-                            (project_id, script_type, prompt_text, now_iso()),
+                            (project_id, video["id"], video["key"], prompt_text, now_iso()),
                         )
                     conn.execute(
                         "UPDATE projects SET status='thumbnails', updated_at=? WHERE id=?",
                         (now_iso(), project_id),
                     )
-                flash(f"Miniatura {script_type} guardada", "ok")
+                flash(f"Miniatura de {video['name']} guardada", "ok")
                 try:
                     sync_project_folder(project_id)
                 except Exception:
                     log.exception("[sync_project_folder] thumbnails %s", project_id)
-            return redirect(url_for("thumbnails", project_id=project_id))
+            return redirect(url_for("thumbnails", project_id=project_id, video_id=video["id"]))
 
     return render_template(
         "thumbnails.html",
         project=project,
         profile=profile,
-        scripts=scripts_rows,
-        thumb_by_type=thumb_by_type,
+        videos=videos,
+        scripts_by_video=scripts_by_video,
+        thumbnail_by_video=thumbnail_by_video,
+        saved_prompts=saved_prompts,
     )
 
 
@@ -3419,6 +4012,12 @@ def export(project_id):
                 "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
             ).fetchall()
         ]
+        videos = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM videos WHERE project_id=? ORDER BY sort_order, id", (project_id,)
+            ).fetchall()
+        ]
 
     out_dir = safe_project_dir(project_id, project["name"])
     if request.method == "POST":
@@ -3466,6 +4065,7 @@ def export(project_id):
         scenes=scenes_rows,
         metadata=meta_rows,
         thumbnails=thumb_rows,
+        videos=videos,
         qc_errors=qc_errors,
         folder=out_dir,
         folder_files=folder_files,

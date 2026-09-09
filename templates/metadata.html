@@ -4,30 +4,42 @@
 {% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Metadata · {{ project.name }}{% endblock %}
 
-{% macro meta_panel(platform, label, lede, default_script_type, saved) %}
-{% set m = meta_by_platform.get(platform) %}
-{% set is_active = gen_platform == platform and generated %}
+{% macro meta_panel(video, platform, saved) %}
+{% set record = metadata_by_video.get(video.id, {}).get(platform) %}
+{% set is_active = gen_video_id == video.id and gen_platform == platform %}
+{% set platform_label = 'YouTube' if platform.startswith('youtube') else ('Facebook' if platform.startswith('facebook') else 'Reels') %}
 <section class="panel">
     <div class="panel-head">
-        <h2>{{ label }}</h2>
-        {% if m %}
+        <div>
+            <p class="eyebrow">{{ video.name }} <span class="num">{{ video.format }}</span></p>
+            <h2>{{ video.name }} · {{ platform_label }}</h2>
+        </div>
+        {% if record %}
         <span class="chip chip-done">Guardada</span>
         {% else %}
         <span class="chip chip-next">Pendiente</span>
         {% endif %}
     </div>
-    <p class="hint">{{ lede }}</p>
+    <p class="hint">Ficha de publicación para el video {{ video.name }}.</p>
 
     <form method="post" class="field-row mt-2">
-        <input type="hidden" name="platform" value="{{ platform }}">
+        <input type="hidden" name="video_id" value="{{ video.id }}">
         <label class="field">
-            <span class="label">Guion base</span>
+            <span class="label">Video base</span>
             <select name="script_id">
-                {% for s in scripts %}
-                <option value="{{ s.id }}"
-                        {% if s.type == default_script_type %}selected{% endif %}>
-                    {% if s.type == 'long' %}Guion 5 min{% else %}Guion 1 min{% endif %}
-                    — {{ s.title or 'sin título' }}
+                {% for script_video_id, script in scripts_by_video.items() %}
+                <option value="{{ script.id }}" {% if script.id == scripts_by_video.get(video.id).id %}selected{% endif %}>
+                    {{ script.title or 'sin título' }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="field">
+            <span class="label">Plataforma</span>
+            <select name="platform">
+                {% for available in metadata_platforms.get(video.id, []) %}
+                <option value="{{ available }}" {% if available == platform %}selected{% endif %}>
+                    {{ 'YouTube' if available.startswith('youtube') else ('Facebook' if available.startswith('facebook') else 'Reels') }}
                 </option>
                 {% endfor %}
             </select>
@@ -44,94 +56,96 @@
             sys_prompt if is_active else (saved.sys_prompt if saved else ''),
             user_prompt if is_active else (saved.user_prompt if saved else ''),
             saved,
-            hidden={'platform': platform},
-            title='Prompt de metadata',
+            hidden={'video_id': video.id, 'platform': platform},
+            title='Prompt de metadata de ' ~ video.name,
             graph_url=graph_url) }}
     </details>
     {% endif %}
 
-    {% if m %}
+    {% if record %}
     <div class="panel-inset mt-2">
-        {% if m.titles_list %}
+        {% if record.titles_list %}
         <p class="label">Títulos propuestos <span class="muted">— caracteres</span></p>
         <ol class="bullets">
-            {% for t in m.titles_list %}<li>{{ t }} <span class="mono muted small">{{ t|length }}</span></li>{% endfor %}
+            {% for title in record.titles_list %}<li>{{ title }} <span class="mono muted small">{{ title|length }}</span></li>{% endfor %}
         </ol>
         {% endif %}
-        {% if m.caption %}
+        {% if record.caption %}
         <p class="label">Caption</p>
-        <pre class="code" id="caption-{{ platform }}">{{ m.caption }}</pre>
+        <pre class="code" id="caption-{{ video.id }}-{{ platform }}">{{ record.caption }}</pre>
         <div class="actions">
-            <button type="button" class="btn btn-sm" data-copy-button data-copy="#caption-{{ platform }}">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#caption-{{ video.id }}-{{ platform }}">
                 Copiar caption
             </button>
         </div>
         {% endif %}
-        {% if m.hook %}
+        {% if record.hook %}
         <p class="label mt-2">Hook</p>
-        <p class="small">{{ m.hook }}</p>
+        <p class="small">{{ record.hook }}</p>
         {% endif %}
-        {% if m.on_screen_list %}
+        {% if record.on_screen_list %}
         <p class="label mt-2">Texto en pantalla</p>
         <ol class="bullets">
-            {% for t in m.on_screen_list %}<li>{{ t }}</li>{% endfor %}
+            {% for text in record.on_screen_list %}<li>{{ text }}</li>{% endfor %}
         </ol>
         {% endif %}
-        {% if m.chapters_list %}
+        {% if record.chapters_list %}
         <details class="fold">
-            <summary>Capítulos ({{ m.chapters_list|length }})</summary>
+            <summary>Capítulos ({{ record.chapters_list|length }})</summary>
             <ul class="bullets">
-                {% for c in m.chapters_list %}<li class="mono small">{{ c }}</li>{% endfor %}
+                {% for chapter in record.chapters_list %}<li class="mono small">{{ chapter }}</li>{% endfor %}
             </ul>
         </details>
         {% endif %}
-        {% if m.description %}
+        {% if record.description %}
         <p class="label mt-2">Descripción</p>
-        <pre class="code" id="desc-{{ platform }}">{{ m.description }}</pre>
+        <pre class="code" id="desc-{{ video.id }}-{{ platform }}">{{ record.description }}</pre>
         <div class="actions">
-            <button type="button" class="btn btn-sm" data-copy-button data-copy="#desc-{{ platform }}">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#desc-{{ video.id }}-{{ platform }}">
                 Copiar descripción
             </button>
         </div>
         {% endif %}
-        {% if m.tags_list %}
-        <p class="label mt-2">Tags ({{ m.tags_list|length }})</p>
-        <pre class="code" id="tags-{{ platform }}">{{ m.tags_list|join(', ') }}</pre>
+        {% if record.tags_list %}
+        <p class="label mt-2">Tags ({{ record.tags_list|length }})</p>
+        <pre class="code" id="tags-{{ video.id }}-{{ platform }}">{{ record.tags_list|join(', ') }}</pre>
         <div class="actions">
-            <button type="button" class="btn btn-sm" data-copy-button data-copy="#tags-{{ platform }}">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#tags-{{ video.id }}-{{ platform }}">
                 Copiar tags
             </button>
         </div>
         {% endif %}
-        {% if m.hashtags_list %}
+        {% if record.hashtags_list %}
         <p class="label mt-2">Hashtags</p>
-        <pre class="code" id="hash-{{ platform }}">{{ m.hashtags_list|join(' ') }}</pre>
+        <pre class="code" id="hash-{{ video.id }}-{{ platform }}">{{ record.hashtags_list|join(' ') }}</pre>
         <div class="actions">
-            <button type="button" class="btn btn-sm" data-copy-button data-copy="#hash-{{ platform }}">
+            <button type="button" class="btn btn-sm" data-copy-button data-copy="#hash-{{ video.id }}-{{ platform }}">
                 Copiar hashtags
             </button>
         </div>
         {% endif %}
-        {% if m.cta %}
+        {% if record.cta %}
         <p class="label mt-2">CTA</p>
-        <p class="small">{{ m.cta }}</p>
+        <p class="small">{{ record.cta }}</p>
         {% endif %}
     </div>
     {% endif %}
 
-    <details class="fold" {% if is_active or not m %}open{% endif %}>
-        <summary>{% if m %}Actualizar con una respuesta nueva{% else %}Respuesta del LLM{% endif %}</summary>
+    <details class="fold" {% if is_active or not record %}open{% endif %}>
+        <summary>{% if record %}Actualizar con una respuesta nueva{% else %}Respuesta del LLM{% endif %}</summary>
         <form method="post">
             <input type="hidden" name="action" value="save">
+            <input type="hidden" name="video_id" value="{{ video.id }}">
             <input type="hidden" name="platform" value="{{ platform }}">
+            <input type="hidden" name="script_id" value="{{ scripts_by_video.get(video.id).id if scripts_by_video.get(video.id) else '' }}">
             <label class="field">
-                <span class="sr-only">Respuesta del LLM para {{ label }}</span>
+                <span class="sr-only">Respuesta del LLM para {{ video.name }} · {{ platform_label }}</span>
                 <textarea name="text" rows="10"
-                          placeholder="Pega aquí la respuesta con las secciones indicadas en el lede.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
+                          placeholder="Pega aquí la respuesta con las secciones indicadas en el prompt.">{% if is_active and not is_manual_output(generated) %}{{ generated }}{% endif %}</textarea>
             </label>
             <div class="actions">
                 <button type="submit" class="btn btn-primary">
-                    {% if m %}Reemplazar metadata{% else %}Guardar metadata{% endif %}
+                    {% if record %}Reemplazar metadata{% else %}Guardar metadata{% endif %}
                 </button>
             </div>
         </form>
@@ -141,30 +155,20 @@
 
 {% block content %}
 {{ ui.stage_head(project, '06', 'Metadata',
-    'Una ficha por plataforma y por guion. Es lo que decide si el vídeo se encuentra y se clica.') }}
+    'Una ficha de publicación por video y plataforma.') }}
 
-{% if not scripts %}
+{% if not videos or not scripts_by_video %}
 <div class="empty">
     <h2>Primero hace falta un guion</h2>
-    <p>La metadata se escribe a partir del contenido del guion.</p>
+    <p>La metadata se escribe a partir del contenido del video.</p>
     <a href="{{ url_for('scripts', project_id=project.id) }}" class="btn btn-primary">Ir a guiones</a>
 </div>
 {% else %}
-<div class="pair">
-    {{ meta_panel('youtube_long', 'YouTube · 5 min',
-        'Formato horizontal largo: cinco títulos, descripción en prosa y quince tags.',
-        'long', saved_yt_long) }}
-    {{ meta_panel('facebook_long', 'Facebook · 5 min',
-        'Formato horizontal largo: descripción completa en prosa continua, sin negritas ni listas.',
-        'long', saved_fb_long) }}
-</div>
-<div class="pair mt-3">
-    {{ meta_panel('youtube_short', 'YouTube Shorts · 1 min',
-        'Formato vertical corto: tres títulos, descripción breve, hashtags y tags.',
-        'short', saved_yt_short) }}
-    {{ meta_panel('reels_short', 'Facebook Reels · 1 min',
-        'Formato vertical corto: descripción en prosa continua con gancho y hashtags.',
-        'short', saved_reels_short) }}
-</div>
+{% for video in videos %}
+    {% for platform in metadata_platforms.get(video.id, []) %}
+        {% set saved = saved_prompts.get('metadata_' ~ platform ~ '_' ~ video.id) or saved_prompts.get('metadata_' ~ platform) %}
+        {{ meta_panel(video, platform, saved) }}
+    {% endfor %}
+{% endfor %}
 {% endif %}
 {% endblock %}

@@ -62,11 +62,9 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
     # Import local para evitar ciclo: app.py -> services.sync -> app.
     from app import (
         PROJECTS_DIR,
-        fetch_optional_dict,
         get_db,
         get_profile,
         list_profile_prompts,
-        now_iso,
     )
 
     with get_db() as conn:
@@ -145,6 +143,12 @@ def _load_legacy_data(conn, project_id: int) -> dict:
             "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
         ).fetchall()
     ]
+    videos = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM videos WHERE project_id=? ORDER BY sort_order, id", (project_id,)
+        ).fetchall()
+    ]
     return {
         "research": research_obj,
         "concept": concept_obj,
@@ -152,14 +156,23 @@ def _load_legacy_data(conn, project_id: int) -> dict:
         "scenes": scenes_rows,
         "metadata": meta_rows,
         "thumbnails": thumb_rows,
+        "videos": videos,
     }
 
 
 def _write_new_model(
     project: dict, profile: dict | None, ps_rows: list[dict]
 ) -> tuple[Path, list[str]]:
-    from app import now_iso
+    from app import get_db, now_iso
 
+    with get_db() as conn:
+        videos = [
+            dict(row)
+            for row in conn.execute(
+                "SELECT * FROM videos WHERE project_id=? ORDER BY sort_order, id",
+                (project["id"],),
+            ).fetchall()
+        ]
     out_dir = safe_project_dir(project["id"], project["name"])
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -225,6 +238,7 @@ def _write_new_model(
     bundle = {
         "project": project,
         "profile": profile,
+        "videos": videos,
         "roadmap_stages": roadmap_stages,
         "project_stages": project_stages,
         "exported_at": now_iso(),
@@ -247,6 +261,7 @@ def _write_legacy_model(
     scenes_rows = legacy["scenes"]
     meta_rows = legacy["metadata"]
     thumb_rows = legacy["thumbnails"]
+    videos = legacy["videos"]
 
     out_dir = safe_project_dir(project["id"], project["name"])
     if out_dir.exists():
@@ -470,6 +485,7 @@ def _write_legacy_model(
         "scenes": scenes_rows,
         "metadata": meta_rows,
         "thumbnails": thumb_rows,
+        "videos": videos,
         "stage_prompts": stage_prompts,
         "exported_at": now_iso(),
     }
