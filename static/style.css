@@ -1249,6 +1249,56 @@ select { appearance: none; background-image: none; cursor: pointer; }
     max-height: 360px;
 }
 
+/* ===== Botón Copiar en text fields ===== */
+.copy-field { position: relative; }
+.copy-field > textarea,
+.copy-field > input[type="text"],
+.copy-field > input[type="number"],
+.copy-field > input[type="search"],
+.copy-field > input[type="url"],
+.copy-field > input[type="email"] { padding-right: 88px; }
+.copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: rgba(240, 168, 60, .08);
+    color: var(--amber);
+    border: 1px solid rgba(240, 168, 60, .28);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+    z-index: 2;
+    line-height: 1.2;
+}
+.copy-btn:hover {
+    background: rgba(240, 168, 60, .18);
+    border-color: var(--amber);
+}
+.copy-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(240, 168, 60, .22);
+}
+.copy-btn.is-ok {
+    background: rgba(79, 191, 135, .15);
+    color: var(--lock);
+    border-color: rgba(79, 191, 135, .45);
+}
+.copy-btn.is-fail {
+    background: rgba(226, 85, 91, .15);
+    color: var(--alert);
+    border-color: rgba(226, 85, 91, .45);
+}
+.copy-btn.is-warn {
+    background: rgba(240, 168, 60, .22);
+    color: var(--amber);
+    border-color: var(--amber);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1080px) {
     .graph-page-grid {
