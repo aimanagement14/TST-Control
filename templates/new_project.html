@@ -32,7 +32,7 @@
                 </option>
                 {% endfor %}
             </select>
-            <span class="hint">Define tono, estilo, niveles y plataformas. <a href="{{ url_for('profiles.view') }}">Gestionar perfiles</a></span>
+            <span class="hint">Define tono, estilo y niveles. <a href="{{ url_for('profiles.view') }}">Gestionar perfiles</a></span>
         </label>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Crear proyecto</button>
@@ -46,11 +46,13 @@
             <ol class="bullets mt-1">
                 <li>Investigación: hechos, fuentes y teorías</li>
                 <li>Concepto: ángulo, tesis y gancho</li>
-                <li>Guion de 5 min y versión de 1 min</li>
+                <li>Guion</li>
                 <li>Escenas (un set por guion, con prompt de imagen)</li>
-                <li>Metadata por plataforma</li>
+                <li>Metadata</li>
+                <li>Miniaturas</li>
                 <li>Control de calidad y exportación</li>
             </ol>
+            <p class="hint mt-2">Siete etapas configurables por perfil: añade, reordena o desactiva las que no necesites.</p>
             <p class="hint mt-2">Cada etapa genera un prompt que puedes copiar a tu LLM y devolver aquí.</p>
         </div>
     </aside>

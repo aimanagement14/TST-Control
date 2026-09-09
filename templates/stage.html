@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% set stage_key = stage_id|default(stage.id|default(stage.key|default(''))) %}
+{% set stage_label = stage.name|default(stage.label|default('Etapa')) %}
+{% set stage_num = stage.num|default(stage.number|default(stage.order|default(''))) %}
+{% set stage_description = stage.description|default('') %}
+{% set _ps = project_stage|default(none) %}
+{% set _ps = _ps if _ps is mapping else {} %}
+{% set saved_instruction = _ps.instruction|default(stage.instruction|default('')) %}
+{% set saved_response = _ps.response|default('') %}
+{% set display_response = generated|default(saved_response) %}
+{% set is_saved = saved_response|length > 0 %}
+{% set _profile = profile|default(none) %}
+{% set has_profile = (_profile is mapping) %}
+{% set stages_list = stages|default([], true) %}
+{% block title %}{{ stage_label }} · {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">
+            <a href="{{ url_for('view_project', project_id=project.id) }}">{{ project.name }}</a>
+            {% if stage_num %}&middot; Etapa <span class="num">{{ stage_num }}</span>{% endif %}
+        </p>
+        <h1>{{ stage_label }}</h1>
+        {% if stage_description %}<p class="lede">{{ stage_description }}</p>{% endif %}
+    </div>
+    <div class="page-head-actions">
+        {% if generated %}<span class="chip chip-info">Generada</span>
+        {% elif is_saved %}<span class="chip chip-done">Guardada</span>
+        {% else %}<span class="chip chip-next">Pendiente</span>{% endif %}
+    </div>
+</section>
+
+<div class="work">
+    <div>
+        <form method="post" action="{{ url_for('project_stage', project_id=project.id, stage_id=stage_key) }}">
+            <input type="hidden" name="stage_id" value="{{ stage_key }}">
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Instrucción</h3>
+                    {% if stage.instruction|default('') %}<span class="chip">Plantilla</span>{% endif %}
+                </div>
+                <label class="field">
+                    <span class="sr-only">Instrucción</span>
+                    <textarea name="instruction" rows="6"
+                              placeholder="Texto que se enviará al LLM (editable)">{{ saved_instruction }}</textarea>
+                </label>
+                <p class="hint">Edita libremente la instrucción antes de generar o guardar.</p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Respuesta</h3>
+                    {% if generated %}<span class="chip chip-info">Generada</span>
+                    {% elif is_saved %}<span class="chip chip-done">Guardada</span>
+                    {% else %}<span class="chip">Vacía</span>{% endif %}
+                </div>
+                <label class="field">
+                    <span class="sr-only">Respuesta en Markdown</span>
+                    <textarea name="response" rows="14"
+                              placeholder="Pega aquí la respuesta de tu LLM o escribe a mano.">{{ display_response }}</textarea>
+                </label>
+                <p class="hint">Markdown editable. Puedes pegarla, editarla y guardarla cuando esté lista.</p>
+                <div class="actions">
+                    <button type="submit" name="action" value="generate" class="btn">Generar</button>
+                    <button type="submit" name="action" value="save" class="btn btn-primary">Guardar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <aside class="work-aside">
+        <div class="panel">
+            <h4>Contexto</h4>
+            <ul class="data-list mt-1">
+                <li><span>Proyecto</span><b>{{ project.name }}</b></li>
+                {% if has_profile and _profile.name %}
+                <li><span>Perfil</span><b>{{ _profile.name }}</b></li>
+                {% endif %}
+                {% if project.status is defined %}
+                <li><span>Estado</span><b>{{ status_label(project.status) }}</b></li>
+                {% endif %}
+                {% if generated %}
+                <li><span>Última respuesta</span><b>generada ahora</b></li>
+                {% elif is_saved %}
+                <li><span>Última respuesta</span><b>guardada</b></li>
+                {% endif %}
+            </ul>
+        </div>
+
+        {% if stages_list %}
+        <div class="panel">
+            <h4>Etapas del proyecto</h4>
+            <ol class="bullets mt-1">
+                {% for s in stages_list %}
+                {% set sk = s.id|default(s.key|default('')) %}
+                {% set s_active = (sk == stage_key) %}
+                {% set s_done = s.done|default(s.complete|default(false)) %}
+                <li>
+                    <a href="{{ url_for('project_stage', project_id=project.id, stage_id=sk) }}">
+                        {{ s.name|default(s.label|default(s.key|default('Etapa'))) }}
+                    </a>
+                    {% if s_done %}<span class="chip chip-done">Hecha</span>
+                    {% elif s_active %}<span class="chip chip-next">Aquí</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+
+{% endblock %}

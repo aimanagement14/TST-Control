@@ -23,26 +23,9 @@
         <a class="btn btn-ghost" href="{{ url_for('export', project_id=project.id) }}">Exportar</a>
         {% else %}
         <a class="btn btn-primary" href="{{ url_for('export', project_id=project.id) }}">Exportar paquete</a>
-        <a class="btn btn-ghost" href="{{ url_for('qc', project_id=project.id) }}">Repasar calidad</a>
         {% endif %}
-        <a class="btn btn-ghost" href="/projects/{{ project.id }}/run">Ejecutar en modo grafo</a>
     </div>
 </section>
-
-{% if profile %}
-<details class="fold">
-    <summary>Perfil aplicado: {{ profile.name }}</summary>
-    <ul class="data-list">
-        <li><span>Tipo de contenido</span><b>{{ profile.content_type or '—' }}</b></li>
-        <li><span>Audiencia</span><b>{{ profile.audience or '—' }}</b></li>
-        <li><span>Tono</span><b>{{ profile.tone or '—' }}</b></li>
-        <li><span>Estilo visual</span><b>{{ profile.style or '—' }}</b></li>
-        <li><span>Misterio / drama</span><b>{{ profile.mystery_level }} · {{ profile.drama_level }}</b></li>
-        <li><span>Velocidad de narración</span><b>{{ profile.narration_speed }} ppm</b></li>
-    </ul>
-    <p class="hint">Los perfiles se editan en <a href="{{ url_for('profiles.view') }}">Perfiles</a>.</p>
-</details>
-{% endif %}
 
 <h2 class="mt-3">Hoja de ruta</h2>
 <div class="rundown">
@@ -65,17 +48,6 @@
     </a>
     {% endfor %}
 </div>
-
-{% if profile %}
-<div class="panel mt-3">
-    <div class="panel-head">
-        <h3>Prompts por perfil</h3>
-        <span class="chip">{{ saved_prompts|length }} de 9</span>
-        <a class="btn btn-ghost btn-sm" href="/profiles/{{ profile.id }}/graph">Abrir editor de grafo</a>
-    </div>
-    <p class="hint">Los prompts del proyecto viven en el perfil. Se editan desde el editor visual de grafo (modo n8n), donde también puedes añadir nodos custom.</p>
-</div>
-{% endif %}
 
 <div class="stepper">
     <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}"

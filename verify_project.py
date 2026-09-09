@@ -1,383 +1,209 @@
 """
-Verificación end-to-end genérica del pipeline.
+Verificación end-to-end del pipeline genérico de siete etapas.
 
-Ejecuta el flujo completo usando el test client de Flask con datos simulados
-del LLM (modo manual):
+Ejecuta el flujo completo contra ``app.test_client()`` con datos
+simulados del LLM (modo manual exclusivo, >= 2.0):
 
-- Crea (si no existe) un proyecto sintético con id=PROJECT_ID
-- Refuerza la investigación con secciones parseables
-- Genera concepto
-- Genera guion largo + corto
-- Genera escenas
-- Genera metadata YouTube + Shorts
-- Ejecuta QC
-- Exporta el ZIP
+- Crea (o reinicia) un proyecto sintético con ``id=PROJECT_ID``.
+- Asegura sus ``project_stages``: research → concept → scripts →
+  scenes → metadata → thumbnails → qc.
+- Para cada etapa, ``POST /projects/<id>/stages/<stage_id>`` con
+  ``action=save`` y una instrucción + respuesta Markdown
+  representativas.
+- ``action=generate`` sobre la primera etapa: devuelve el bloque
+  manual exclusivo y **no** persiste la respuesta en BD.
+- Comprueba el dashboard y la vista del proyecto.
+- Verifica ``7/7`` etapas completas vía ``project_stage_status``.
+- Comprueba los archivos en disco: ``00_RESUMEN.md`` +
+  ``stage_<roadmap_stage_id>.md`` por etapa + ``08_paquete_completo.json``.
+- Comprueba que renombrar el proyecto renombra la carpeta pero **no**
+  los ``stage_<roadmap_stage_id>.md`` (el ID en el nombre se mantiene).
+- Comprueba que desactivar (``is_active=0``) una etapa no genera
+  su ``.md`` y la hace invisible para ``project_stage_status``.
+- ``POST /projects/<id>/export action=zip`` devuelve el ZIP con los
+  mismos archivos.
 
-PROJECT_ID se eligió alto (2) para no chocar con proyectos reales que el
-usuario pueda tener en id=1. Renombrar este archivo o cambiar el id es
-trivial.
+PROJECT_ID se eligió alto (2) para no chocar con proyectos reales del
+usuario. Renombrar este archivo o cambiar el id es trivial.
 """
 
 import io
 import json
+import shutil
 import sys
 import zipfile
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).parent))
 import app
 
 PROJECT_ID = 2
 
+PROJECT_NAME = "Verificacion pipeline"
+PROJECT_TOPIC = "Tema sintetico para smoke test del pipeline de 7 etapas"
 
-def ensure_project():
-    """Garantiza que existe un proyecto válido con id=PROJECT_ID.
+VERIFY_PROFILE_NAME = "__verify_project__"
 
-    Si no hay proyectos o el id solicitado no existe, crea uno reutilizando
-    el perfil por defecto. Devuelve el id del proyecto listo para usar.
+STAGE_FIXTURES = {
+    "research": (
+        "Investiga el tema con hechos verificables y fuentes.",
+        "# Investigación\n\n"
+        "## Resumen\n\nTexto de la investigación sintética del flujo "
+        "genérico de siete etapas.\n\n"
+        "## Hechos confirmados\n\n"
+        "- Hecho verificable A con su fuente.\n"
+        "- Hecho verificable B con su fuente.\n"
+        "- Hecho verificable C con su fuente.\n\n"
+        "## Fuentes\n\n"
+        "- https://example.org/fuente-1\n"
+        "- https://example.org/fuente-2\n"
+        "- https://example.org/fuente-3\n",
+    ),
+    "concept": (
+        "Define ángulo, tesis y ganchos del documental.",
+        "# Concepto\n\n"
+        "## Ángulo\n\nSeparar la realidad verificable del ruido viral.\n\n"
+        "## Tesis\n\nLa realidad geológica es más asombrosa que el mito.\n\n"
+        "## Puntos clave\n\n"
+        "1. Punto uno del concepto.\n"
+        "2. Punto dos del concepto.\n",
+    ),
+    "scripts": (
+        "Escribe el guion completo del documental.",
+        "# Guiones\n\n"
+        "Representación genérica del contenido de guiones para el pipeline "
+        "de siete etapas. Incluye el cuerpo necesario para verificar la "
+        "persistencia del bloque Markdown en la nueva ``project_stage``.\n",
+    ),
+    "scenes": (
+        "Convierte el guion en una lista de escenas visuales.",
+        "# Escenas\n\n"
+        "## ESCENA 1\n"
+        "**TEXTO AUDIO:** Frase de prueba de la primera escena.\n"
+        "**IMAGEN:** Imagen representativa de la escena uno.\n"
+        "_Cámara: estático · Transición: corte seco · Duración: 15s_\n\n"
+        "## ESCENA 2\n"
+        "**TEXTO AUDIO:** Frase de la segunda escena.\n"
+        "**IMAGEN:** Imagen representativa de la escena dos.\n"
+        "_Cámara: travelling · Transición: fundido · Duración: 20s_\n",
+    ),
+    "metadata": (
+        "Genera metadata publicable (títulos, descripción, tags).",
+        "# Metadata\n\n"
+        "Representación genérica del contenido de metadata para el pipeline "
+        "de siete etapas. Cubre títulos, descripción, capítulos y tags.\n",
+    ),
+    "thumbnails": (
+        "Genera prompts visuales para las miniaturas.",
+        "# Miniaturas\n\n"
+        "Representación genérica del contenido de miniaturas para el "
+        "pipeline de siete etapas, con prompts visuales cinematográficos.\n",
+    ),
+    "qc": (
+        "Revisa el paquete y emite el informe de calidad.",
+        "# Control de calidad\n\n"
+        "- [info] Revisión representativa del paquete del pipeline "
+        "genérico de siete etapas.\n",
+    ),
+}
+
+EXPECTED_ORDER = (
+    "research",
+    "concept",
+    "scripts",
+    "scenes",
+    "metadata",
+    "thumbnails",
+    "qc",
+)
+
+
+def reset_project():
+    """Borra el proyecto sintético (si existe) y lo recrea con un perfil sintético dedicado.
+
+    Garantiza que existe un perfil ``__verify_project__`` con las siete
+    etapas activas en el orden de ``EXPECTED_ORDER`` y, si ya existía,
+    reemplaza sus ``roadmap_stages`` y los ``project_stages`` de los
+    proyectos asociados. No toca perfiles ni proyectos reales del
+    usuario.
     """
     with app.get_db() as conn:
-        row = conn.execute("SELECT id FROM projects WHERE id=?", (PROJECT_ID,)).fetchone()
-        if row:
-            return row["id"]
-        default_profile = conn.execute(
-            "SELECT id FROM profiles WHERE is_default=1 LIMIT 1"
+        row = conn.execute(
+            "SELECT name FROM projects WHERE id=?", (PROJECT_ID,)
         ).fetchone()
-        if not default_profile:
-            default_profile = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()
-        profile_id = default_profile["id"] if default_profile else None
-        cur = conn.execute(
-            """INSERT INTO projects (id, name, topic, profile_id, status,
-               created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'research', ?, ?)""",
+        if row:
+            app.delete_project_folder(PROJECT_ID, row["name"])
+            conn.execute("DELETE FROM projects WHERE id=?", (PROJECT_ID,))
+
+    for orphan in app.PROJECTS_DIR.glob(f"*_{PROJECT_ID}"):
+        if orphan.is_dir():
+            shutil.rmtree(orphan)
+        elif orphan.suffix == ".zip":
+            orphan.unlink()
+
+    now = app.now_iso()
+    with app.get_db() as conn:
+        profile = conn.execute(
+            "SELECT id FROM profiles WHERE name=?", (VERIFY_PROFILE_NAME,)
+        ).fetchone()
+        if profile:
+            profile_id = profile["id"]
+            conn.execute(
+                "DELETE FROM project_stages WHERE project_id IN "
+                "(SELECT id FROM projects WHERE profile_id=?)",
+                (profile_id,),
+            )
+            conn.execute(
+                "DELETE FROM roadmap_stages WHERE profile_id=?",
+                (profile_id,),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO profiles (name, is_default, created_at)
+                VALUES (?, 0, ?)
+                """,
+                (VERIFY_PROFILE_NAME, now),
+            )
+            profile_id = cur.lastrowid
+        for idx, name in enumerate(EXPECTED_ORDER):
+            conn.execute(
+                """
+                INSERT INTO roadmap_stages
+                    (profile_id, name, instruction, sort_order, is_active,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    profile_id,
+                    name,
+                    STAGE_FIXTURES[name][0],
+                    idx,
+                    now,
+                    now,
+                ),
+            )
+        conn.execute(
+            """
+            INSERT INTO projects
+                (id, name, topic, profile_id, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'research', ?, ?)
+            """,
             (
                 PROJECT_ID,
-                "Verificacion pipeline",
-                "Tema sintetico para smoke test del pipeline",
+                PROJECT_NAME,
+                PROJECT_TOPIC,
                 profile_id,
                 "2026-01-01T00:00:00",
                 "2026-01-01T00:00:00",
             ),
         )
-        return cur.lastrowid or PROJECT_ID
-
-
-# ---------------------------------------------------------------------------
-# Datos simulados del LLM (modo manual) por etapa
-# ---------------------------------------------------------------------------
-
-RESEARCH_TEXT = """\
-## RESUMEN
-El derretimiento de glaciares en el Himalaya nepalí está exponiendo restos geológicos, paleontológicos y arqueológicos a un ritmo sin precedentes. Algunos hallazgos virales en redes hablan de un "fósil misterioso" tras el colapso de un glaciar; en realidad, el Himalaya contiene abundantes fósiles marinos del antiguo Mar de Tetis, elevados por la colisión tectónica entre las placas india y euroasiática. La cobertura mediática suele mezclar estos hallazgos geológicos con la tradición folclórica del Yeti, cuyos supuestos restos físicos analizados científicamente han resultado ser de origen animal conocido.
-
-## HECHOS CONFIRMADOS
-- El Himalaya se formó por la colisión de las placas india y euroasiática iniciada hace ~50 millones de años (Fuente: USGS)
-- El Mar de Tetis existió entre el Mesozoico y el Paleógeno, dejando fósiles marinos en lo que hoy es el Himalaya (Fuente: Nature, 2019)
-- El retroceso glaciar en el Himalaya se acelera desde 1970 y se intensifica por el cambio climático (Fuente: ICIMOD, 2023)
-- En 2023 un estudio identificó ADN antiguo de plantas y artrópodos en sedimentos del glaciar de Khumbu (Fuente: PNAS, 2023)
-- Los supuestos "scalps" de Yeti en monasterios nepalíes fueron analizados y corresponden a osos pardos y ganado (Fuente: Proceedings of the Royal Society B, 2017)
-- En 2019 se hallaron microfósiles de fitoplancton del Eoceno en la Formación Gokarna, Nepal (Fuente: Journal of Asian Earth Sciences)
-- Los fósiles marinos más comunes en el Himalaya son ammonites, braquiópodos y nummulites (Fuente: Geology Today, 2021)
-- El término "arqueología glacial" describe cómo los deshielos exponen artefactos orgánicos preservados (Fuente: Antiquity, 2022)
-
-## TEORÍAS Y VERSIONES
-- Teoría geológica estándar: el "fósil misterioso" es un fósil marino del Tetis expuesto por el deshielo. A favor: explica los hallazgos reales documentados. En contra: no encaja con la narrativa de misterio.
-- Teoría Yeti criptozoológico: ciertos restos pertenecen a un primate desconocido. A favor: tradición oral y folclore local milenario. En contra: análisis genéticos de supuestos restos los identifican como osos.
-- Teoría conspirativa viral: el hallazgo prueba civilizaciones prehistóricas avanzadas. A favor: engagement en redes. En contra: ausencia total de evidencia física verificable.
-- Teoría arqueológica: muchos hallazgos son vestigios humanos rituales o funerarios de los últimos siglos, no fósiles paleontológicos. A favor: contexto cultural documentado. En contra: se confunden con frecuencia.
-
-## CONTROVERSIAS Y DEBATES
-- ¿Cómo separar en medios la divulgación paleontológica del sensacionalismo paranormal?
-- ¿Qué protocolo científico aplicar para autentificar hallazgos virales antes de su difusión?
-- ¿Cómo proteger yacimientos recién expuestos de saqueo y tráfico de fósiles?
-
-## DATOS CLAVE
-- 50 millones de años: inicio del levantamiento del Himalaya
-- ~8.000 m: altitud media del Himalaya
-- 1970-2020: periodo de aceleración del retroceso glaciar documentado
-- Eoceno: época geológica de muchos fósiles expuestos en Nepal
-- 2017: año del análisis genético de supuestos restos de Yeti
-- Mar de Tetis: océano desaparecido que dio origen a muchos fósiles himalayos
-
-## FUENTES
-- https://www.usgs.gov/special-topics/plate-tectonics/science/himalayas
-- https://www.nature.com/articles/s41586-019-1180-2
-- https://www.icimod.org/article/himalaya-glacier-mass-balance
-- https://www.pnas.org/doi/10.1073/pnas.2217561120
-- https://royalsocietypublishing.org/doi/10.1098/rspb.2017.1304
-- https://www.sciencedirect.com/journal/journal-of-asian-earth-sciences
-- https://www.cambridge.org/core/journals/antiquity
-
-## AFIRMACIONES QUE REQUIEREN VERIFICACIÓN
-- "Fósil misterioso de Nepal" viral en redes: sin paper publicado, requiere verificación primaria.
-- Identificación de posibles "huellas humanas prehistóricas" en roca nepalí: pendiente de datación.
-"""
-
-CONCEPT_TEXT = """\
-## ÁNGULO
-Separar la realidad geológica del Himalaya —los fósiles marinos del Mar de Tetis expuestos por el deshielo— del ruido viral que mezcla estos hallazgos con la mitología del Yeti. Un documental que muestre lo extraordinario de lo real, sin necesidad de inventar misterios.
-
-## TESIS CENTRAL
-El Himalaya guarda un registro paleontológico extraordinario y verificable; los "misterios virales" suelen ocultar hallazgos reales que la ciencia ya puede explicar.
-
-## PUNTOS CLAVE A DESARROLLAR
-1. El Himalaya como archivo geológico del Mar de Tetis.
-2. La aceleración del deshielo y la "arqueología glacial".
-3. La tradición Yeti frente al análisis genético de supuestos restos.
-4. Fósiles reales documentados en Nepal y su valor científico.
-
-## GANCHO EMOCIONAL
-Asombro al descubrir que la "montaña sagrada" es también un cementerio de criaturas marinas de hace 50 millones de años.
-
-## LO QUE EL ESPECTADOR DEBE APRENDER
-- Por qué hay fósiles marinos en la cima del mundo.
-- Qué dice realmente la ciencia sobre los supuestos restos de Yeti.
-- Cómo distinguir hallazgos reales de bulos virales.
-- Por qué el deshielo expone y a la vez destruye patrimonio.
-
-## LO QUE EL ESPECTADOR DEBE SENTIR
-- Asombro ante la escala del tiempo geológico.
-- Curiosidad por visitar Nepal con ojos nuevos.
-- Indignación ante el sensacionalismo viral.
-- Respeto por la ciencia que separa hecho de ficción.
-
-## RIESGOS
-- Caer en narrativa sensacionalista paranormal y contradecir el ángulo.
-- Sensibilidades culturales locales sobre la figura del Yeti.
-- Uso indebido de imágenes de yacimientos protegidos.
-"""
-
-SCRIPT_LONG_TEXT = """\
-## TITULO
-El Himalaya guarda los mares que el mundo olvidó
-
-## HOOK (0:00 - 0:15)
-Donde hoy se levanta la montaña más alta del planeta, hubo un mar entero. Sus criaturas descansan ahora bajo glaciares que el sol, poco a poco, está derritiendo.
-
-## CONTEXTO (0:15 - 1:00)
-Cada año, el Himalaya pierde milímetros de hielo que han permanecido durante milenios. Lo que ese hielo esconde cambia la historia que contamos sobre el planeta. La colisión de las placas tectónicas india y euroasiática levantó un océano entero. Sus habitantes quedaron grabados en la roca. Y ahora, empujados por el deshielo, vuelven a la superficie ante los ojos de los geólogos y paleontólogos que recorren las morrenas en busca de respuestas.
-
-## DESARROLLO (1:00 - 3:30)
-
-### BLOQUE 1: El archivo del Tetis
-Hace cincuenta millones de años, una placa oceánica se subdujo bajo otra continental. El fondo del Mar de Tetis se elevó, se plegó, se fracturó, y acabó convertido en la cordillera más alta del mundo. En sus estratos quedaron atrapados ammonites con espirales perfectas, braquiópodos con conchas brillantes y nummulites del tamaño de una moneda. La montaña entera es un libro abierto de paleontología, escrito en piedra caliza y pizarra, listo para quien quiera leerlo con paciencia y respeto por las escalas de tiempo que maneja la Tierra.
-
-### BLOQUE 2: La arqueología del deshielo
-Desde 1970 los glaciares del Himalaya pierden masa de forma acelerada. El hielo que durante siglos protegió restos orgánicos los está soltando uno a uno. En 2023, un equipo internacional recuperó ADN antiguo de plantas y artrópodos en sedimentos del glaciar de Khumbu. No es una casualidad. La arqueología glacial se ha convertido en una disciplina nueva que une glaciólogos, genetistas y paleontólogos en torno a una misma pregunta: ¿qué ha estado guardando el hielo durante miles de años?
-
-### BLOQUE 3: La sombra del Yeti
-Durante siglos, los monasterios budistas nepalíes guardaron restos atribuidos al Yeti. Cueros cabelludos, huesos, fragmentos de piel. En 2017, un análisis genético publicado en la Royal Society los identificó con claridad: pertenecían a osos pardos del Himalaya y a ganado de la región. La tradición oral sigue viva, las expediciones siguen saliendo cada primavera, pero la ciencia ya tiene una respuesta. Y esa respuesta es más interesante que el mito, porque habla de cómo una cultura convierte sus montañas en leyenda.
-
-### BLOQUE 4: Lo que se pierde al derretirse
-Cada fósil que el hielo suelta es también un fósil que la intemperie empieza a destruir. Lluvia, viento, ciclos de hielo y deshielo. No hay tiempo para el sensacionalismo viral. El Himalaya nos regala una ventana única al pasado profundo de la Tierra. Si no la cuidamos, si no la estudiamos con rigor, si no la documentamos antes de que se deteriore, la perderemos al ritmo del deshielo. La urgencia no es solo climática: es también patrimonial y científica, y necesita equipos internacionales, financiación estable y divulgación seria para que cada descubrimiento llegue al público sin filtros sensacionalistas.
-
-## REVELACIONES (3:30 - 4:30)
-La verdadera rareza no es un monstruo. Es que criaturas marinas de hace cincuenta millones de años estén asomando entre las nieves del techo del mundo. Es que un océano entero se haya convertido en una cordillera. Y es que el cambio climático esté reescribiendo, en tiempo real, lo que sabemos del pasado profundo del planeta. El Himalaya no necesita ficción: ya cuenta la historia más asombrosa que podamos imaginar.
-
-## CONCLUSIÓN (4:30 - 4:50)
-El Himalaya no necesita misterios inventados. Tiene los mares más antiguos del planeta grabados en su roca. Solo hay que mirar con los pies en la tierra, las manos en la pizarra y la cabeza abierta a lo que la geología lleva cincuenta millones de años intentando contarnos. La realidad, una vez más, supera a la leyenda, y la próxima vez que alguien te hable de un fósil misterioso caído del cielo, recuerda que la verdadera rareza ya está ahí fuera, escrita en piedra, esperando a quien quiera leerla sin prisa y sin filtros de conspiración.
-
-## CTA (4:50 - 5:00)
-Si quieres más documentales donde desmontamos bulos y celebramos la realidad, suscríbete al canal y activa la campana. Nos vemos en el siguiente misterio resuelto.
-"""
-
-SCRIPT_SHORT_TEXT = """\
-## TITULO
-Himalaya: el mar que se hizo montaña
-
-## HOOK (0:00 - 0:05)
-El techo del mundo fue un océano.
-
-## INFORMACIÓN ESENCIAL (0:05 - 0:35)
-Hace 50 millones de años, las placas tectónicas levantaron el Mar de Tetis hasta formar el Himalaya que conocemos hoy. Sus fósiles marinos —ammonites, nummulites, braquiópodos— están grabados en la roca. El deshielo los está sacando a la luz poco a poco. En 2023 se recuperó ADN antiguo en el glaciar de Khumbu, y la arqueología glacial ya es una disciplina científica con identidad propia.
-
-## ESCALADA (0:35 - 0:55)
-En 2017, supuestos restos del Yeti analizados genéticamente resultaron ser de oso pardo. La tradición sobrevive. La ciencia ya respondió. Y la respuesta es más extraordinaria que el mito, porque cuenta cómo la Tierra transforma un océano entero en la cordillera más alta del planeta.
-
-## REMATE (0:55 - 1:00)
-La montaña guarda un océano. Solo necesitamos ojos para verlo.
-
-## CTA (1:00 - 1:05)
-Sígueme para más bulos desmontados.
-"""
-
-SCENES_JSON = """\
-[
-  {
-    "scene_number": 1,
-    "narration_segment": "Donde hoy se levanta la montaña más alta del planeta, hubo un mar. Sus criaturas descansan ahora bajo glaciares que el sol está derritiendo.",
-    "visual_description": "Amanecer sobre el Himalaya, pico nevado bañado en luz dorada, glaciar descendiendo por la ladera, vista aérea que desciende lentamente hasta una grieta donde asoma roca oscura.",
-    "camera_movement": "aéreo",
-    "duration_seconds": 15,
-    "transition": "fundido"
-  },
-  {
-    "scene_number": 2,
-    "narration_segment": "Cada año, el Himalaya pierde milímetros de hielo que han permanecido durante milenios. Lo que ese hielo esconde cambia la historia que contamos sobre el planeta.",
-    "visual_description": "Time-lapse de un glaciar retrocediendo, comparación antes/después de la línea de hielo, agua de deshielo formando un río turbio entre morrenas.",
-    "camera_movement": "travelling",
-    "duration_seconds": 25,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 3,
-    "narration_segment": "Hace cincuenta millones de años, una placa oceánica se subdujo bajo otra continental. El fondo del Mar de Tetis se elevó y plegó hasta formar la cordillera más alta del mundo.",
-    "visual_description": "Animación esquemática de placas tectónicas chocando, el fondo marino plegándose, estratos sedimentarios ascendiendo, transición al Himalaya actual.",
-    "camera_movement": "zoom in",
-    "duration_seconds": 35,
-    "transition": "cortinilla"
-  },
-  {
-    "scene_number": 4,
-    "narration_segment": "En sus estratos quedaron atrapados ammonites, braquiópodos y nummulites. La montaña entera es un libro abierto de paleontología.",
-    "visual_description": "Primer plano de un ammonite fosilizado emergiendo de roca gris, luz rasante lateral que resalta las espirales del fósil.",
-    "camera_movement": "primer plano",
-    "duration_seconds": 30,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 5,
-    "narration_segment": "Desde 1970 los glaciares del Himalaya pierden masa de forma acelerada. El hielo que durante siglos protegió restos orgánicos los está soltando. En 2023 un equipo recuperó ADN antiguo en el glaciar de Khumbu.",
-    "visual_description": "Investigadores con ropa de alta montaña extrayendo muestras de sedimento en la base de un glaciar, tubos de ensayo etiquetados, luz fría azulada.",
-    "camera_movement": "paneo lento",
-    "duration_seconds": 40,
-    "transition": "fundido"
-  },
-  {
-    "scene_number": 6,
-    "narration_segment": "Lo que aparece no es un monstruo: es un registro científico excepcional.",
-    "visual_description": "Detalle de un fósil diminuto bajo microscopio de campo, manos con guantes de nitrilo sosteniendo la muestra, fondo oscuro.",
-    "camera_movement": "zoom in",
-    "duration_seconds": 18,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 7,
-    "narration_segment": "Durante siglos, los monasterios nepalíes guardaron restos atribuidos al Yeti. En 2017, un análisis genético publicado en la Royal Society los identificó como osos pardos y ganado.",
-    "visual_description": "Interior de un monasterio nepalí con luz de velas, cajas antiguas con cueros cabelludos, transición a una gráfica de barras con resultados del estudio genético.",
-    "camera_movement": "estático",
-    "duration_seconds": 35,
-    "transition": "fundido"
-  },
-  {
-    "scene_number": 8,
-    "narration_segment": "La verdadera rareza no es un monstruo. Es que criaturas marinas de hace cincuenta millones de años estén asomando entre las nieves del techo del mundo.",
-    "visual_description": "Plano cenital de la cumbre del Everest al atardecer, nubes envolviendo la cima, sensación de inmensidad y silencio.",
-    "camera_movement": "aéreo",
-    "duration_seconds": 22,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 9,
-    "narration_segment": "El Himalaya no necesita misterios inventados. Tiene los mares más antiguos del planeta grabados en su roca. Solo hay que mirar con los pies en la tierra.",
-    "visual_description": "Vista panorámica del Himalaya con texto en pantalla desvaneciéndose, un geólogo sentado en una roca con martillo en mano mirando la cordillera.",
-    "camera_movement": "travelling",
-    "duration_seconds": 15,
-    "transition": "fundido"
-  }
-]
-"""
-
-# Set corto (1 min, Shorts/Reels). Set reducido de 4 escenas para
-# ejercitar el camino script_id=short en el runner y la ruta /scenes
-# (min_scenes_short del QC = 4, asi evitamos el warning no-bloqueante).
-SCENES_SHORT_JSON = """\
-[
-  {
-    "scene_number": 1,
-    "narration_segment": "El techo del mundo fue un mar. Hace 50 millones de años.",
-    "visual_description": "Time-lapse del Himalaya con el mar cubriendo la zona donde hoy están las cumbres, transición fundida a las nieves actuales.",
-    "camera_movement": "zoom out",
-    "duration_seconds": 10,
-    "transition": "fundido"
-  },
-  {
-    "scene_number": 2,
-    "narration_segment": "El deshielo está sacando a la luz criaturas atrapadas durante milenios.",
-    "visual_description": "Glaciar retrocediendo, ammonite diminuto asomando entre el sedimento, luz rasante cinematográfica.",
-    "camera_movement": "primer plano",
-    "duration_seconds": 12,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 3,
-    "narration_segment": "Un registro científico excepcional. Ammonites y nummulites del antiguo Mar de Tetis.",
-    "visual_description": "Primer plano de un ammonite fosilizado, manos con guantes de nitrilo sosteniendo la muestra, fondo oscuro.",
-    "camera_movement": "zoom in",
-    "duration_seconds": 10,
-    "transition": "corte seco"
-  },
-  {
-    "scene_number": 4,
-    "narration_segment": "El Himalaya no necesita misterios inventados. Solo geología real.",
-    "visual_description": "Cumbre del Everest al atardecer, texto en pantalla desvaneciéndose, silencio y quietud.",
-    "camera_movement": "estático",
-    "duration_seconds": 8,
-    "transition": "fundido"
-  }
-]
-"""
-
-
-METADATA_YOUTUBE_TEXT = """\
-## TITULOS (5 opciones)
-1. El Himalaya guarda un mar de 50 millones de años
-2. El techo del mundo fue un océano (y el deshielo lo destapa)
-3. Fósiles del Mar de Tetis en el Himalaya: la verdad
-4. Yeti, bulos y paleontología real en Nepal
-5. Cuando el Himalaya era mar: lo que el deshielo está sacando
-
-## DESCRIPCIÓN
-Cada año, los glaciares del Himalaya pierden milímetros de hielo milenario. Lo que ese hielo ha protegido durante milenios está cambiando lo que sabemos del pasado profundo del planeta. En este documental desmontamos la narrativa viral de los "fósiles misteriosos" tras el deshielo nepalí y mostramos la realidad geológica verificable: ammonites, braquiópodos y nummulites del antiguo Mar de Tetis, elevados por la colisión tectónica entre la placa india y la euroasiática hace 50 millones de años. Analizamos también el estudio genético de 2017 que identificó los supuestos restos del Yeti como pertenecientes a osos pardos y ganado, y ponemos en valor la arqueología glacial como nueva disciplina científica.
-
-Si te interesan los documentales donde desmontamos bulos y celebramos la realidad, suscríbete al canal y activa la campana.
-
-Fuentes mencionadas en el vídeo:
-- USGS: https://www.usgs.gov/special-topics/plate-tectonics/science/himalayas
-- Nature (2019): https://www.nature.com/articles/s41586-019-1180-2
-- ICIMOD (2023): https://www.icimod.org/article/himalaya-glacier-mass-balance
-- PNAS (2023): https://www.pnas.org/doi/10.1073/pnas.2217561120
-- Royal Society B (2017): https://royalsocietypublishing.org/doi/10.1098/rspb.2017.1304
-
-## CAPÍTULOS
-00:00 Hook — Donde hubo un mar
-00:15 El deshielo que cambia la historia
-01:00 El archivo del Mar de Tetis
-01:35 La arqueología del deshielo
-02:15 La sombra del Yeti
-03:30 Lo que el hielo esconde de verdad
-04:00 Conclusión
-
-## TAGS (15)
-himalaya, fosiles, mar de tetis, paleontologia, yeti, nepal, deshielo, cambio climatico, tectonica de placas, geologia, arqueologia glaciar, ammonites, braquiopodos, documental misterio, todo sobre todo
-
-## HASHTAGS (5)
-#himalaya #fosiles #paleontologia #tetis #yetis
-
-## CTA
-Suscríbete al canal y activa la campana para más documentales donde desmontamos bulos y celebramos la realidad.
-"""
-
-METADATA_SHORTS_TEXT = """\
-## CAPTION
-El Himalaya fue un océano.
-Sus criaturas descansan bajo glaciares que se derriten.
-Lo que está apareciendo cambia la historia del planeta.
-
-## HOOK
-El techo del mundo fue un mar.
-
-## HASHTAGS (10)
-#himalaya #fosiles #tetis #yetis #nepal #paleontologia #arqueologia #deshielo #documental #shorts
-
-## CTA
-Sígueme para más bulos desmontados.
-
-## TEXTO EN PANTALLA
-1. EL HIMALAYA FUE UN OCÉANO
-2. HACE 50 MILLONES DE AÑOS
-3. EL DESHIELO LO ESTÁ DESTAPANDO
-"""
+    app.sync_project_stages_for_project(PROJECT_ID)
 
 
 def log(stage, msg, ok=True):
@@ -387,316 +213,299 @@ def log(stage, msg, ok=True):
 
 def main():
     client = app.app.test_client()
+    failures: list[str] = []
 
-    # ---- Bootstrap: garantiza que el proyecto existe ----
-    print("=== Bootstrap ===")
-    ensure_project()
+    def check(label, ok, detail=""):
+        ok = bool(ok)
+        log(label, detail if detail else ("sí" if ok else "NO"), ok)
+        if not ok:
+            failures.append(label)
+
+    print("=== 0) Bootstrap ===")
+    reset_project()
     with app.get_db() as conn:
-        n = conn.execute("SELECT COUNT(*) AS n FROM projects").fetchone()["n"]
-        log("Proyecto bootstrap", f"{n} proyecto(s) en BD", True)
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM projects WHERE id=?", (PROJECT_ID,)
+        ).fetchone()["n"]
+    check("Proyecto sintético recreado", n == 1, f"id={PROJECT_ID}")
 
-    # ---- 0) Verificar dashboard ----
-    print("\n=== 0) Dashboard ===")
+    stages = app.load_project_stages(PROJECT_ID)
+    check("Hay 7 project_stages", len(stages) == 7, f"{len(stages)} filas")
+    ordered_names = [s["stage_name"] for s in stages]
+    check(
+        "Orden = research → ... → qc",
+        ordered_names == list(EXPECTED_ORDER),
+        f"{ordered_names}",
+    )
+    ps_id_by_name = {s["stage_name"]: s["id"] for s in stages}
+    rs_id_by_name = {s["stage_name"]: s["roadmap_stage_id"] for s in stages}
+
+    print("\n=== 1) Dashboard y vista de proyecto ===")
     r = client.get("/")
-    log("Dashboard", f"status {r.status_code}, len {len(r.data)}", r.status_code == 200)
-    assert b"Todo Sobre Todo" in r.data, "Dashboard no contiene marca"
+    check("GET / status 200", r.status_code == 200, f"status {r.status_code}")
+    check("GET / contiene marca", b"Todo Sobre Todo" in r.data)
 
-    # ---- 1) Reforzar investigación con secciones parseables ----
-    print("\n=== 1) Investigación (reescribir con formato parseable) ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/research",
-        data={"action": "save", "content": RESEARCH_TEXT},
-        follow_redirects=True,
+    r = client.get(f"/projects/{PROJECT_ID}")
+    check("GET /projects/<id> status 200", r.status_code == 200, f"status {r.status_code}")
+    check(
+        "GET /projects/<id> contiene el nombre",
+        PROJECT_NAME.encode("utf-8") in r.data,
     )
-    log("Investigación POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        research = dict(
-            conn.execute("SELECT * FROM research WHERE project_id=?", (PROJECT_ID,)).fetchone()
-        )
-    parsed_sources = json.loads(research["sources"] or "[]")
-    parsed_facts = json.loads(research["facts"] or "[]")
-    parsed_theories = json.loads(research["theories"] or "[]")
-    parsed_unverified = json.loads(research["unverified"] or "[]")
-    log("Hechos", f"{len(parsed_facts)} extraídos", len(parsed_facts) >= 6)
-    log("Fuentes", f"{len(parsed_sources)} extraídas", len(parsed_sources) >= 6)
-    log("Teorías", f"{len(parsed_theories)} extraídas", len(parsed_theories) >= 3)
-    log("Sin verificar", f"{len(parsed_unverified)} marcadas", len(parsed_unverified) >= 1)
+    check("GET /projects/<id> muestra la hoja de ruta", b"Hoja de ruta" in r.data)
 
-    # ---- 2) Concepto ----
-    print("\n=== 2) Concepto ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/concept",
-        data={"action": "save", "text": CONCEPT_TEXT},
-        follow_redirects=True,
-    )
-    log("Concepto POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        concept = dict(
-            conn.execute("SELECT * FROM concept WHERE project_id=?", (PROJECT_ID,)).fetchone()
-        )
-    log("Ángulo", bool(concept["angle"]), bool(concept["angle"]))
-    log("Tesis", bool(concept["thesis"]), bool(concept["thesis"]))
-    kp = json.loads(concept["key_points"] or "[]")
-    log("Puntos clave", f"{len(kp)} puntos", len(kp) >= 3)
-
-    # ---- 3) Guion largo ----
-    print("\n=== 3) Guion largo (5 min) ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/scripts",
-        data={"action": "save", "script_type": "long", "text": SCRIPT_LONG_TEXT},
-        follow_redirects=True,
-    )
-    log("Guion largo POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        long_s = dict(
-            conn.execute(
-                "SELECT * FROM scripts WHERE project_id=? AND type='long'",
-                (PROJECT_ID,),
-            ).fetchone()
-        )
-    log("Hook largo", bool(long_s["hook"]), bool(long_s["hook"]))
-    log("Contexto largo", bool(long_s["context"]), bool(long_s["context"]))
-    log("Desarrollo largo", bool(long_s["development"]), bool(long_s["development"]))
-    log("Revelaciones largo", bool(long_s["revelations"]), bool(long_s["revelations"]))
-    log("Conclusión largo", bool(long_s["conclusion"]), bool(long_s["conclusion"]))
-    log("CTA largo", bool(long_s["cta"]), bool(long_s["cta"]))
-    log(
-        "Palabras largo",
-        f"{long_s['word_count']} (rango 650-850)",
-        650 <= long_s["word_count"] <= 850,
-    )
-
-    # ---- 4) Guion corto ----
-    print("\n=== 4) Guion corto (1 min) ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/scripts",
-        data={"action": "save", "script_type": "short", "text": SCRIPT_SHORT_TEXT},
-        follow_redirects=True,
-    )
-    log("Guion corto POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        short_s = dict(
-            conn.execute(
-                "SELECT * FROM scripts WHERE project_id=? AND type='short'",
-                (PROJECT_ID,),
-            ).fetchone()
-        )
-    log("Hook corto", bool(short_s["hook"]), bool(short_s["hook"]))
-    log(
-        "Palabras corto",
-        f"{short_s['word_count']} (rango 130-180)",
-        130 <= short_s["word_count"] <= 180,
-    )
-
-    # ---- 5) Escenas ----
-    print("\n=== 5) Escenas ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/scenes",
-        data={
-            "action": "save",
-            "script_id": str(long_s["id"]),
-            "text": SCENES_JSON,
-        },
-        follow_redirects=True,
-    )
-    log("Escenas POST (long)", f"status {r.status_code}", r.status_code == 200)
-    r = client.post(
-        f"/projects/{PROJECT_ID}/scenes",
-        data={
-            "action": "save",
-            "script_id": str(short_s["id"]),
-            "text": SCENES_SHORT_JSON,
-        },
-        follow_redirects=True,
-    )
-    log("Escenas POST (short)", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        n_long = conn.execute(
-            "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
-            (PROJECT_ID, long_s["id"]),
-        ).fetchone()["n"]
-        n_short = conn.execute(
-            "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
-            (PROJECT_ID, short_s["id"]),
-        ).fetchone()["n"]
-    log(
-        "Escenas long guardadas",
-        f"{n_long} (>= 6)",
-        n_long >= 6,
-    )
-    log(
-        "Escenas short guardadas",
-        f"{n_short} (>= 4)",
-        n_short >= 4,
-    )
-
-    # ---- 6) Metadata YouTube ----
-    print("\n=== 6) Metadata YouTube ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/metadata",
-        data={
-            "action": "save",
-            "platform": "youtube_long",
-            "script_id": str(long_s["id"]),
-            "text": METADATA_YOUTUBE_TEXT,
-        },
-        follow_redirects=True,
-    )
-    log("Metadata YT POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        m_yt = dict(
-            conn.execute(
-                "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_long'",
-                (PROJECT_ID,),
-            ).fetchone()
-        )
-    titles = json.loads(m_yt["titles"] or "[]")
-    chapters = json.loads(m_yt["chapters"] or "[]")
-    tags = json.loads(m_yt["tags"] or "[]")
-    hashtags = json.loads(m_yt["hashtags"] or "[]")
-    log("Títulos YT", f"{len(titles)} (>= 3)", len(titles) >= 3)
-    log("Capítulos YT", f"{len(chapters)} (>= 3)", len(chapters) >= 3)
-    log("Tags YT", f"{len(tags)} (>= 10)", len(tags) >= 10)
-    log("Hashtags YT", f"{len(hashtags)} (>= 3)", len(hashtags) >= 3)
-    log("Descripción YT", bool(m_yt["description"]), bool(m_yt["description"]))
-
-    # ---- 7) Metadata Shorts ----
-    print("\n=== 7) Metadata Shorts ===")
-    r = client.post(
-        f"/projects/{PROJECT_ID}/metadata",
-        data={
-            "action": "save",
-            "platform": "youtube_short",
-            "script_id": str(short_s["id"]),
-            "text": METADATA_SHORTS_TEXT,
-        },
-        follow_redirects=True,
-    )
-    log("Metadata Shorts POST", f"status {r.status_code}", r.status_code == 200)
-    with app.get_db() as conn:
-        m_sh = dict(
-            conn.execute(
-                "SELECT * FROM metadata_records WHERE project_id=? AND platform='youtube_short'",
-                (PROJECT_ID,),
-            ).fetchone()
-        )
-    sh_hashtags = json.loads(m_sh["hashtags"] or "[]")
-    sh_text = json.loads(m_sh["on_screen_text"] or "[]")
-    log("Caption Shorts", bool(m_sh["caption"]), bool(m_sh["caption"]))
-    log("Hook Shorts", bool(m_sh["hook"]), bool(m_sh["hook"]))
-    log("Hashtags Shorts", f"{len(sh_hashtags)} (>= 5)", len(sh_hashtags) >= 5)
-    log("Texto pantalla Shorts", f"{len(sh_text)} (>= 3)", len(sh_text) >= 3)
-
-    # ---- 7b) Miniaturas ----
-    print("\n=== 7b) Miniaturas ===")
-    THUMB_LONG_TEXT = """## MINIATURA
-A half-buried trilobite fossil in red sandstone, lit by a single volumetric sunbeam through desert dust, hyper-detailed textures, cinematic orange and teal grading, 16:9 composition, off-center focal point, documentary premium quality.
-"""
-    THUMB_SHORT_TEXT = """## MINIATURA
-Close-up of an ancient trilobite fossil eye filling the frame, orange and teal color grading, volumetric rim light, 9:16 vertical composition, centered subject, cinematic hyperrealism.
-"""
-    for stype, sid, body in (
-        ("long", long_s["id"], THUMB_LONG_TEXT),
-        ("short", short_s["id"], THUMB_SHORT_TEXT),
-    ):
+    print("\n=== 2) action=save por etapa (ruta genérica) ===")
+    for name in EXPECTED_ORDER:
+        instruction, response = STAGE_FIXTURES[name]
         r = client.post(
-            f"/projects/{PROJECT_ID}/thumbnails",
+            f"/projects/{PROJECT_ID}/stages/{ps_id_by_name[name]}",
             data={
                 "action": "save",
-                "script_type": stype,
-                "script_id": str(sid),
-                "text": body,
+                "instruction": instruction,
+                "response": response,
             },
-            follow_redirects=True,
+            follow_redirects=False,
         )
-        log(f"Thumbnail {stype} POST", f"status {r.status_code}", r.status_code == 200)
-        with app.get_db() as conn:
-            row = conn.execute(
-                "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type=?",
-                (PROJECT_ID, stype),
-            ).fetchone()
-        log(f"Thumbnail {stype} guardada", bool(row and row["prompt"]), bool(row and row["prompt"]))
-    # Etapa 'thumbnails' debe estar completa (ambas con prompt)
-    stages = app.project_stage_status(
-        {
-            "id": PROJECT_ID,
-            "status": app.get_db()
-            .execute("SELECT status FROM projects WHERE id=?", (PROJECT_ID,))
-            .fetchone()["status"],
-        }
-    )
-    log("Etapa thumbnails completa", bool(stages.get("thumbnails")), bool(stages.get("thumbnails")))
-
-    # ---- 8) QC ----
-    print("\n=== 8) Control de calidad ===")
-    r = client.post(f"/projects/{PROJECT_ID}/qc", follow_redirects=True)
-    log("QC POST", f"status {r.status_code}", r.status_code == 200)
-    issues = app.run_qc(PROJECT_ID)
-    errors = [i for i in issues if i[1] == "error"]
-    warnings = [i for i in issues if i[1] == "warning"]
-    infos = [i for i in issues if i[1] == "info"]
-    log("Errores", f"{len(errors)} (0 esperado)", len(errors) == 0)
-    log("Warnings", f"{len(warnings)} (tolerable)", True)
-    log("Info", f"{len(infos)}", True)
-    for sev, items in [("error", errors), ("warning", warnings)]:
-        for stage, _, msg, _field in items:
-            print(f"      [{sev}] {stage}: {msg}")
+        check(f"{name} save", r.status_code in (200, 302), f"status {r.status_code}")
 
     with app.get_db() as conn:
-        status = conn.execute("SELECT status FROM projects WHERE id=?", (PROJECT_ID,)).fetchone()[
-            "status"
-        ]
-    log("Status del proyecto", f"'{status}' (esperado 'ready')", status == "ready")
+        rows = {
+            row["stage_name"]: dict(row)
+            for row in conn.execute(
+                """
+                SELECT rs.name AS stage_name, ps.instruction, ps.response
+                FROM project_stages ps
+                JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+                WHERE ps.project_id=?
+                """,
+                (PROJECT_ID,),
+            ).fetchall()
+        }
+    for name, (instruction, response) in STAGE_FIXTURES.items():
+        row = rows.get(name, {})
+        saved_resp = (row.get("response") or "").strip()
+        saved_inst = (row.get("instruction") or "").strip()
+        check(
+            f"{name} response persistida",
+            saved_resp == response.strip(),
+            f"{len(saved_resp)} chars",
+        )
+        check(
+            f"{name} instruction persistida",
+            saved_inst == instruction.strip(),
+            f"{len(saved_inst)} chars",
+        )
 
-    # ---- 9) Export ZIP ----
-    print("\n=== 9) Exportación ZIP ===")
-    r = client.post(f"/projects/{PROJECT_ID}/export", follow_redirects=False)
-    log("Export POST", f"status {r.status_code}", r.status_code == 200)
-    log(
-        "Content-Type zip",
-        "zip" in r.headers.get("Content-Type", "").lower() or r.data[:2] == b"PK",
+    print("\n=== 3) action=generate (modo manual, sin guardar) ===")
+    research_id = ps_id_by_name["research"]
+    with app.get_db() as conn:
+        before = (
+            conn.execute(
+                "SELECT response FROM project_stages WHERE id=?", (research_id,)
+            ).fetchone()["response"]
+            or ""
+        )
+    r = client.post(
+        f"/projects/{PROJECT_ID}/stages/{research_id}",
+        data={
+            "action": "generate",
+            "instruction": "instruccion generada de prueba",
+        },
+        follow_redirects=False,
+    )
+    check("generate status 200", r.status_code == 200, f"status {r.status_code}")
+    body = r.data.decode("utf-8", errors="replace")
+    check(
+        "generate devuelve el bloque manual exclusivo",
+        "## [MODO MANUAL" in body,
+        "marker presente",
+    )
+    with app.get_db() as conn:
+        after = (
+            conn.execute(
+                "SELECT response FROM project_stages WHERE id=?", (research_id,)
+            ).fetchone()["response"]
+            or ""
+        )
+    check(
+        "generate NO persiste la respuesta",
+        after == before,
+        f"{len(before)}ch -> {len(after)}ch",
+    )
+
+    print("\n=== 4) 7/7 completas + carpeta sincronizada (modelo nuevo) ===")
+    with app.get_db() as conn:
+        proj = dict(
+            conn.execute(
+                "SELECT * FROM projects WHERE id=?", (PROJECT_ID,)
+            ).fetchone()
+        )
+    status = app.project_stage_status(proj)
+    done = sum(1 for v in status.values() if v)
+    check("7/7 etapas marcadas como hechas", done == 7, f"{done}/7")
+    check(
+        "Claves del status = conjunto esperado",
+        set(status.keys()) == set(EXPECTED_ORDER),
+        f"{sorted(status.keys())}",
+    )
+
+    folder, written = app.sync_project_folder(PROJECT_ID)
+    expected_files = (
+        {"00_RESUMEN.md", "08_paquete_completo.json"}
+        | {f"stage_{rs_id_by_name[n]}.md" for n in EXPECTED_ORDER}
+    )
+    check(
+        "Carpeta contiene exactamente 9 archivos esperados",
+        set(written) == expected_files,
+        f"faltan={sorted(expected_files - set(written))} "
+        f"sobran={sorted(set(written) - expected_files)}",
+    )
+    resumen = (folder / "00_RESUMEN.md").read_text(encoding="utf-8")
+    check("00_RESUMEN contiene el tema", PROJECT_TOPIC in resumen)
+    check("00_RESUMEN contiene el nombre", PROJECT_NAME in resumen)
+
+    bundle = json.loads((folder / "08_paquete_completo.json").read_text(encoding="utf-8"))
+    check(
+        "bundle tiene 7 project_stages",
+        len(bundle.get("project_stages", [])) == 7,
+        f"{len(bundle.get('project_stages', []))}",
+    )
+    check(
+        "bundle tiene 7 roadmap_stages activos",
+        len(bundle.get("roadmap_stages", [])) == 7,
+        f"{len(bundle.get('roadmap_stages', []))}",
+    )
+
+    print("\n=== 5) Renombrar no cambia los filenames internos ===")
+    NEW_NAME = "Otro Nombre Con Acentos"
+    with app.get_db() as conn:
+        conn.execute(
+            "UPDATE projects SET name=?, updated_at=? WHERE id=?",
+            (NEW_NAME, "2026-02-01T00:00:00", PROJECT_ID),
+        )
+    renamed_folder, renamed_written = app.sync_project_folder(PROJECT_ID)
+    expected_renamed = app.safe_project_dir(PROJECT_ID, NEW_NAME).name
+    check(
+        "La carpeta tiene el nuevo nombre",
+        renamed_folder.name == expected_renamed,
+        f"{renamed_folder.name}",
+    )
+    check(
+        "Filenames NO cambian tras renombrar",
+        set(renamed_written) == expected_files,
+        f"diffs {sorted(set(renamed_written) ^ expected_files)}",
+    )
+    check(
+        "Cada stage_<rsid>.md sigue presente",
+        all(
+            (renamed_folder / f"stage_{rs_id_by_name[n]}.md").exists()
+            for n in EXPECTED_ORDER
+        ),
+        "todos",
+    )
+    with app.get_db() as conn:
+        conn.execute(
+            "UPDATE projects SET name=?, updated_at=? WHERE id=?",
+            (PROJECT_NAME, "2026-01-01T00:00:00", PROJECT_ID),
+        )
+
+    print("\n=== 6) Etapa desactivada: sin MD, sin acceso visible ===")
+    DISABLED = "qc"
+    disabled_rs = rs_id_by_name[DISABLED]
+    with app.get_db() as conn:
+        conn.execute(
+            "UPDATE roadmap_stages SET is_active=0, updated_at=? WHERE id=?",
+            ("2026-03-01T00:00:00", disabled_rs),
+        )
+        proj2 = dict(
+            conn.execute(
+                "SELECT * FROM projects WHERE id=?", (PROJECT_ID,)
+            ).fetchone()
+        )
+    disabled_folder, disabled_written = app.sync_project_folder(PROJECT_ID)
+    disabled_file = disabled_folder / f"stage_{disabled_rs}.md"
+    check(
+        f"Etapa '{DISABLED}' desactivada NO genera MD",
+        not disabled_file.exists(),
+        f"{disabled_file.name}",
+    )
+    check(
+        "El set de archivos cae a 8 (-1 desactivada)",
+        len(disabled_written) == len(expected_files) - 1,
+        f"{len(disabled_written)} archivos",
+    )
+    check(
+        "El MD de la desactivada tampoco está en la lista escrita",
+        f"stage_{disabled_rs}.md" not in disabled_written,
+    )
+
+    status_disabled = app.project_stage_status(proj2)
+    check(
+        "project_stage_status omite la etapa desactivada",
+        DISABLED not in status_disabled,
+        f"{sorted(status_disabled.keys())}",
+    )
+    check(
+        "Conteo activo = 6 (no 7)",
+        sum(1 for v in status_disabled.values() if v) == 6,
+        f"{sum(1 for v in status_disabled.values() if v)}/6",
+    )
+
+    with app.get_db() as conn:
+        conn.execute(
+            "UPDATE roadmap_stages SET is_active=1, updated_at=? WHERE id=?",
+            ("2026-04-01T00:00:00", disabled_rs),
+        )
+    app.sync_project_folder(PROJECT_ID)
+
+    print("\n=== 7) Export ZIP ===")
+    r = client.post(
+        f"/projects/{PROJECT_ID}/export",
+        data={"action": "zip"},
+        follow_redirects=False,
+    )
+    check("Export status 200", r.status_code == 200, f"status {r.status_code}")
+    check(
+        "Export devuelve un ZIP (PK magic)",
+        r.data[:2] == b"PK",
+        f"primeros bytes={r.data[:4]!r}",
     )
     zf = zipfile.ZipFile(io.BytesIO(r.data))
     names = zf.namelist()
-    expected_substrings = [
-        "00_RESUMEN.md",
-        "01_investigacion.md",
-        "02_concepto.md",
-        "03_guiones/guion_long.md",
-        "03_guiones/guion_short.md",
-        "04_escenas/",
-        "05_metadata/metadata_youtube_long.md",
-        "05_metadata/metadata_youtube_short.md",
-        "06_thumbnails/thumbnail_long.md",
-        "06_thumbnails/thumbnail_short.md",
-        "08_paquete_completo.json",
-    ]
-    for s in expected_substrings:
-        present = any(s in n for n in names)
-        log(f"Contiene {s}", "sí" if present else "NO", present)
+    for token in ("00_RESUMEN.md", "08_paquete_completo.json"):
+        check(f"ZIP contiene {token}", any(token in n for n in names), token)
+    for name in EXPECTED_ORDER:
+        token = f"stage_{rs_id_by_name[name]}.md"
+        check(f"ZIP contiene {token}", any(token in n for n in names), token)
 
-    # Validar contenido de un par de archivos
-    resumen = zf.read([n for n in names if n.endswith("00_RESUMEN.md")][0]).decode("utf-8")
-    resumen_ok = "Verificacion pipeline" in resumen or "Himalaya" in resumen
-    log("Resumen contiene tema", resumen_ok, resumen_ok)
-    bundle = json.loads(
-        zf.read([n for n in names if n.endswith("08_paquete_completo.json")][0]).decode("utf-8")
+    resumen_zip = next(
+        zf.read(n).decode("utf-8")
+        for n in names
+        if n.endswith("00_RESUMEN.md")
     )
-    log(
-        "Bundle JSON",
-        f"keys: {list(bundle.keys())[:6]}...",
-        {"project", "research", "concept", "scripts"}.issubset(bundle.keys()),
+    check("ZIP resumen contiene el tema", PROJECT_TOPIC in resumen_zip)
+    bundle_zip = json.loads(
+        next(
+            zf.read(n).decode("utf-8")
+            for n in names
+            if n.endswith("08_paquete_completo.json")
+        )
     )
-    log(
-        "Bundle thumbnails",
-        f"{len(bundle.get('thumbnails', []))} (esperado 2)",
-        len(bundle.get("thumbnails", [])) == 2,
+    check(
+        "ZIP bundle tiene 7 project_stages",
+        len(bundle_zip.get("project_stages", [])) == 7,
+        f"{len(bundle_zip.get('project_stages', []))}",
     )
 
     print("\n" + "=" * 60)
-    print(f"  ZIP exportado: {len(names)} archivos, {len(r.data)} bytes")
+    if failures:
+        print(f"  {len(failures)} comprobaciones fallaron:")
+        for name in failures:
+            print(f"    - {name}")
+        print("=" * 60)
+        sys.exit(1)
+    print(f"  Todas las comprobaciones pasaron en verde")
+    print(f"  ZIP: {len(names)} archivos, {len(r.data)} bytes")
     print("=" * 60)
-    print("\n[OK] Verificación end-to-end completada.\n")
 
 
 if __name__ == "__main__":

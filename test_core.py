@@ -607,7 +607,7 @@ def test_export_creates_zip(tmp_path):
 
 
 def test_new_project_creates_folder(tmp_path):
-    """Al crear un proyecto, sync_project_folder deja 00_RESUMEN.md en disco."""
+    """Al crear un proyecto, la carpeta se sincroniza con el contrato nuevo."""
     _setup_qc_db(tmp_path)
     test_projects = tmp_path / "projects"
     test_projects.mkdir()
@@ -617,7 +617,11 @@ def test_new_project_creates_folder(tmp_path):
         c = app.app.test_client()
         r = c.post(
             "/projects/new",
-            data={"name": "Carpeta auto", "topic": "verifico la sincronización"},
+            data={
+                "name": "Carpeta auto",
+                "topic": "verifico la sincronización",
+                "profile_id": "1",
+            },
             follow_redirects=False,
         )
         assert r.status_code == 302
@@ -630,7 +634,17 @@ def test_new_project_creates_folder(tmp_path):
         resumen = (folder / "00_RESUMEN.md").read_text(encoding="utf-8")
         assert "Carpeta auto" in resumen
         assert "verifico la sincronización" in resumen
-        print("  ✓ crear proyecto sincroniza la carpeta con 00_RESUMEN.md")
+        stage_files = sorted(folder.glob("stage_*.md"))
+        assert len(stage_files) == 7, (
+            f"esperaba 7 stage_<id>.md, hay {len(stage_files)}: {stage_files}"
+        )
+        assert (folder / "08_paquete_completo.json").exists()
+        legacy_dirs = ["03_guiones", "04_escenas", "05_metadata", "06_thumbnails"]
+        for d in legacy_dirs:
+            assert not (folder / d).exists(), (
+                f"carpeta legacy {d} no debe existir en el modelo nuevo"
+            )
+        print("  ✓ crear proyecto sincroniza la carpeta con stage_<id>.md")
     finally:
         app.PROJECTS_DIR = original
 
@@ -1025,356 +1039,514 @@ def test_migration_copies_stage_prompts_to_profile_prompts(tmp_path):
 
 
 # ==========================================================================
-# Tests del graph CRUD y ejecutor unificado
+# Tests del modelo genérico de hoja de ruta (roadmap + project_stages)
 # ==========================================================================
 
 
-def _get_default_profile_id(tmp_path):
+def test_default_profile_seeds_seven_roadmap_stages(tmp_path):
+    """init_db() siembra las 7 etapas base del perfil por defecto."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
-        row = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()
-    return row["id"]
+        rows = conn.execute(
+            "SELECT name, sort_order, is_active FROM roadmap_stages "
+            "WHERE profile_id=1 ORDER BY sort_order, id"
+        ).fetchall()
+    assert len(rows) == 7, f"esperaba 7, hay {len(rows)}: {[r['name'] for r in rows]}"
+    names = [r["name"] for r in rows]
+    assert names == list(app.DEFAULT_ROADMAP_STAGES), names
+    assert all(r["is_active"] == 1 for r in rows)
+    sort_orders = [r["sort_order"] for r in rows]
+    assert sort_orders == list(range(7)), sort_orders
+    print("  ✓ perfil por defecto siembra 7 roadmap_stages activos en orden")
 
 
-def test_get_or_create_fixed_graph_nodes(tmp_path):
-    """Crea las 10 filas fijas y no duplica en llamadas sucesivas."""
-    pid = _get_default_profile_id(tmp_path)
-    rows1 = app.get_or_create_fixed_graph_nodes(pid)
-    assert len(rows1) == 10, f"esperaba 10, hay {len(rows1)}"
-    keys = {r["node_key"] for r in rows1}
-    assert keys == set(app.KNOWN_FIXED_NODE_KEYS), keys
-    rows2 = app.get_or_create_fixed_graph_nodes(pid)
-    assert len(rows2) == 10, "segunda llamada no debe duplicar"
-    keys2 = {r["node_key"] for r in rows2}
-    assert keys2 == set(app.KNOWN_FIXED_NODE_KEYS)
-    for r in rows2:
-        assert r["is_fixed"] == 1
-        assert r["position_x"] is not None
-        assert r["position_y"] is not None
-    print("  ✓ get_or_create_fixed_graph_nodes crea 10 filas únicas")
-
-
-def test_save_graph_node_and_delete(tmp_path):
-    """Custom node: save, update, delete. Fijos no se pueden borrar."""
-    pid = _get_default_profile_id(tmp_path)
-    saved = app.save_graph_node(pid, "custom_a", "Custom A", "sys", "user", "[]", 100, 200, False)
-    assert saved["node_key"] == "custom_a"
-    assert saved["is_fixed"] == 0
-    assert saved["label"] == "Custom A"
-    assert saved["position_x"] == 100
-    assert saved["position_y"] == 200
-    saved2 = app.save_graph_node(
-        pid, "custom_a", "Custom A v2", "sys2", "user2", '["research"]', 150, 250, False
+def test_new_profile_seeds_seven_roadmap_stages(tmp_path):
+    """POST /profiles action=create siembra las 7 etapas en el nuevo perfil."""
+    _setup_qc_db(tmp_path)
+    client = app.app.test_client()
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "create",
+            "name": "Perfil test",
+            "content_type": "Docu",
+            "audience": "x",
+            "tone": "serio",
+            "style": "cinema",
+            "notes": "",
+        },
+        follow_redirects=True,
     )
-    assert saved2["label"] == "Custom A v2"
-    assert saved2["position_x"] == 150
-    assert saved2["position_y"] == 250
-    deleted = app.delete_graph_node(pid, "custom_a")
-    assert deleted is True
-    deleted_again = app.delete_graph_node(pid, "custom_a")
-    assert deleted_again is False
-    app.get_or_create_fixed_graph_nodes(pid)
-    deleted_fixed = app.delete_graph_node(pid, "research")
-    assert deleted_fixed is False
+    assert r.status_code == 200
     with app.get_db() as conn:
-        n = conn.execute(
-            "SELECT COUNT(*) AS n FROM profile_graph_nodes "
-            "WHERE profile_id=? AND node_key='research'",
-            (pid,),
-        ).fetchone()["n"]
-    assert n == 1, "el nodo fijo 'research' debe seguir existiendo"
-    print("  ✓ save_graph_node + delete (rechaza fijos)")
+        pid = conn.execute(
+            "SELECT id FROM profiles WHERE name='Perfil test'"
+        ).fetchone()["id"]
+        names = [
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM roadmap_stages WHERE profile_id=? ORDER BY sort_order",
+                (pid,),
+            ).fetchall()
+        ]
+    assert names == list(app.DEFAULT_ROADMAP_STAGES), names
+    print("  ✓ crear perfil siembra 7 roadmap_stages con los nombres por defecto")
 
 
-def test_execute_graph_node_fixed_research(tmp_path):
-    """Ejecuta research en modo manual: persiste node_executions."""
+def test_new_project_seeds_seven_project_stages(tmp_path):
+    """Crear un proyecto siembra 7 project_stages, uno por roadmap_stage activa."""
     _setup_qc_db(tmp_path)
-    with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute(
-            """
-            INSERT INTO projects (id, name, topic, profile_id, status,
-                                  created_at, updated_at)
-            VALUES (1, 'Test', 'Tema de prueba', ?, 'research',
-                    '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post(
+            "/projects/new",
+            data={"name": "P1", "topic": "tema", "profile_id": "1"},
+            follow_redirects=False,
         )
-    result = app.execute_graph_node(1, "research")
-    assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
-    assert result.get("status") == "ok"
-    assert "Tema de prueba" in result.get("output", ""), (
-        f"manual mode debe contener el tema: {result.get('output')[:200]}"
-    )
-    with app.get_db() as conn:
-        row = conn.execute(
-            "SELECT status, output FROM node_executions "
-            "WHERE project_id=1 AND node_key='research' "
-            "ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-    assert row is not None, "node_executions no escritas"
-    assert row["status"] == "ok"
-    assert "Tema de prueba" in row["output"]
-    print("  ✓ execute_graph_node (research fixed, manual mode)")
-
-
-def test_execute_graph_node_custom(tmp_path):
-    """Ejecuta un nodo custom con interpolación de inputs."""
-    _setup_qc_db(tmp_path)
-    with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute(
-            """
-            INSERT INTO projects (id, name, topic, profile_id, status,
-                                  created_at, updated_at)
-            VALUES (1, 'Custom Test', 'Tema', ?, 'created',
-                    '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
-        )
-    app.save_graph_node(
-        pid,
-        "my_node",
-        "My Node",
-        "SYS_PROMPT",
-        "USER con {{ inputs.research }} metido",
-        '["research"]',
-        0,
-        0,
-        False,
-    )
-    with app.get_db() as conn:
-        conn.execute("""
-            INSERT INTO node_executions
-                (project_id, node_key, output, status, created_at)
-            VALUES (1, 'research', 'HECHOS IMPORTANTES', 'ok', '2025-01-01')
-        """)
-    result = app.execute_graph_node(1, "my_node")
-    assert result.get("ok") is True, f"esperaba ok, obtuve: {result}"
-    with app.get_db() as conn:
-        row = conn.execute(
-            "SELECT status, output FROM node_executions "
-            "WHERE project_id=1 AND node_key='my_node' "
-            "ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-    assert row["status"] == "ok"
-    assert "USER con" in row["output"], row["output"]
-    assert "HECHOS IMPORTANTES" in row["output"], (
-        "placeholder {{ inputs.research }} debe haberse interpolado"
-    )
-    print("  ✓ execute_graph_node (custom con inputs interpolados)")
-
-
-def test_persist_scenes_to_specific_script(tmp_path):
-    """_persist_scenes graba en el guion pedido (long o short)."""
-    _setup_qc_db(tmp_path)
-    with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
-        conn.execute(
-            """
-            INSERT INTO projects (id, name, topic, profile_id, status,
-                                  created_at, updated_at)
-            VALUES (1, 'PScenes', 'T', ?, 'created',
-                    '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
-        )
-        cur_l = conn.execute("""
-            INSERT INTO scripts (project_id, type, title, hook, body_full,
-                word_count, updated_at)
-            VALUES (1, 'long', 'L', 'h', 'uno dos tres', 3, '2025-01-01')
-        """)
-        cur_s = conn.execute("""
-            INSERT INTO scripts (project_id, type, title, hook, body_full,
-                word_count, updated_at)
-            VALUES (1, 'short', 'C', 'h', 'cuatro cinco', 2, '2025-01-01')
-        """)
-        long_id = cur_l.lastrowid
-        short_id = cur_s.lastrowid
-    parsed = [
-        {"scene_number": 1, "narration_segment": "uno", "image_prompt": "img1"},
-        {"scene_number": 2, "narration_segment": "dos tres", "image_prompt": "img2"},
-    ]
-    with app.app.app_context():
+        assert r.status_code == 302
         with app.get_db() as conn:
-            app._persist_scenes(conn, 1, "short", parsed, "2025-01-01")
-    with app.get_db() as conn:
-        rows_s = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT script_id, scene_number FROM scenes WHERE project_id=1 "
-                "AND script_id=? ORDER BY scene_number",
-                (short_id,),
+            pid = conn.execute(
+                "SELECT id FROM projects WHERE name='P1'"
+            ).fetchone()["id"]
+            stages = conn.execute(
+                """
+                SELECT ps.id AS ps_id, rs.name, rs.sort_order,
+                       ps.instruction, ps.response
+                FROM project_stages ps
+                JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+                WHERE ps.project_id = ?
+                ORDER BY rs.sort_order, rs.id
+                """,
+                (pid,),
             ).fetchall()
-        ]
-        rows_l = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT script_id, scene_number FROM scenes WHERE project_id=1 AND script_id=?",
-                (long_id,),
-            ).fetchall()
-        ]
-    assert len(rows_s) == 2, f"debe persistir 2 escenas en short: {rows_s}"
-    assert all(r["script_id"] == short_id for r in rows_s)
-    assert len(rows_l) == 0, "no debe tocar el guion largo"
-    print("  ✓ _persist_scenes escribe solo en el guion pedido")
+        assert len(stages) == 7, f"esperaba 7 project_stages, hay {len(stages)}"
+        names = [s["name"] for s in stages]
+        assert names == list(app.DEFAULT_ROADMAP_STAGES), names
+        with_inst = [s for s in stages if (s["instruction"] or "").strip()]
+        with_response = [s for s in stages if (s["response"] or "").strip()]
+        assert len(with_response) == 0, (
+            f"las project_stages nuevas deben tener response vacía: {with_response}"
+        )
+        for s in stages:
+            if s["name"] == "qc":
+                continue
+            assert (s["instruction"] or "").strip(), (
+                f"project_stage '{s['name']}' debe traer instruction inicial"
+            )
+        print("  ✓ crear proyecto siembra 7 project_stages (qc sin instrucción por contrato)")
+    finally:
+        app.PROJECTS_DIR = original
 
 
-def test_update_graph_layout(tmp_path):
-    """Persiste las posiciones enviadas."""
-    pid = _get_default_profile_id(tmp_path)
-    app.get_or_create_fixed_graph_nodes(pid)
-    nodes_data = [
-        {"node_key": "research", "position_x": 10.0, "position_y": 20.0},
-        {"node_key": "concept", "position_x": 300.0, "position_y": 40.0},
-        {"node_key": "scenes", "position_x": 700.0, "position_y": 90.0},
-    ]
-    updated = app.update_graph_layout(pid, nodes_data)
-    assert updated == 3, f"esperaba 3 updates, hay {updated}"
-    with app.get_db() as conn:
-        for nd in nodes_data:
-            row = conn.execute(
-                "SELECT position_x, position_y FROM profile_graph_nodes "
-                "WHERE profile_id=? AND node_key=?",
-                (pid, nd["node_key"]),
-            ).fetchone()
-            assert row is not None
-            assert row["position_x"] == nd["position_x"], nd["node_key"]
-            assert row["position_y"] == nd["position_y"], nd["node_key"]
-    empty = app.update_graph_layout(pid, [])
-    assert empty == 0
-    print("  ✓ update_graph_layout persiste posiciones")
-
-
-# ==========================================================================
-# Runner
-# ==========================================================================
-
-
-def test_runner_renders_for_project(tmp_path):
-    """GET /projects/<id>/run renderiza con los 10 nodos fijos."""
+def test_project_stage_get_renders(tmp_path):
+    """GET /projects/<id>/stages/<stage_id> renderiza la etapa."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
         conn.execute(
             """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
-            VALUES (1, 'Runner Test', 'Tema', ?, 'created',
+            VALUES (1, 'P', 'tema', 1, 'research',
                     '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
+        """
         )
+    app.sync_project_stages_for_project(1)
+    with app.get_db() as conn:
+        sid = conn.execute(
+            "SELECT id FROM project_stages WHERE project_id=1 ORDER BY id LIMIT 1"
+        ).fetchone()["id"]
     with app.app.test_client() as c:
-        r = c.get("/projects/1/run")
-        assert r.status_code == 200
+        r = c.get(f"/projects/1/stages/{sid}")
+        assert r.status_code == 200, r.status_code
         body = r.data.decode("utf-8")
-        assert "Ejecutar en modo grafo" in body
-        # Los 10 nodos fijos se inyectan en window.__GRAPH_DATA__
-        assert body.count('"isFixed": true') >= 10
-    print("  ✓ runner renderiza con 10 nodos fijos")
+        assert "Instrucción" in body
+        assert "Respuesta" in body
+        assert "Guardar" in body
+        assert "Etapas del proyecto" in body
+    print("  ✓ GET /projects/<id>/stages/<stage_id> renderiza la etapa")
 
 
-def test_runner_execute_route_returns_json(tmp_path):
-    """POST /projects/<id>/run/execute ejecuta un nodo fijo en modo manual."""
+def test_project_stage_post_saves_instruction_and_response(tmp_path):
+    """POST /projects/<id>/stages/<stage_id> action=save guarda instruction y response."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, topic, profile_id, status,
+                                      created_at, updated_at)
+                VALUES (1, 'P', 'tema', 1, 'research',
+                        '2025-01-01', '2025-01-01')
+            """
+            )
+        app.sync_project_stages_for_project(1)
+        with app.get_db() as conn:
+            sid = conn.execute(
+                "SELECT id FROM project_stages WHERE project_id=1 ORDER BY id LIMIT 1"
+            ).fetchone()["id"]
+        with app.app.test_client() as c:
+            r = c.post(
+                f"/projects/1/stages/{sid}",
+                data={
+                    "action": "save",
+                    "instruction": "instr editada",
+                    "response": "respuesta guardada",
+                },
+                follow_redirects=False,
+            )
+            assert r.status_code == 302, r.status_code
+        with app.get_db() as conn:
+            row = dict(
+                conn.execute(
+                    "SELECT instruction, response FROM project_stages WHERE id=?",
+                    (sid,),
+                ).fetchone()
+            )
+        assert row["instruction"] == "instr editada", row
+        assert row["response"] == "respuesta guardada", row
+        stage_file = app.safe_project_dir(1, "P") / f"stage_{sid}.md"
+        assert stage_file.exists(), f"falta {stage_file}"
+        content = stage_file.read_text(encoding="utf-8")
+        assert "instr editada" in content
+        assert "respuesta guardada" in content
+        print("  ✓ POST /stages/<id> action=save guarda y reescribe stage_<id>.md")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_non_empty_response_marks_stage_done(tmp_path):
+    """Una respuesta no vacía en project_stages marca la etapa como hecha."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
         conn.execute(
             """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
-            VALUES (1, 'Runner Exec', 'Tema runner', ?, 'created',
+            VALUES (1, 'P', 'tema', 1, 'research',
                     '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
+        """
         )
-    with app.app.test_client() as c:
-        r = c.post("/projects/1/run/execute", json={"node_key": "research"})
-        assert r.status_code == 200
-        data = r.get_json()
-        assert data.get("ok") is True, data
-        assert data.get("status") == "ok"
-        assert "Tema runner" in data.get("output", "")
-        assert "node_executions" in data
+    app.sync_project_stages_for_project(1)
     with app.get_db() as conn:
         row = conn.execute(
-            "SELECT status FROM node_executions "
-            "WHERE project_id=1 AND node_key='research' "
-            "ORDER BY id DESC LIMIT 1"
+            "SELECT id, roadmap_stage_id FROM project_stages "
+            "WHERE project_id=1 ORDER BY id LIMIT 1"
         ).fetchone()
-        assert row is not None and row["status"] == "ok"
-    print("  ✓ runner /run/execute persiste ok en node_executions")
+        sid = row["id"]
+        rs_id = row["roadmap_stage_id"]
+        rs_name = conn.execute(
+            "SELECT name FROM roadmap_stages WHERE id=?", (rs_id,)
+        ).fetchone()["name"]
+    project = {"id": 1}
+    before = app.project_stage_status(project)
+    assert before.get(rs_name) is False, f"debe empezar sin hacer: {before}"
+    with app.get_db() as conn:
+        conn.execute(
+            "UPDATE project_stages SET response='contenido real' WHERE id=?", (sid,)
+        )
+    after = app.project_stage_status(project)
+    assert after.get(rs_name) is True, f"esperaba True tras guardar: {after}"
+    print("  ✓ respuesta no vacía marca la etapa como hecha en project_stage_status")
 
 
-def test_runner_reset_node_clears_executions(tmp_path):
-    """POST /projects/<id>/run/reset-node borra ejecuciones previas del nodo."""
+def test_update_stage_renames_reorders_activates_deactivates(tmp_path):
+    """POST /profiles action=update_stage renombra, reordena, activa y desactiva."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
+        sid = conn.execute(
+            "SELECT id FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order LIMIT 1"
+        ).fetchone()["id"]
+    client = app.app.test_client()
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "update_stage",
+            "profile_id": "1",
+            "stage_id": str(sid),
+            "name": "Etapa renombrada",
+            "order": "5",
+            "instruction": "instr nueva",
+            "active": "on",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    with app.get_db() as conn:
+        row = dict(
+            conn.execute(
+                "SELECT name, sort_order, is_active, instruction FROM roadmap_stages "
+                "WHERE id=?",
+                (sid,),
+            ).fetchone()
+        )
+    assert row["name"] == "Etapa renombrada", row
+    assert row["sort_order"] == 5, row
+    assert row["is_active"] == 1, row
+    assert row["instruction"] == "instr nueva", row
+
+    r = client.post(
+        "/profiles",
+        data={
+            "action": "update_stage",
+            "profile_id": "1",
+            "stage_id": str(sid),
+            "name": "Etapa renombrada",
+            "order": "5",
+            "instruction": "instr nueva",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    with app.get_db() as conn:
+        is_active = conn.execute(
+            "SELECT is_active FROM roadmap_stages WHERE id=?", (sid,)
+        ).fetchone()["is_active"]
+    assert is_active == 0, "debe haberse desactivado al omitir 'active'"
+    print("  ✓ /profiles update_stage renombra, reordena, activa y desactiva")
+
+
+def test_delete_stage_cascades_project_stages(tmp_path):
+    """Borrar una roadmap_stage hace CASCADE en sus project_stages."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, topic, profile_id, status,
+                                      created_at, updated_at)
+                VALUES (1, 'P', 'tema', 1, 'research',
+                        '2025-01-01', '2025-01-01')
+            """
+            )
+        app.sync_project_stages_for_project(1)
+        with app.get_db() as conn:
+            sid = conn.execute(
+                "SELECT id FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order LIMIT 1"
+            ).fetchone()["id"]
+            n_before = conn.execute(
+                "SELECT COUNT(*) AS n FROM project_stages WHERE roadmap_stage_id=?",
+                (sid,),
+            ).fetchone()["n"]
+        assert n_before == 1, f"esperaba 1 project_stage antes, hay {n_before}"
+        with app.app.test_client() as c:
+            r = c.post(
+                "/profiles",
+                data={
+                    "action": "delete_stage",
+                    "profile_id": "1",
+                    "stage_id": str(sid),
+                },
+                follow_redirects=True,
+            )
+            assert r.status_code == 200
+        with app.get_db() as conn:
+            n_after = conn.execute(
+                "SELECT COUNT(*) AS n FROM project_stages WHERE roadmap_stage_id=?",
+                (sid,),
+            ).fetchone()["n"]
+            rs_exists = conn.execute(
+                "SELECT 1 FROM roadmap_stages WHERE id=?", (sid,)
+            ).fetchone()
+        assert n_after == 0, f"esperaba 0 tras CASCADE, hay {n_after}"
+        assert rs_exists is None, "la roadmap_stage debe haberse eliminado"
+        print("  ✓ delete_stage hace CASCADE en project_stages")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_migration_backfills_legacy_content_into_project_stages(tmp_path):
+    """init_db() migra contenido legacy de research/concept/etc a project_stages."""
+    db_path = tmp_path / "test.db"
+    app.DB_PATH = db_path
+    app.init_db()
+    now = "2025-01-01T00:00:00"
+    import gc
+
+    with app.get_db() as conn:
         conn.execute(
             """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
-            VALUES (1, 'Reset', 'Tema', ?, 'created',
-                    '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
+            VALUES (1, 'Legacy', 'Tema', 1, 'research', ?, ?)
+            """,
+            (now, now),
         )
-        conn.execute("""
-            INSERT INTO node_executions
-                (project_id, node_key, output, status, created_at)
-            VALUES (1, 'concept', 'previo', 'ok', '2025-01-01')
-        """)
-    with app.app.test_client() as c:
-        r = c.post("/projects/1/run/reset-node", json={"node_key": "concept"})
-        assert r.status_code == 200
-        data = r.get_json()
-        assert data.get("ok") is True
-        assert data.get("deleted") == 1
+        conn.execute(
+            "DELETE FROM _schema_migrations WHERE name='migrate_to_roadmap_model'"
+        )
+        conn.execute("DELETE FROM roadmap_stages")
+        conn.execute("DELETE FROM project_stages")
+        conn.execute(
+            """
+            INSERT INTO research (project_id, content, sources, updated_at)
+            VALUES (1, 'investigación vieja con detalle', '["a","b","c"]', ?)
+            """,
+            (now,),
+        )
+        conn.execute(
+            """
+            INSERT INTO concept (project_id, angle, thesis, updated_at)
+            VALUES (1, 'ángulo viejo', 'tesis vieja', ?)
+            """,
+            (now,),
+        )
+    gc.collect()
+    app.init_db()
+    gc.collect()
     with app.get_db() as conn:
-        n = conn.execute(
-            "SELECT COUNT(*) AS n FROM node_executions WHERE project_id=1 AND node_key='concept'"
-        ).fetchone()["n"]
-        assert n == 0
-    print("  ✓ runner /run/reset-node borra ejecuciones del nodo")
+        stages = conn.execute(
+            """
+            SELECT rs.name, ps.response FROM project_stages ps
+            JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+            WHERE ps.project_id = 1
+            ORDER BY rs.sort_order
+            """
+        ).fetchall()
+    by_name = {s["name"]: (s["response"] or "") for s in stages}
+    assert "investigación vieja" in by_name["research"], by_name["research"]
+    assert "ángulo viejo" in by_name["concept"], by_name["concept"]
+    print("  ✓ migración backfilea contenido legacy en project_stages")
 
 
-def test_runner_scenes_short_persists_to_short_script(tmp_path):
-    """El nodo scenes_short persiste escenas en el guion corto."""
+def test_stage_file_uses_stable_roadmap_id(tmp_path):
+    """El nombre del archivo usa el id de roadmap_stage, no el nombre."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, topic, profile_id, status,
+                                      created_at, updated_at)
+                VALUES (1, 'P', 'tema', 1, 'research',
+                        '2025-01-01', '2025-01-01')
+            """
+            )
+        app.sync_project_stages_for_project(1)
+        app.sync_project_folder(1)
+        folder = app.safe_project_dir(1, "P")
+        with app.get_db() as conn:
+            sid = conn.execute(
+                "SELECT id FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order LIMIT 1"
+            ).fetchone()["id"]
+            original_name = conn.execute(
+                "SELECT name FROM roadmap_stages WHERE id=?", (sid,)
+            ).fetchone()["name"]
+        stage_path = folder / f"stage_{sid}.md"
+        assert stage_path.exists(), f"falta {stage_path}"
+        with app.get_db() as conn:
+            conn.execute(
+                "UPDATE roadmap_stages SET name='Otra cosa' WHERE id=?", (sid,)
+            )
+        app.sync_project_folder(1)
+        assert stage_path.exists(), f"{stage_path} debe seguir existiendo tras renombrar"
+        assert not (folder / "stage_Otra cosa.md").exists()
+        assert not (folder / f"stage_{original_name}.md").exists()
+        print("  ✓ stage_<id>.md usa id estable, no el nombre")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_new_project_export_uses_stage_files(tmp_path):
+    """Un proyecto nuevo exporta stage_<id>.md y no carpetas por variante."""
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post(
+            "/projects/new",
+            data={"name": "Nuevo", "topic": "tema", "profile_id": "1"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 302
+        with app.get_db() as conn:
+            new_id = conn.execute(
+                "SELECT id FROM projects WHERE name='Nuevo'"
+            ).fetchone()["id"]
+        r = c.post(f"/projects/{new_id}/export", follow_redirects=False)
+        assert r.status_code == 200
+        import io
+        import zipfile
+
+        zf = zipfile.ZipFile(io.BytesIO(r.data))
+        names = zf.namelist()
+        stage_files = [n for n in names if n.endswith("stage_1.md") or
+                       any(f"/stage_{i}.md" in n for i in range(1, 8))]
+        plain_stages = [n for n in names if "/stage_" in n and n.endswith(".md")]
+        assert len(plain_stages) == 7, (
+            f"esperaba 7 stage_*.md en el ZIP, hay {len(plain_stages)}: {plain_stages}"
+        )
+        for legacy in ("03_guiones", "04_escenas", "05_metadata", "06_thumbnails"):
+            assert not any(legacy in n for n in names), (
+                f"carpeta legacy {legacy} no debe existir en el modelo nuevo"
+            )
+        assert any("00_RESUMEN.md" in n for n in names)
+        assert any("08_paquete_completo.json" in n for n in names)
+        print(f"  ✓ export de proyecto nuevo usa stage_<id>.md ({len(plain_stages)} archivos)")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_legacy_project_export_keeps_legacy_layout(tmp_path):
+    """Un proyecto sin project_stages sigue exportando el layout legacy."""
     _setup_qc_db(tmp_path)
     with app.get_db() as conn:
-        pid = conn.execute("SELECT id FROM profiles LIMIT 1").fetchone()["id"]
         conn.execute(
             """
             INSERT INTO projects (id, name, topic, profile_id, status,
                                   created_at, updated_at)
-            VALUES (1, 'Scenes Short', 'Tema', ?, 'created',
+            VALUES (1, 'LegacyP', 'tema', 1, 'ready',
                     '2025-01-01', '2025-01-01')
-        """,
-            (pid,),
+        """
         )
-        # Crear guion corto
-        conn.execute("""
-            INSERT INTO scripts (project_id, type, title, hook, context,
-                development, revelations, conclusion, cta, body_full,
-                word_count, updated_at)
-            VALUES (1, 'short', 'Corto', 'h', 'c', 'd', 'r', 'f', 'cta',
-                    'uno dos tres cuatro cinco seis siete ocho', 8, '2025-01-01')
-        """)
-    with app.app.test_client() as c:
-        r = c.post("/projects/1/run/execute", json={"node_key": "scenes_short"})
+        conn.execute(
+            """
+            INSERT INTO research (project_id, content, sources, updated_at)
+            VALUES (1, 'investigación', '["s1","s2","s3","s4","s5","s6"]',
+                    '2025-01-01')
+        """
+        )
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        c = app.app.test_client()
+        r = c.post("/projects/1/export", follow_redirects=False)
         assert r.status_code == 200
-    # En modo manual la persistencia no se ejecuta (raw es el prompt,
-    # no escenas parseables). Verificamos que se llama al nodo correcto.
-    with app.get_db() as conn:
-        row = conn.execute(
-            "SELECT status FROM node_executions "
-            "WHERE project_id=1 AND node_key='scenes_short' "
-            "ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-    assert row is not None and row["status"] == "ok"
-    print("  ✓ runner procesa scenes_short como nodo fijo")
+        import io
+        import zipfile
+
+        zf = zipfile.ZipFile(io.BytesIO(r.data))
+        names = zf.namelist()
+        assert any("00_RESUMEN.md" in n for n in names)
+        assert any("01_investigacion.md" in n for n in names)
+        assert any("08_paquete_completo.json" in n for n in names)
+        plain_stages = [n for n in names if "/stage_" in n and n.endswith(".md")]
+        assert not plain_stages, (
+            f"proyecto legacy no debe usar stage_<id>.md: {plain_stages}"
+        )
+        print("  ✓ export de proyecto legacy mantiene el layout legacy")
+    finally:
+        app.PROJECTS_DIR = original
 
 
 def main():
@@ -1382,100 +1554,101 @@ def main():
     import tempfile
     from pathlib import Path
 
-    print("\n=== TESTS DE PARSERS ===")
-    test_parse_research()
-    test_parse_research_with_variations()
-    test_parse_concept()
-    test_parse_concept_with_body_text()
-    test_parse_script_long()
-    test_parse_script_short()
-    test_parse_scenes_json()
-    test_parse_scenes_json_bare()
-    test_parse_prompt_json()
-    test_parse_metadata_youtube()
-    test_parse_metadata_shorts()
-    test_parse_metadata_facebook_long()
-    test_parse_metadata_reels_short()
-    test_parse_thumbnail()
-    test_parse_thumbnail_ignores_other_blocks()
+    failures: list[tuple[str, BaseException]] = []
 
-    print("\n=== TESTS DE UTILIDADES ===")
-    test_count_words()
-    test_estimate_duration()
-
-    def _run_qc_test(test_fn, label):
-        with tempfile.TemporaryDirectory() as tmp:
-            test_fn(Path(tmp))
-            # Forzar liberación de handles SQLite antes de borrar el tmp
-            # (necesario en Windows, donde el delete falla con WinError 32).
+    def _safe(label, fn):
+        try:
+            fn()
+        except Exception as e:
+            failures.append((label, e))
+            print(f"  ✗ {label}: {type(e).__name__}: {e}")
             gc.collect()
 
+    def _with_tmp(label, fn):
+        try:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+                fn(Path(tmp))
+                gc.collect()
+        except Exception as e:
+            failures.append((label, e))
+            print(f"  ✗ {label}: {type(e).__name__}: {e}")
+
+    print("\n=== TESTS DE PARSERS ===")
+    _safe("parse_research", test_parse_research)
+    _safe("parse_research_with_variations", test_parse_research_with_variations)
+    _safe("parse_concept", test_parse_concept)
+    _safe("parse_concept_with_body_text", test_parse_concept_with_body_text)
+    _safe("parse_script_long", test_parse_script_long)
+    _safe("parse_script_short", test_parse_script_short)
+    _safe("parse_scenes_json", test_parse_scenes_json)
+    _safe("parse_scenes_json_bare", test_parse_scenes_json_bare)
+    _safe("parse_prompt_json", test_parse_prompt_json)
+    _safe("parse_metadata_youtube", test_parse_metadata_youtube)
+    _safe("parse_metadata_shorts", test_parse_metadata_shorts)
+    _safe("parse_metadata_facebook_long", test_parse_metadata_facebook_long)
+    _safe("parse_metadata_reels_short", test_parse_metadata_reels_short)
+    _safe("parse_thumbnail", test_parse_thumbnail)
+    _safe("parse_thumbnail_ignores_other_blocks", test_parse_thumbnail_ignores_other_blocks)
+
+    print("\n=== TESTS DE UTILIDADES ===")
+    _safe("count_words", test_count_words)
+    _safe("estimate_duration", test_estimate_duration)
+
     print("\n=== TESTS DE QC ===")
-    _run_qc_test(test_qc_detects_missing_research, "missing_research")
-    _run_qc_test(test_qc_detects_short_script, "short_script")
-    _run_qc_test(test_qc_detects_repetition, "repetition")
-    _run_qc_test(test_qc_detects_missing_sources, "missing_sources")
-    _run_qc_test(test_qc_passes_complete_project, "complete_project")
+    _with_tmp("missing_research", test_qc_detects_missing_research)
+    _with_tmp("short_script", test_qc_detects_short_script)
+    _with_tmp("repetition", test_qc_detects_repetition)
+    _with_tmp("missing_sources", test_qc_detects_missing_sources)
+    _with_tmp("complete_project", test_qc_passes_complete_project)
 
     print("\n=== TESTS DE EXPORTACIÓN ===")
-    with tempfile.TemporaryDirectory() as tmp:
-        test_export_creates_zip(Path(tmp))
-        gc.collect()
+    _with_tmp("export_creates_zip", test_export_creates_zip)
 
     print("\n=== TESTS DE SINCRONIZACIÓN DE CARPETA ===")
-    with tempfile.TemporaryDirectory() as tmp:
-        test_new_project_creates_folder(Path(tmp))
-        gc.collect()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_research_save_syncs_folder(Path(tmp))
-        gc.collect()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_metadata_save_syncs_folder(Path(tmp))
-        gc.collect()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_export_get_renders_folder(Path(tmp))
-        gc.collect()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_export_resync_action(Path(tmp))
-        gc.collect()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_delete_project_removes_folder(Path(tmp))
-        gc.collect()
+    _with_tmp("new_project_creates_folder", test_new_project_creates_folder)
+    _with_tmp("research_save_syncs_folder", test_research_save_syncs_folder)
+    _with_tmp("metadata_save_syncs_folder", test_metadata_save_syncs_folder)
+    _with_tmp("export_get_renders_folder", test_export_get_renders_folder)
+    _with_tmp("export_resync_action", test_export_resync_action)
+    _with_tmp("delete_project_removes_folder", test_delete_project_removes_folder)
 
     print("\n=== TESTS DE PROMPTS POR PERFIL ===")
-    _run_qc_test(
-        test_resolve_stage_prompt_falls_back_to_config, "resolve_stage_prompt_falls_back_to_config"
+    _with_tmp(
+        "resolve_stage_prompt_falls_back_to_config",
+        test_resolve_stage_prompt_falls_back_to_config,
     )
-    _run_qc_test(test_save_profile_prompt_upsert, "save_profile_prompt_upsert")
-    _run_qc_test(
-        test_migration_copies_stage_prompts_to_profile_prompts,
+    _with_tmp("save_profile_prompt_upsert", test_save_profile_prompt_upsert)
+    _with_tmp(
         "migration_copies_stage_prompts_to_profile_prompts",
+        test_migration_copies_stage_prompts_to_profile_prompts,
     )
 
     print("\n=== TESTS DE EDICIÓN DE PERFILES ===")
-    _run_qc_test(test_profiles_page_renders, "profiles_page_renders")
-    _run_qc_test(test_profiles_update_default, "profiles_update_default")
-    _run_qc_test(test_profiles_update_changes_default, "profiles_update_changes_default")
-    _run_qc_test(test_profiles_update_rejects_empty_name, "profiles_update_rejects_empty_name")
+    _with_tmp("profiles_page_renders", test_profiles_page_renders)
+    _with_tmp("profiles_update_default", test_profiles_update_default)
+    _with_tmp("profiles_update_changes_default", test_profiles_update_changes_default)
+    _with_tmp("profiles_update_rejects_empty_name", test_profiles_update_rejects_empty_name)
 
-    print("\n=== TESTS DE GRAPH CRUD ===")
-    _run_qc_test(test_get_or_create_fixed_graph_nodes, "get_or_create_fixed_graph_nodes")
-    _run_qc_test(test_save_graph_node_and_delete, "save_graph_node_and_delete")
-    _run_qc_test(test_update_graph_layout, "update_graph_layout")
-    _run_qc_test(test_execute_graph_node_fixed_research, "execute_graph_node_fixed_research")
-    _run_qc_test(test_execute_graph_node_custom, "execute_graph_node_custom")
-    _run_qc_test(test_persist_scenes_to_specific_script, "persist_scenes_to_specific_script")
+    print("\n=== TESTS DEL MODELO DE HOJA DE RUTA ===")
+    _with_tmp("default_profile_seeds_seven", test_default_profile_seeds_seven_roadmap_stages)
+    _with_tmp("new_profile_seeds_seven", test_new_profile_seeds_seven_roadmap_stages)
+    _with_tmp("new_project_seeds_seven", test_new_project_seeds_seven_project_stages)
+    _with_tmp("project_stage_get_renders", test_project_stage_get_renders)
+    _with_tmp("project_stage_post_saves", test_project_stage_post_saves_instruction_and_response)
+    _with_tmp("non_empty_response_marks_done", test_non_empty_response_marks_stage_done)
+    _with_tmp("update_stage", test_update_stage_renames_reorders_activates_deactivates)
+    _with_tmp("delete_stage_cascades", test_delete_stage_cascades_project_stages)
+    _with_tmp("migration_backfill", test_migration_backfills_legacy_content_into_project_stages)
+    _with_tmp("stage_file_stable_id", test_stage_file_uses_stable_roadmap_id)
+    _with_tmp("export_uses_stage_files", test_new_project_export_uses_stage_files)
+    _with_tmp("legacy_export_keeps_layout", test_legacy_project_export_keeps_legacy_layout)
 
-    print("\n=== TESTS DEL RUNNER (E2E) ===")
-    _run_qc_test(test_runner_renders_for_project, "runner_renders_for_project")
-    _run_qc_test(test_runner_execute_route_returns_json, "runner_execute_route_returns_json")
-    _run_qc_test(test_runner_reset_node_clears_executions, "runner_reset_node_clears_executions")
-    _run_qc_test(
-        test_runner_scenes_short_persists_to_short_script,
-        "runner_scenes_short_persists_to_short_script",
-    )
-
-    print("\n✅ Todos los tests pasaron\n")
+    if failures:
+        print(f"\n❌ Fallos restantes ({len(failures)}):")
+        for label, err in failures:
+            print(f"  - {label}: {type(err).__name__}: {err}")
+    else:
+        print("\n✅ Todos los tests pasaron\n")
 
 
 if __name__ == "__main__":

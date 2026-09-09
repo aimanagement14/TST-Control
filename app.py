@@ -89,15 +89,8 @@ app.config["JSON_AS_ASCII"] = False
 # True en dev (autoreload al editar plantillas), False en prod (Waitress)
 # para evitar el coste del filesystem check en cada render.
 
-# Blueprints (PoC monolito — T2.2). Ver blueprints/graph.py y
-# blueprints/runner.py. Los imports se hacen aqui para que los
-# modulos blueprints puedan importar desde app sin ciclos.
-from blueprints.graph import graph_bp  # noqa: E402
 from blueprints.profiles import profiles_bp  # noqa: E402
-from blueprints.runner import runner_bp  # noqa: E402
 
-app.register_blueprint(graph_bp)
-app.register_blueprint(runner_bp)
 app.register_blueprint(profiles_bp)
 
 
@@ -275,32 +268,28 @@ CREATE TABLE IF NOT EXISTS profile_prompts (
     FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS profile_graph_nodes (
+CREATE TABLE IF NOT EXISTS roadmap_stages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL,
-    node_key TEXT NOT NULL,
-    label TEXT,
-    sys_prompt TEXT,
-    user_prompt TEXT,
-    inputs_json TEXT,
-    position_x REAL DEFAULT 0,
-    position_y REAL DEFAULT 0,
+    name TEXT NOT NULL,
+    instruction TEXT,
     sort_order INTEGER DEFAULT 0,
-    is_fixed INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT,
     updated_at TEXT,
-    UNIQUE(profile_id, node_key),
     FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS node_executions (
+CREATE TABLE IF NOT EXISTS project_stages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
-    node_key TEXT NOT NULL,
-    output TEXT,
-    status TEXT,
-    duration_ms INTEGER,
-    created_at TEXT,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    roadmap_stage_id INTEGER NOT NULL,
+    instruction TEXT,
+    response TEXT,
+    updated_at TEXT,
+    UNIQUE(project_id, roadmap_stage_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (roadmap_stage_id) REFERENCES roadmap_stages(id) ON DELETE CASCADE
 );
 """
 
@@ -352,7 +341,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS _schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT)"
         )
         _migrate_stage_prompts_to_profile_prompts(conn)
-        # Perfil por defecto si no existe ninguno
+        # Perfil por defecto si no existe ninguno (necesario antes de la
+        # migración al modelo genérico para que tenga a quién sembrar).
         cur = conn.execute("SELECT COUNT(*) AS n FROM profiles")
         if cur.fetchone()["n"] == 0:
             now = datetime.now().isoformat()
@@ -376,6 +366,10 @@ def init_db():
                     now,
                 ),
             )
+        _migrate_to_roadmap_model(conn)
+        _ensure_roadmap_integrity(conn)
+        conn.execute("DROP TABLE IF EXISTS profile_graph_nodes")
+        conn.execute("DROP TABLE IF EXISTS node_executions")
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +416,510 @@ def _migrate_stage_prompts_to_profile_prompts(conn):
         "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
         (_LEGACY_STAGE_PROMPTS_MIGRATION, now_iso()),
     )
+
+
+# ---------------------------------------------------------------------------
+# Roadmap genérico (migración opt-in desde el esquema por etapa)
+# ---------------------------------------------------------------------------
+
+_ROADMAP_MIGRATION = "migrate_to_roadmap_model"
+
+BACKUP_DIR = BASE_DIR / "backups"
+
+DEFAULT_ROADMAP_STAGES = (
+    "research",
+    "concept",
+    "scripts",
+    "scenes",
+    "metadata",
+    "thumbnails",
+    "qc",
+)
+
+ROADMAP_STAGE_LABELS = {
+    "research": "Investigación",
+    "concept": "Concepto",
+    "scripts": "Guiones",
+    "scenes": "Escenas",
+    "metadata": "Metadata",
+    "thumbnails": "Miniaturas",
+    "qc": "Control de calidad",
+}
+
+ROADMAP_PROMPT_KEYS = {
+    "research": ("research",),
+    "concept": ("concept",),
+    "scripts": ("script_long", "script_short"),
+    "scenes": ("scenes",),
+    "metadata": (
+        "metadata_youtube_long",
+        "metadata_youtube",
+        "metadata_youtube_short",
+        "metadata_shorts",
+        "metadata_facebook_long",
+        "metadata_reels_short",
+    ),
+    "thumbnails": ("thumbnail_long", "thumbnail_short"),
+    "qc": (),
+}
+
+
+def _roadmap_instruction_for(conn, profile_id: int, stage_name: str) -> str:
+    """Devuelve la instrucción inicial de una etapa, leída de ``profile_prompts`` o de ``config.json``.
+
+    Si tanto ``sys_prompt`` como ``user_prompt`` están presentes los
+    concatena en una sola instrucción; si solo uno está presente devuelve
+    ese.
+    """
+    for key in ROADMAP_PROMPT_KEYS.get(stage_name, ()):
+        row = conn.execute(
+            "SELECT sys_prompt, user_prompt FROM profile_prompts "
+            "WHERE profile_id=? AND stage=?",
+            (profile_id, key),
+        ).fetchone()
+        if row:
+            sys_p = (row["sys_prompt"] or "").strip()
+            user_p = (row["user_prompt"] or "").strip()
+            if sys_p and user_p:
+                return f"{sys_p}\n\n{user_p}"
+            if sys_p:
+                return sys_p
+            if user_p:
+                return user_p
+        cfg = CONFIG.get("prompts", {}).get(key) or {}
+        cfg_sys = (cfg.get("system") or "").strip()
+        cfg_user = (cfg.get("format") or "").strip()
+        if cfg_sys and cfg_user:
+            return f"{cfg_sys}\n\n{cfg_user}"
+        if cfg_sys:
+            return cfg_sys
+        if cfg_user:
+            return cfg_user
+    return ""
+
+
+def _build_legacy_response(conn, project: dict, stage_name: str) -> str:
+    """Combina los campos legacy de un proyecto en una respuesta Markdown para la etapa."""
+    pid = project["id"]
+
+    def _load_json(raw):
+        try:
+            value = json.loads(raw or "[]")
+            return value if isinstance(value, list) else []
+        except Exception:
+            return []
+
+    if stage_name == "research":
+        row = conn.execute(
+            "SELECT content, sources, facts, theories, unverified FROM research WHERE project_id=?",
+            (pid,),
+        ).fetchone()
+        if not row or not (row["content"] or "").strip():
+            return ""
+        parts = ["# Investigación", "", row["content"].strip()]
+        sources = _load_json(row["sources"])
+        if sources:
+            parts.append("")
+            parts.append("## Fuentes")
+            parts.append("")
+            parts.extend(f"- {s}" for s in sources)
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "concept":
+        row = conn.execute(
+            "SELECT angle, thesis, key_points, emotional_hook, what_they_learn, what_they_feel, risks "
+            "FROM concept WHERE project_id=?",
+            (pid,),
+        ).fetchone()
+        if not row or not (row["angle"] or "").strip():
+            return ""
+        parts = [
+            "# Concepto",
+            "",
+            "## Ángulo",
+            row["angle"].strip(),
+            "",
+            "## Tesis",
+            (row["thesis"] or "").strip(),
+        ]
+        kp = _load_json(row["key_points"])
+        if kp:
+            parts.append("")
+            parts.append("## Puntos clave")
+            parts.append("")
+            parts.extend(f"1. {p}" for p in kp)
+        if row["emotional_hook"]:
+            parts.extend(["", "## Gancho emocional", row["emotional_hook"].strip()])
+        wl = _load_json(row["what_they_learn"])
+        if wl:
+            parts.extend(["", "## Qué aprenden", ""])
+            parts.extend(f"- {p}" for p in wl)
+        wf = _load_json(row["what_they_feel"])
+        if wf:
+            parts.extend(["", "## Qué sienten", ""])
+            parts.extend(f"- {p}" for p in wf)
+        rk = _load_json(row["risks"])
+        if rk:
+            parts.extend(["", "## Riesgos", ""])
+            parts.extend(f"- {p}" for p in rk)
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "scripts":
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT type, title, hook, context, development, revelations, conclusion, cta, body_full "
+                "FROM scripts WHERE project_id=?",
+                (pid,),
+            ).fetchall()
+        ]
+        if not rows:
+            return ""
+        parts = ["# Guiones", ""]
+        for s in rows:
+            label = "Guion 5 min" if s["type"] == "long" else "Guion 1 min"
+            parts.append(f"## {label}")
+            parts.append("")
+            if s.get("body_full"):
+                parts.append(s["body_full"].strip())
+            else:
+                for heading, key in (
+                    ("Hook", "hook"),
+                    ("Contexto", "context"),
+                    ("Desarrollo", "development"),
+                    ("Revelaciones", "revelations"),
+                    ("Conclusión", "conclusion"),
+                    ("CTA", "cta"),
+                ):
+                    if s.get(key):
+                        parts.extend([f"### {heading}", "", s[key].strip(), ""])
+            parts.append("")
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "scenes":
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT scene_number, narration, visual_description, camera_movement, transition, "
+                "duration_seconds FROM scenes WHERE project_id=? ORDER BY scene_number",
+                (pid,),
+            ).fetchall()
+        ]
+        if not rows:
+            return ""
+        parts = ["# Escenas", ""]
+        for s in rows:
+            parts.append(f"## ESCENA {s['scene_number']}")
+            parts.append(f"**TEXTO AUDIO:** {(s.get('narration') or '').strip()}")
+            parts.append(f"**IMAGEN:** {(s.get('visual_description') or '').strip()}")
+            parts.append(
+                f"_Cámara: {s.get('camera_movement') or ''} · "
+                f"Transición: {s.get('transition') or ''} · "
+                f"Duración: {s.get('duration_seconds') or 0}s_"
+            )
+            parts.append("")
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "metadata":
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT platform, titles, description, chapters, tags, hashtags, caption, hook, cta, "
+                "on_screen_text FROM metadata_records WHERE project_id=?",
+                (pid,),
+            ).fetchall()
+        ]
+        if not rows:
+            return ""
+        parts = ["# Metadata", ""]
+        for m in rows:
+            parts.append(f"## {m['platform']}")
+            parts.append("")
+            if m.get("description"):
+                parts.append(m["description"].strip())
+                parts.append("")
+            titles = _load_json(m["titles"])
+            if titles:
+                parts.append("### Títulos")
+                parts.append("")
+                parts.extend(f"{i}. {t}" for i, t in enumerate(titles, 1))
+                parts.append("")
+            chapters = _load_json(m["chapters"])
+            if chapters:
+                parts.append("### Capítulos")
+                parts.append("")
+                parts.extend(f"- {c}" for c in chapters)
+                parts.append("")
+            tags = _load_json(m["tags"])
+            if tags:
+                parts.append(f"### Tags: {', '.join(tags)}")
+            hashtags = _load_json(m["hashtags"])
+            if hashtags:
+                parts.append(f"### Hashtags: {' '.join(hashtags)}")
+            if m.get("caption"):
+                parts.extend(["### Caption", "", m["caption"].strip(), ""])
+            if m.get("hook"):
+                parts.extend(["### Hook", "", m["hook"].strip(), ""])
+            if m.get("cta"):
+                parts.extend(["### CTA", "", m["cta"].strip(), ""])
+            ost = _load_json(m["on_screen_text"])
+            if ost:
+                parts.append("### Texto en pantalla")
+                parts.append("")
+                parts.extend(f"{i}. {t}" for i, t in enumerate(ost, 1))
+                parts.append("")
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "thumbnails":
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT script_type, prompt FROM thumbnail_records WHERE project_id=?",
+                (pid,),
+            ).fetchall()
+        ]
+        if not rows:
+            return ""
+        parts = ["# Miniaturas", ""]
+        for t in rows:
+            aspect = "16:9 (horizontal)" if t["script_type"] == "long" else "9:16 (vertical)"
+            parts.append(f"## Miniatura {t['script_type']} — {aspect}")
+            parts.append("")
+            parts.append((t.get("prompt") or "").strip())
+            parts.append("")
+        return "\n".join(parts).strip() + "\n"
+
+    if stage_name == "qc":
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT stage, severity, message FROM qc_issues WHERE project_id=? "
+                "ORDER BY CASE severity WHEN 'error' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END, stage",
+                (pid,),
+            ).fetchall()
+        ]
+        if not rows:
+            return ""
+        parts = ["# Control de calidad", ""]
+        for r in rows:
+            parts.append(f"- [{r['severity']}] {r['stage']}: {r['message']}")
+        return "\n".join(parts).strip() + "\n"
+
+    return ""
+
+
+def _migrate_to_roadmap_model(conn):
+    """Migra el esquema al modelo genérico de hoja de ruta.
+
+    Pasos (idempotentes, controlados por ``_schema_migrations``):
+
+    1. Backup de ``workflow.db`` si no existe uno previo.
+    2. Exporta ``profile_graph_nodes`` y ``node_executions`` a un JSON.
+    3. Siembra ``roadmap_stages`` con las 7 etapas base por perfil,
+       copiando la instrucción desde ``profile_prompts`` o ``config.json``.
+    4. Para cada proyecto existente con ``profile_id``, inserta una
+       fila en ``project_stages`` por cada ``roadmap_stage`` con la
+       instrucción inicial y el ``response`` que ``_build_legacy_response``
+       reconstruye desde las tablas legacy. ``INSERT OR IGNORE`` evita
+       duplicar si la migración se ejecuta de nuevo.
+    5. Elimina ``profile_graph_nodes`` y ``node_executions``.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM _schema_migrations WHERE name=?",
+        (_ROADMAP_MIGRATION,),
+    ).fetchone()
+    if row:
+        return
+
+    BACKUP_DIR.mkdir(exist_ok=True)
+    backup_stamp = now_iso().replace(":", "-").replace(".", "-")
+    db_backup = BACKUP_DIR / f"workflow_{backup_stamp}.db.bak"
+    if not db_backup.exists() and DB_PATH.exists():
+        try:
+            shutil.copyfile(str(DB_PATH), str(db_backup))
+        except Exception:
+            log.warning("[migrate_to_roadmap_model] no se pudo copiar el backup de DB")
+
+    graph_nodes = []
+    node_executions = []
+    has_graph_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='profile_graph_nodes'"
+    ).fetchone()
+    if has_graph_table:
+        graph_nodes = [dict(r) for r in conn.execute("SELECT * FROM profile_graph_nodes").fetchall()]
+        node_executions = [dict(r) for r in conn.execute("SELECT * FROM node_executions").fetchall()]
+    graph_payload = {
+        "exported_at": now_iso(),
+        "profile_graph_nodes": graph_nodes,
+        "node_executions": node_executions,
+    }
+    graph_backup = BACKUP_DIR / f"graph_backup_{backup_stamp}.json"
+    try:
+        graph_backup.write_text(
+            json.dumps(graph_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        log.warning("[migrate_to_roadmap_model] no se pudo escribir el backup JSON del grafo")
+
+    now = now_iso()
+    profiles = [
+        dict(r)
+        for r in conn.execute("SELECT id, name FROM profiles ORDER BY id").fetchall()
+    ]
+    for profile in profiles:
+        for idx, stage_name in enumerate(DEFAULT_ROADMAP_STAGES):
+            instruction = _roadmap_instruction_for(conn, profile["id"], stage_name)
+            conn.execute(
+                """
+                INSERT INTO roadmap_stages
+                    (profile_id, name, instruction, sort_order, is_active,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+            """,
+                (
+                    profile["id"],
+                    stage_name,
+                    instruction,
+                    idx,
+                    now,
+                    now,
+                ),
+            )
+
+    projects = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, name, topic, profile_id FROM projects ORDER BY id"
+        ).fetchall()
+    ]
+    for project in projects:
+        if not project.get("profile_id"):
+            continue
+        rs_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, name, instruction FROM roadmap_stages WHERE profile_id=?",
+                (project["profile_id"],),
+            ).fetchall()
+        ]
+        for rs in rs_rows:
+            response = _build_legacy_response(conn, project, rs["name"])
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO project_stages
+                    (project_id, roadmap_stage_id, instruction, response, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            """,
+                (
+                    project["id"],
+                    rs["id"],
+                    rs.get("instruction") or "",
+                    response,
+                    now,
+                ),
+            )
+
+    conn.execute("DROP TABLE IF EXISTS profile_graph_nodes")
+    conn.execute("DROP TABLE IF EXISTS node_executions")
+
+    conn.execute(
+        "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_ROADMAP_MIGRATION, now_iso()),
+    )
+
+
+def _ensure_roadmap_integrity(conn):
+    """Reparador idempotente del modelo de hoja de ruta; se llama en cada arranque.
+
+    No toca el marcador de ``_schema_migrations``: si la migración
+    ``migrate_to_roadmap_model`` quedó registrada antes de haber sembrado
+    ``roadmap_stages`` o ``project_stages``, este helper rellena los huecos
+    sin alterar el resto del estado. Garantiza:
+
+    - Cada perfil sin ninguna ``roadmap_stage`` recibe las siete etapas base
+      (``DEFAULT_ROADMAP_STAGES``). Si el perfil ya tiene alguna etapa
+      (p.ej. porque fue renombrada o personalizada) no se vuelve a sembrar
+      para no crear duplicados. No modifica filas existentes, ni su
+      ``instruction`` ni su ``is_active``.
+    - Cada proyecto con ``profile_id`` tiene una ``project_stage`` por cada
+      ``roadmap_stage`` del perfil, activa o inactiva. La ``instruction``
+      inicial solo se escribe al crear la fila. La ``response`` se migra
+      desde ``_build_legacy_response`` solo si la fila de ``project_stages``
+      está vacía y la tabla legacy correspondiente tiene contenido. Nunca
+      sobrescribe respuestas ni instrucciones ya editadas.
+    """
+    now = now_iso()
+    profiles = [
+        dict(r) for r in conn.execute("SELECT id FROM profiles ORDER BY id").fetchall()
+    ]
+    for profile in profiles:
+        existing_names = {
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM roadmap_stages WHERE profile_id=?",
+                (profile["id"],),
+            ).fetchall()
+        }
+        if existing_names:
+            continue
+        for idx, stage_name in enumerate(DEFAULT_ROADMAP_STAGES):
+            instruction = _roadmap_instruction_for(conn, profile["id"], stage_name)
+            conn.execute(
+                """
+                INSERT INTO roadmap_stages
+                    (profile_id, name, instruction, sort_order, is_active,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+            """,
+                (profile["id"], stage_name, instruction, idx, now, now),
+            )
+
+    projects = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, name, topic, profile_id FROM projects "
+            "WHERE profile_id IS NOT NULL ORDER BY id"
+        ).fetchall()
+    ]
+    for project in projects:
+        rs_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, name, instruction FROM roadmap_stages WHERE profile_id=?",
+                (project["profile_id"],),
+            ).fetchall()
+        ]
+        for rs in rs_rows:
+            existing = conn.execute(
+                "SELECT id, response FROM project_stages "
+                "WHERE project_id=? AND roadmap_stage_id=?",
+                (project["id"], rs["id"]),
+            ).fetchone()
+            if existing is None:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO project_stages
+                        (project_id, roadmap_stage_id, instruction, response, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                    (
+                        project["id"],
+                        rs["id"],
+                        rs.get("instruction") or "",
+                        _build_legacy_response(conn, project, rs["name"]),
+                        now,
+                    ),
+                )
+                continue
+            if (existing["response"] or "").strip():
+                continue
+            legacy_response = _build_legacy_response(conn, project, rs["name"])
+            if legacy_response:
+                conn.execute(
+                    "UPDATE project_stages SET response=?, updated_at=? WHERE id=?",
+                    (legacy_response, now, existing["id"]),
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -1307,70 +1805,265 @@ def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def project_stage_status(project):
-    """Devuelve un dict con el estado de cada etapa del proyecto."""
-    qc_cfg = CONFIG["qc"]["checks"]
-    min_scenes_long = qc_cfg["min_scenes_long"]
-    min_scenes_short = qc_cfg["min_scenes_short"]
+def load_roadmap_stages(profile_id: int | None) -> list[dict]:
+    """Devuelve las etapas activas del perfil ordenadas por ``sort_order``."""
+    if not profile_id:
+        return []
     with get_db() as conn:
-        stages = {
-            "research": conn.execute(
-                "SELECT COUNT(*) AS n FROM research WHERE project_id=? AND content IS NOT NULL AND content != ''",
-                (project["id"],),
-            ).fetchone()["n"]
-            > 0,
-            "concept": conn.execute(
-                "SELECT COUNT(*) AS n FROM concept WHERE project_id=? AND angle IS NOT NULL AND angle != ''",
-                (project["id"],),
-            ).fetchone()["n"]
-            > 0,
-            "scripts_long": conn.execute(
-                "SELECT COUNT(*) AS n FROM scripts WHERE project_id=? AND type='long'",
-                (project["id"],),
-            ).fetchone()["n"]
-            > 0,
-            "scripts_short": conn.execute(
-                "SELECT COUNT(*) AS n FROM scripts WHERE project_id=? AND type='short'",
-                (project["id"],),
-            ).fetchone()["n"]
-            > 0,
-        }
-        scripts = [
+        return [
             dict(r)
             for r in conn.execute(
-                "SELECT id, type FROM scripts WHERE project_id=?",
-                (project["id"],),
+                "SELECT * FROM roadmap_stages WHERE profile_id=? AND is_active=1 "
+                "ORDER BY sort_order, id",
+                (profile_id,),
             ).fetchall()
         ]
-        scenes_done = False
-        if scripts:
-            scenes_done = True
-            for s in scripts:
-                min_n = min_scenes_long if s["type"] == "long" else min_scenes_short
-                count = conn.execute(
-                    "SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND script_id=?",
-                    (project["id"], s["id"]),
-                ).fetchone()["n"]
-                if count < min_n:
-                    scenes_done = False
-                    break
-        stages["scenes"] = scenes_done
-        stages["metadata"] = (
+
+
+def load_project_stages(project_id: int) -> list[dict]:
+    """Devuelve las ``project_stages`` del proyecto con la info de su ``roadmap_stage``."""
+    with get_db() as conn:
+        return [
+            dict(r)
+            for r in conn.execute(
+                """
+                SELECT ps.id AS id, ps.project_id, ps.roadmap_stage_id,
+                       ps.instruction, ps.response, ps.updated_at,
+                       rs.profile_id, rs.name AS stage_name, rs.sort_order,
+                       rs.is_active, rs.created_at AS rs_created_at
+                FROM project_stages ps
+                JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+                WHERE ps.project_id=?
+                ORDER BY rs.sort_order, rs.id
+            """,
+                (project_id,),
+            ).fetchall()
+        ]
+
+
+def sync_project_stages_for_project(project_id: int) -> list[dict]:
+    """Asegura que el proyecto tiene una ``project_stage`` por cada ``roadmap_stage`` activa del perfil.
+
+    Crea las filas activas que falten. Conserva las filas de etapas
+    desactivadas (``is_active=0``) para no perder respuestas ya escritas.
+    Sólo elimina filas cuyo ``roadmap_stage_id`` ya no existe en
+    ``roadmap_stages`` (etapa borrada del roadmap). Devuelve la lista
+    actualizada de ``project_stages``.
+    """
+    with get_db() as conn:
+        project = conn.execute(
+            "SELECT profile_id FROM projects WHERE id=?", (project_id,)
+        ).fetchone()
+        if not project or not project["profile_id"]:
+            return []
+        profile_id = project["profile_id"]
+        active_roadmap = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, instruction FROM roadmap_stages "
+                "WHERE profile_id=? AND is_active=1",
+                (profile_id,),
+            ).fetchall()
+        ]
+        all_roadmap_ids = {
+            r["id"]
+            for r in conn.execute(
+                "SELECT id FROM roadmap_stages WHERE profile_id=?",
+                (profile_id,),
+            ).fetchall()
+        }
+        existing_rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, roadmap_stage_id FROM project_stages WHERE project_id=?",
+                (project_id,),
+            ).fetchall()
+        ]
+        existing_ids = {r["roadmap_stage_id"] for r in existing_rows}
+        now = now_iso()
+        for rs in active_roadmap:
+            if rs["id"] in existing_ids:
+                continue
             conn.execute(
-                "SELECT COUNT(*) AS n FROM metadata_records WHERE project_id=?", (project["id"],)
-            ).fetchone()["n"]
-            > 0
+                """
+                INSERT INTO project_stages
+                    (project_id, roadmap_stage_id, instruction, response, updated_at)
+                VALUES (?, ?, ?, '', ?)
+            """,
+                (project_id, rs["id"], rs["instruction"], now),
+            )
+        for ps in existing_rows:
+            if ps["roadmap_stage_id"] not in all_roadmap_ids:
+                conn.execute("DELETE FROM project_stages WHERE id=?", (ps["id"],))
+    return load_project_stages(project_id)
+
+
+def sync_profile_projects(profile_id: int, *, sync_folder: bool = True) -> int:
+    """Sincroniza ``project_stages`` y, opcionalmente, la carpeta de todos los proyectos del perfil.
+
+    Pensado para llamarse desde ``blueprints/profiles`` tras ``create`` o
+    ``update``. Los errores en un proyecto se registran pero no detienen
+    el resto. Devuelve el número de proyectos sincronizados correctamente.
+    """
+    with get_db() as conn:
+        project_ids = [
+            r["id"]
+            for r in conn.execute(
+                "SELECT id FROM projects WHERE profile_id=?", (profile_id,)
+            ).fetchall()
+        ]
+    synced = 0
+    for pid in project_ids:
+        try:
+            sync_project_stages_for_project(pid)
+            if sync_folder:
+                sync_project_folder(pid)
+            synced += 1
+        except Exception:
+            log.exception("[sync_profile_projects] pid=%s profile=%s", pid, profile_id)
+    return synced
+
+
+def build_stage_context(project_id: int, stage_id: int) -> str:
+    """Concatena en Markdown las respuestas de las etapas anteriores para alimentar al LLM."""
+    stages = load_project_stages(project_id)
+    current = next((s for s in stages if s["id"] == stage_id), None)
+    if not current:
+        return ""
+    parts: list[str] = []
+    for s in stages:
+        if s["sort_order"] >= current["sort_order"]:
+            break
+        response = (s.get("response") or "").strip()
+        if not response:
+            continue
+        label = ROADMAP_STAGE_LABELS.get(s["stage_name"], s["stage_name"])
+        parts.append(f"## {label}\n\n{response}")
+    return "\n\n---\n\n".join(parts)
+
+
+def generate_stage_response(project_id: int, stage_id: int) -> tuple[str, str, str]:
+    """Llama al LLM con la instrucción del proyecto y el contexto acumulado. Devuelve (sys, raw, user)."""
+    stages = load_project_stages(project_id)
+    current = next((s for s in stages if s["id"] == stage_id), None)
+    if not current:
+        return "", "", ""
+    project = fetch_project_or_404(project_id)
+    profile = get_profile(project["profile_id"])
+    sys_p = (current.get("instruction") or "").strip()
+    label = ROADMAP_STAGE_LABELS.get(current["stage_name"], current["stage_name"])
+    user_parts = [
+        f"Tema: {project['topic']}",
+        f"Canal: Todo Sobre Todo",
+    ]
+    if profile:
+        user_parts.append(f"Tipo de contenido: {profile.get('content_type', '') or 'documental'}")
+        user_parts.append(f"Tono: {profile.get('tone', '') or 'serio'}")
+        user_parts.append(f"Estilo: {profile.get('style', '') or 'cinematográfico'}")
+        user_parts.append(f"Nivel de misterio: {profile.get('mystery_level', 5)}/10")
+    context = build_stage_context(project_id, stage_id)
+    if context:
+        user_parts.extend(["", "Contexto de etapas anteriores:", "", context])
+    user_parts.extend(["", f"Etapa actual: {label}."])
+    user_msg = "\n".join(user_parts)
+    raw = call_llm(sys_p, user_msg)
+    return sys_p, raw, user_msg
+
+
+def recompute_project_status(conn, project_id: int) -> None:
+    """Recalcula ``projects.status`` según las ``project_stages`` activas.
+
+    Devuelve ``'ready'`` si todas las etapas activas del proyecto tienen
+    ``response`` no vacía. Si falta alguna, degrada el estado a
+    ``'in_progress'`` para que limpiar una respuesta saque al proyecto
+    de ``ready``. No depende de los scripts legacy de cada etapa.
+    """
+    total_row = conn.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM project_stages ps
+        JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+        WHERE ps.project_id=? AND rs.is_active=1
+        """,
+        (project_id,),
+    ).fetchone()
+    total = total_row["n"] if total_row else 0
+    if total == 0:
+        return
+    done_row = conn.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM project_stages ps
+        JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+        WHERE ps.project_id=? AND rs.is_active=1
+          AND ps.response IS NOT NULL AND TRIM(ps.response) != ''
+        """,
+        (project_id,),
+    ).fetchone()
+    done = done_row["n"] if done_row else 0
+    if done < total:
+        conn.execute(
+            "UPDATE projects SET status='in_progress', updated_at=? WHERE id=?",
+            (now_iso(), project_id),
         )
-        thumb_long = conn.execute(
-            "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type='long'",
-            (project["id"],),
-        ).fetchone()
-        thumb_short = conn.execute(
-            "SELECT prompt FROM thumbnail_records WHERE project_id=? AND script_type='short'",
-            (project["id"],),
-        ).fetchone()
-        stages["thumbnails"] = bool(
-            thumb_long and thumb_long["prompt"] and thumb_short and thumb_short["prompt"]
+        return
+    conn.execute(
+        "UPDATE projects SET status='ready', updated_at=? WHERE id=?",
+        (now_iso(), project_id),
+    )
+
+
+def project_stage_status(project):
+    """Devuelve ``{stage_name: True/False}`` con el estado de cada etapa activa del proyecto."""
+    pid = project["id"]
+    stages: dict[str, bool] = {}
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT rs.name AS name, ps.response AS response
+            FROM project_stages ps
+            JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+            WHERE ps.project_id=? AND rs.is_active=1
+            """,
+            (pid,),
+        ).fetchall()
+    for r in rows:
+        stages[r["name"]] = bool((r["response"] or "").strip())
+
+    def _has(query: str, params: tuple) -> bool:
+        with get_db() as conn:
+            return bool(conn.execute(query, params).fetchone())
+
+    if not stages.get("research"):
+        stages["research"] = _has(
+            "SELECT 1 FROM research WHERE project_id=? AND content IS NOT NULL AND content != ''",
+            (pid,),
+        )
+    if not stages.get("concept"):
+        stages["concept"] = _has(
+            "SELECT 1 FROM concept WHERE project_id=? AND angle IS NOT NULL AND angle != ''",
+            (pid,),
+        )
+    if not stages.get("scripts"):
+        stages["scripts"] = _has(
+            "SELECT 1 FROM scripts WHERE project_id=?",
+            (pid,),
+        )
+    if not stages.get("scenes"):
+        stages["scenes"] = _has(
+            "SELECT 1 FROM scenes WHERE project_id=?",
+            (pid,),
+        )
+    if not stages.get("metadata"):
+        stages["metadata"] = _has(
+            "SELECT 1 FROM metadata_records WHERE project_id=?",
+            (pid,),
+        )
+    if not stages.get("thumbnails"):
+        stages["thumbnails"] = _has(
+            "SELECT 1 FROM thumbnail_records WHERE project_id=? "
+            "AND prompt IS NOT NULL AND prompt != ''",
+            (pid,),
         )
     return stages
 
@@ -1509,54 +2202,73 @@ def project_runtime(project, profile=None):
 def pipeline_view(project, current=None):
     """Estado del pipeline para la barra de etapas y el paso siguiente.
 
-    `current` es el nombre de la página activa (endpoint), no la etapa:
-    la página de guiones cubre dos etapas del pipeline.
+    `current` es el ``id`` de la ``project_stage`` activa (no el nombre
+    de la página). Las celdas se construyen dinámicamente desde las
+    ``roadmap_stages`` activas del perfil del proyecto y enlazan a la
+    ruta genérica ``project_stage``.
     """
-    stages = dict(project.get("stages") or project_stage_status(project))
-    qc_done = project.get("status") == "ready"
-    if not qc_done:
-        with get_db() as conn:
-            n_unresolved = conn.execute(
-                "SELECT COUNT(*) AS n FROM qc_issues WHERE project_id=? AND resolved=0",
-                (project["id"],),
-            ).fetchone()["n"]
-            qc_done = n_unresolved > 0
-    stages["qc"] = qc_done
+    stages_dict = dict(project.get("stages") or project_stage_status(project))
+    profile_id = project.get("profile_id")
+    roadmap = load_roadmap_stages(profile_id)
 
-    cells, pending = [], None
-    for stage in PIPELINE_STAGES:
-        cell = dict(
-            stage,
-            done=bool(stages.get(stage["key"])),
-            current=stage["endpoint"] == current,
-            url=url_for(stage["endpoint"], project_id=project["id"]),
-        )
+    cells: list[dict] = []
+    pending = None
+    prev_step = None
+    next_step = None
+    current_index = None
+    with get_db() as conn:
+        ps_index = {
+            r["roadmap_stage_id"]: r["id"]
+            for r in conn.execute(
+                "SELECT id, roadmap_stage_id FROM project_stages WHERE project_id=?",
+                (project["id"],),
+            ).fetchall()
+        }
+
+    for idx, rs in enumerate(roadmap):
+        stage_id = ps_index.get(rs["id"])
+        label = ROADMAP_STAGE_LABELS.get(rs["name"], rs["name"])
+        cell = {
+            "id": stage_id,
+            "key": rs["name"],
+            "num": f"{idx + 1:02d}",
+            "label": label,
+            "short": label,
+            "hint": "",
+            "done": bool(stages_dict.get(rs["name"])),
+            "current": stage_id is not None and stage_id == current,
+            "url": (
+                url_for("project_stage", project_id=project["id"], stage_id=stage_id)
+                if stage_id is not None
+                else url_for("view_project", project_id=project["id"])
+            ),
+        }
         if not cell["done"] and pending is None:
             pending = cell
+        if stage_id is not None and stage_id == current:
+            current_index = idx
         cells.append(cell)
 
+    if current_index is not None:
+        if current_index > 0 and cells[current_index - 1]["id"] is not None:
+            prev = cells[current_index - 1]
+            prev_step = {"label": prev["label"], "url": prev["url"]}
+        if current_index + 1 < len(cells) and cells[current_index + 1]["id"] is not None:
+            nxt = cells[current_index + 1]
+            next_step = {"label": nxt["label"], "url": nxt["url"]}
+
     done = sum(1 for c in cells if c["done"])
-    index = PAGE_ORDER.index(current) if current in PAGE_ORDER else None
-
-    def step(offset):
-        if index is None:
-            return None
-        pos = index + offset
-        if not 0 <= pos < len(PAGE_ORDER):
-            return None
-        page = PAGE_ORDER[pos]
-        return {"label": PAGE_LABELS[page], "url": url_for(page, project_id=project["id"])}
-
+    total = len(cells)
     return {
         "cells": cells,
         "done": done,
-        "total": len(cells),
-        "percent": round(done * 100 / len(cells)),
+        "total": total,
+        "percent": round(done * 100 / total) if total else 0,
         "next": pending,
-        "prev_step": step(-1),
-        "next_step": step(1),
-        "complete": done == len(cells),
-        "runtime": project_runtime(project, get_profile(project.get("profile_id"))),
+        "prev_step": prev_step,
+        "next_step": next_step,
+        "complete": total > 0 and done == total,
+        "runtime": project_runtime(project, get_profile(profile_id)),
     }
 
 
@@ -1818,6 +2530,10 @@ def new_project():
         if not name or not topic:
             flash("Nombre y tema son obligatorios", "error")
             return render_template("new_project.html", profiles=profiles)
+        if profile_id is None:
+            default_profile = get_default_profile()
+            if default_profile:
+                profile_id = default_profile["id"]
         with get_db() as conn:
             cur = conn.execute(
                 """
@@ -1828,6 +2544,10 @@ def new_project():
             )
             new_id = cur.lastrowid
         assert new_id is not None
+        try:
+            sync_project_stages_for_project(new_id)
+        except Exception:
+            log.exception("[sync_project_stages_for_project] %s", new_id)
         try:
             sync_project_folder(new_id)
         except Exception:
@@ -1866,6 +2586,109 @@ def delete_project(project_id):
             log.exception("[delete_project_folder] %s", project_id)
     flash("Proyecto eliminado", "ok")
     return redirect(url_for("dashboard"))
+
+
+@app.route("/projects/<int:project_id>/stages/<int:stage_id>", methods=["GET", "POST"])
+def project_stage(project_id, stage_id):
+    """Ruta genérica de etapa. Sustituye a las páginas individuales de cada fase."""
+    project = fetch_project_or_404(project_id)
+    sync_project_stages_for_project(project_id)
+    stages = load_project_stages(project_id)
+    current = next((s for s in stages if s["id"] == stage_id), None)
+    if not current:
+        abort(404)
+    if not current.get("is_active"):
+        flash("Esta etapa está desactivada en el perfil", "error")
+        return redirect(url_for("view_project", project_id=project_id))
+    profile = get_profile(project["profile_id"])
+
+    label = ROADMAP_STAGE_LABELS.get(current["stage_name"], current["stage_name"])
+    stage_view = {
+        "id": current["id"],
+        "key": current["stage_name"],
+        "name": label,
+        "num": f"{current['sort_order'] + 1:02d}",
+        "instruction": current.get("instruction") or "",
+        "description": "",
+    }
+    project_stage_view = {
+        "id": current["id"],
+        "instruction": current.get("instruction") or "",
+        "response": current.get("response") or "",
+        "updated_at": current.get("updated_at") or "",
+    }
+    stage_links = [
+        {
+            "id": s["id"],
+            "key": s["stage_name"],
+            "name": ROADMAP_STAGE_LABELS.get(s["stage_name"], s["stage_name"]),
+            "num": f"{s['sort_order'] + 1:02d}",
+            "done": bool((s.get("response") or "").strip()),
+            "complete": bool((s.get("response") or "").strip()),
+        }
+        for s in stages
+        if s.get("is_active")
+    ]
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "generate":
+            sys_p, raw, user_msg = generate_stage_response(project_id, stage_id)
+            return render_template(
+                "stage.html",
+                project=project,
+                profile=profile,
+                stage=stage_view,
+                project_stage=dict(
+                    project_stage_view,
+                    instruction=request.form.get("instruction", project_stage_view["instruction"]),
+                ),
+                stages=stage_links,
+                generated=raw,
+                sys_prompt=sys_p,
+                user_prompt=user_msg,
+                current_stage=stage_id,
+            )
+        if action == "save":
+            response_text = request.form.get("response", "").strip()
+            instruction_text = (request.form.get("instruction") or "").strip()
+            now = now_iso()
+            with get_db() as conn:
+                if instruction_text:
+                    conn.execute(
+                        "UPDATE project_stages SET response=?, instruction=?, updated_at=? "
+                        "WHERE id=? AND project_id=?",
+                        (response_text, instruction_text, now, stage_id, project_id),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE project_stages SET response=?, updated_at=? "
+                        "WHERE id=? AND project_id=?",
+                        (response_text, now, stage_id, project_id),
+                    )
+                conn.execute(
+                    "UPDATE projects SET updated_at=? WHERE id=?",
+                    (now, project_id),
+                )
+                recompute_project_status(conn, project_id)
+            try:
+                sync_project_folder(project_id)
+            except Exception:
+                log.exception("[sync_project_folder] project_stage %s/%s", project_id, stage_id)
+            flash("Etapa guardada", "ok")
+            return redirect(
+                url_for("project_stage", project_id=project_id, stage_id=stage_id)
+            )
+
+    return render_template(
+        "stage.html",
+        project=project,
+        profile=profile,
+        stage=stage_view,
+        project_stage=project_stage_view,
+        stages=stage_links,
+        current_stage=stage_id,
+    )
 
 
 # --- Investigación -----------------------------------------------------------
@@ -2650,9 +3473,7 @@ def export(project_id):
 
 
 # --- Perfiles ----------------------------------------------------------------
-# La ruta /profiles vive en blueprints/profiles.py (extracción desde
-# el monolito — siguiente paso tras blueprints/graph.py y
-# blueprints/runner.py).
+# La ruta /profiles vive en blueprints/profiles.py.
 
 
 # --- Settings ----------------------------------------------------------------
@@ -2661,9 +3482,9 @@ def export(project_id):
 
 # --- Graph (editor y runner) -------------------------------------------------
 
-# Las 7 rutas del editor de grafo y del runner viven ahora en
-# blueprints/graph.py y blueprints/runner.py (T2.2). Aqui solo se
-# conserva el grueso de las rutas del monolito.
+# Los blueprints del editor de grafo y del runner existen en
+# blueprints/graph.py y blueprints/runner.py pero no se registran a
+# propósito: el editor y el runner no son accesibles desde la app.
 
 
 # ---------------------------------------------------------------------------

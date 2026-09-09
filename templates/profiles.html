@@ -6,7 +6,7 @@
     <div>
         <p class="eyebrow">Ajustes reutilizables</p>
         <h1>Perfiles de contenido</h1>
-        <p class="lede">Tono, estilo, intensidad y plataformas. Cada proyecto usa un perfil y todos los prompts lo heredan.</p>
+        <p class="lede">Tono, estilo, intensidad y las siete etapas configurables del pipeline. Cada proyecto usa un perfil y hereda todas sus instrucciones.</p>
     </div>
 </section>
 
@@ -24,7 +24,6 @@
                         {% if p.is_default %}<span class="chip chip-done">Por defecto</span>{% endif %}
                     </h2>
                     <div class="actions tight">
-                        <a class="btn btn-ghost btn-sm" href="/profiles/{{ p.id }}/graph">Abrir editor de grafo</a>
                         <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
                     </div>
                 </div>
@@ -77,19 +76,6 @@
                     </label>
                 </div>
 
-                <div class="field mt-2">
-                    <span class="label">Plataformas</span>
-                    <div class="checks">
-                        {% for plat in ['youtube', 'shorts', 'tiktok', 'instagram', 'facebook', 'twitter'] %}
-                        <label>
-                            <input type="checkbox" name="platforms" value="{{ plat }}"
-                                   {% if plat in (p.platforms_list or []) %}checked{% endif %}>
-                            {{ plat }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
                 <label class="field mt-2">
                     <span class="label">Notas</span>
                     <textarea name="notes" rows="3"
@@ -104,18 +90,96 @@
                             Marcar como perfil por defecto
                         </label>
                     </div>
-                    {% if not p.is_default %}
-                    <form method="post" class="inline-form"
-                          onsubmit="return confirm('Se elimina el perfil «{{ p.name }}». Los proyectos que ya lo usan conservan su contenido.')">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="profile_id" value="{{ p.id }}">
-                        <button class="btn btn-danger btn-sm" aria-label="Eliminar perfil {{ p.name }}">Eliminar perfil</button>
-                    </form>
-                    {% else %}
-                    <span class="hint">El perfil por defecto no se puede eliminar.</span>
-                    {% endif %}
                 </div>
             </form>
+
+            {% if not p.is_default %}
+            <form method="post" class="inline-form mt-2"
+                  onsubmit="return confirm('Se elimina el perfil «{{ p.name }}». Los proyectos que ya lo usan conservan su contenido.')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="profile_id" value="{{ p.id }}">
+                <button class="btn btn-danger btn-sm" aria-label="Eliminar perfil {{ p.name }}">Eliminar perfil</button>
+            </form>
+            {% else %}
+            <p class="hint mt-2">El perfil por defecto no se puede eliminar.</p>
+            {% endif %}
+
+            <div class="panel-inset mt-3">
+                <div class="panel-head">
+                    <h3>Etapas del pipeline</h3>
+                    <span class="chip">{{ p.stages|length }} etapas</span>
+                </div>
+                <p class="hint">Edita nombre, orden, instrucción y visibilidad de cada etapa. Los cambios se aplican a todos los proyectos del perfil al guardar.</p>
+
+                {% for stage in p.stages %}
+                <div class="profile-stage">
+                    <form method="post">
+                        <input type="hidden" name="action" value="update_stage">
+                        <input type="hidden" name="profile_id" value="{{ p.id }}">
+                        <input type="hidden" name="stage_id" value="{{ stage.id }}">
+                        <div class="field-row">
+                            <label class="field">
+                                <span class="label">Nombre</span>
+                                <input type="text" name="name" value="{{ stage.name }}" required>
+                            </label>
+                            <label class="field">
+                                <span class="label">Orden</span>
+                                <input type="number" name="order" value="{{ stage.order }}" min="0" step="1">
+                            </label>
+                            <label class="checks">
+                                <input type="checkbox" name="active" {% if stage.active %}checked{% endif %}>
+                                Activa
+                            </label>
+                        </div>
+                        <label class="field">
+                            <span class="label">Instrucción</span>
+                            <textarea name="instruction" rows="3"
+                                      placeholder="Qué debe producir esta etapa.">{{ stage.instruction }}</textarea>
+                        </label>
+                        <div class="actions tight">
+                            <button type="submit" class="btn btn-primary btn-sm">Guardar etapa</button>
+                        </div>
+                    </form>
+                    <form method="post" class="inline-form"
+                          onsubmit="return confirm('Se elimina la etapa «{{ stage.name }}» y todas sus project_stages asociadas.')">
+                        <input type="hidden" name="action" value="delete_stage">
+                        <input type="hidden" name="profile_id" value="{{ p.id }}">
+                        <input type="hidden" name="stage_id" value="{{ stage.id }}">
+                        <button class="btn btn-ghost btn-sm" aria-label="Eliminar etapa {{ stage.name }}">Eliminar etapa</button>
+                    </form>
+                </div>
+                {% endfor %}
+
+                <form method="post" class="mt-2">
+                    <div class="panel-head">
+                        <h4>Añadir etapa</h4>
+                    </div>
+                    <input type="hidden" name="action" value="add_stage">
+                    <input type="hidden" name="profile_id" value="{{ p.id }}">
+                    <div class="field-row">
+                        <label class="field">
+                            <span class="label">Nombre</span>
+                            <input type="text" name="name" required placeholder="Nombre de la nueva etapa">
+                        </label>
+                        <label class="field">
+                            <span class="label">Orden</span>
+                            <input type="number" name="order" value="{{ p.stages|length }}" min="0" step="1">
+                        </label>
+                        <label class="checks">
+                            <input type="checkbox" name="active" checked>
+                            Activa
+                        </label>
+                    </div>
+                    <label class="field">
+                        <span class="label">Instrucción</span>
+                        <textarea name="instruction" rows="3"
+                                  placeholder="Qué debe producir esta etapa."></textarea>
+                    </label>
+                    <div class="actions tight">
+                        <button type="submit" class="btn btn-primary btn-sm">Añadir etapa</button>
+                    </div>
+                </form>
+            </div>
         </section>
         {% else %}
         <div class="empty">
@@ -173,15 +237,6 @@
                     <output>150</output>
                 </span>
             </label>
-
-            <div class="field">
-                <span class="label">Plataformas</span>
-                <div class="checks">
-                    {% for plat in ['youtube', 'shorts', 'tiktok', 'instagram', 'facebook', 'twitter'] %}
-                    <label><input type="checkbox" name="platforms" value="{{ plat }}"> {{ plat }}</label>
-                    {% endfor %}
-                </div>
-            </div>
 
             <label class="field">
                 <span class="label">Notas</span>

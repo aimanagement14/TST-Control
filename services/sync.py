@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sqlite3
 from pathlib import Path
 
 
@@ -47,16 +48,16 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
     Devuelve ``(carpeta, lista_de_rutas_relativas)`` para que el caller
     pueda listar los archivos o construir un ZIP a demanda.
 
-    El contrato de archivos es estable:
-        00_RESUMEN.md
-        01_investigacion.md
-        02_concepto.md
-        03_guiones/guion_{long,short}.md
-        04_escenas/escenas.md
-        05_metadata/metadata_{platform}.md
-        06_thumbnails/thumbnail_{long,short}.md
-        07_prompts_usados.md
-        08_paquete_completo.json
+    Si el proyecto tiene ``project_stages`` activas (modelo genérico de
+    etapas), se genera el layout nuevo: ``00_RESUMEN.md``, un
+    ``stage_<roadmap_stage_id>.md`` por etapa activa del perfil con fila
+    de proyecto, y ``08_paquete_completo.json`` con
+    ``project/profile/roadmap_stages/project_stages/exported_at``.
+
+    Si no las tiene o las tablas ``roadmap_stages``/``project_stages`` aún
+    no existen, se conserva el layout legacy (research, concept, scripts,
+    scenes, metadata, thumbnails, prompts) para no romper proyectos
+    antiguos.
     """
     # Import local para evitar ciclo: app.py -> services.sync -> app.
     from app import (
@@ -74,38 +75,180 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
             return PROJECTS_DIR / "_missing", []
         project = dict(project)
         profile = get_profile(project["profile_id"])
-        research_obj = fetch_optional_dict(
-            conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
-        )
-        concept_obj = fetch_optional_dict(
-            conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
-        )
-        scripts_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM scripts WHERE project_id=?", (project_id,)
-            ).fetchall()
-        ]
-        scenes_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
-            ).fetchall()
-        ]
-        meta_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
-            ).fetchall()
-        ]
-        thumb_rows = [
-            dict(r)
-            for r in conn.execute(
-                "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
-            ).fetchall()
-        ]
 
-    out_dir = safe_project_dir(project_id, project["name"])
+        ps_rows: list[dict] = []
+        try:
+            ps_rows = [
+                dict(r)
+                for r in conn.execute(
+                    """
+                    SELECT ps.id AS ps_id, ps.project_id, ps.roadmap_stage_id,
+                           ps.instruction AS ps_instruction,
+                           ps.response, ps.updated_at AS ps_updated_at,
+                           rs.id AS rs_id, rs.profile_id, rs.name,
+                           rs.instruction AS rs_instruction,
+                           rs.sort_order, rs.is_active,
+                           rs.created_at, rs.updated_at
+                    FROM project_stages ps
+                    JOIN roadmap_stages rs ON rs.id = ps.roadmap_stage_id
+                    WHERE ps.project_id=? AND rs.is_active=1
+                    ORDER BY rs.sort_order, rs.id
+                    """,
+                    (project_id,),
+                ).fetchall()
+            ]
+        except sqlite3.OperationalError:
+            ps_rows = []
+
+        legacy: dict | None = None
+        if not ps_rows:
+            legacy = _load_legacy_data(conn, project_id)
+
+    if ps_rows:
+        return _write_new_model(project, profile, ps_rows)
+
+    assert legacy is not None
+    stage_prompts = list_profile_prompts(project["profile_id"])
+    return _write_legacy_model(project, profile, legacy, stage_prompts)
+
+
+def _load_legacy_data(conn, project_id: int) -> dict:
+    from app import fetch_optional_dict
+
+    research_obj = fetch_optional_dict(
+        conn, "SELECT * FROM research WHERE project_id=?", (project_id,)
+    )
+    concept_obj = fetch_optional_dict(
+        conn, "SELECT * FROM concept WHERE project_id=?", (project_id,)
+    )
+    scripts_rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM scripts WHERE project_id=?", (project_id,)
+        ).fetchall()
+    ]
+    scenes_rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,)
+        ).fetchall()
+    ]
+    meta_rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM metadata_records WHERE project_id=?", (project_id,)
+        ).fetchall()
+    ]
+    thumb_rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM thumbnail_records WHERE project_id=?", (project_id,)
+        ).fetchall()
+    ]
+    return {
+        "research": research_obj,
+        "concept": concept_obj,
+        "scripts": scripts_rows,
+        "scenes": scenes_rows,
+        "metadata": meta_rows,
+        "thumbnails": thumb_rows,
+    }
+
+
+def _write_new_model(
+    project: dict, profile: dict | None, ps_rows: list[dict]
+) -> tuple[Path, list[str]]:
+    from app import now_iso
+
+    out_dir = safe_project_dir(project["id"], project["name"])
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    written: list[str] = []
+
+    # 00_RESUMEN.md
+    rel = "00_RESUMEN.md"
+    with open(out_dir / rel, "w", encoding="utf-8") as f:
+        f.write(f"# {project['name']}\n\n")
+        f.write(f"**Tema:** {project['topic']}\n\n")
+        f.write(f"**Estado:** {project['status']}\n\n")
+        f.write(f"**Creado:** {project['created_at']}\n\n")
+        if profile:
+            f.write(f"**Perfil:** {profile['name']}\n\n")
+            f.write(f"- Tipo: {profile.get('content_type', '')}\n")
+            f.write(f"- Tono: {profile.get('tone', '')}\n")
+            f.write(f"- Estilo: {profile.get('style', '')}\n")
+            f.write(f"- Misterio: {profile.get('mystery_level', '')}/10\n")
+            f.write(f"- Dramatización: {profile.get('drama_level', '')}/10\n")
+            f.write(f"- Velocidad: {profile.get('narration_speed', '')} ppm\n")
+    written.append(rel)
+
+    roadmap_stages: list[dict] = []
+    project_stages: list[dict] = []
+    for row in ps_rows:
+        rel = f"stage_{row['rs_id']}.md"
+        instruction = row.get("ps_instruction") or row.get("rs_instruction") or ""
+        with open(out_dir / rel, "w", encoding="utf-8") as f:
+            f.write(f"# {row['name']}\n\n")
+            f.write(f"**Etapa:** {row['name']}\n\n")
+            f.write("## Instrucción\n\n")
+            f.write(instruction + "\n\n")
+            f.write("## Respuesta\n\n")
+            f.write((row.get("response") or "") + "\n")
+        written.append(rel)
+
+        roadmap_stages.append(
+            {
+                "id": row["rs_id"],
+                "profile_id": row["profile_id"],
+                "name": row["name"],
+                "instruction": row.get("rs_instruction"),
+                "sort_order": row["sort_order"],
+                "is_active": row["is_active"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+        )
+        project_stages.append(
+            {
+                "id": row["ps_id"],
+                "project_id": row["project_id"],
+                "roadmap_stage_id": row["roadmap_stage_id"],
+                "instruction": row.get("ps_instruction"),
+                "response": row.get("response"),
+                "updated_at": row.get("ps_updated_at"),
+            }
+        )
+
+    rel = "08_paquete_completo.json"
+    bundle = {
+        "project": project,
+        "profile": profile,
+        "roadmap_stages": roadmap_stages,
+        "project_stages": project_stages,
+        "exported_at": now_iso(),
+    }
+    with open(out_dir / rel, "w", encoding="utf-8") as f:
+        json.dump(bundle, f, ensure_ascii=False, indent=2)
+    written.append(rel)
+
+    return out_dir, written
+
+
+def _write_legacy_model(
+    project: dict, profile: dict | None, legacy: dict, stage_prompts: dict
+) -> tuple[Path, list[str]]:
+    from app import now_iso
+
+    research_obj = legacy["research"]
+    concept_obj = legacy["concept"]
+    scripts_rows = legacy["scripts"]
+    scenes_rows = legacy["scenes"]
+    meta_rows = legacy["metadata"]
+    thumb_rows = legacy["thumbnails"]
+
+    out_dir = safe_project_dir(project["id"], project["name"])
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
@@ -283,7 +426,6 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
             written.append(rel)
 
     # 07_prompts_usados.md
-    stage_prompts = list_profile_prompts(project["profile_id"])
     if stage_prompts:
         stage_labels = {
             "research": "Investigación",
