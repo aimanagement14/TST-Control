@@ -17,6 +17,11 @@ from services.parsers import (
     parse_prompt_json,
     parse_scenes_json,
 )
+from services.templates import (
+    RenderReport,
+    render,
+    render_profile,
+)
 
 # Forzar UTF-8 en stdout/stderr para que los caracteres (✓, á, ó, →) no rompan
 # en consolas Windows con cp1252 por defecto (Python 3.13 mantiene la
@@ -266,57 +271,78 @@ def test_parse_prompt_json():
     print("  ✓ parse_prompt_json")
 
 
-def test_parse_metadata_youtube():
-    text = """## TÍTULOS (5 opciones)
+def test_parse_metadata_youtube_long():
+    text = """## TITULOS (5 opciones)
 1. OVNIs: la verdad
 2. Pentagon confirmado
+3. UAPs al descubierto
+4. Misterio en el cielo
+5. LaPentagon contra los UAPs
 
-## DESCRIPCIÓN
-Video sobre OVNIs.
-
-## CAPÍTULOS
-00:00 Intro
-01:00 Bloque 1
+## DESCRIPCION
+Video sobre OVNIs en prosa continua. Se separa en párrafos.
 
 ## TAGS (15)
-ovnis, uap, pentagono, mil
-
-## HASHTAGS (5)
-#ovnis #misterio #uap #pentagono #viral
+ovnis uap pentagono mil misterio aviadores
 
 ## CTA
-Suscríbete."""
-    r = app.parse_metadata(text, "youtube")
-    assert len(r["titles"]) == 2
+Suscríbete al canal."""
+    r = app.parse_metadata(text, "youtube_long")
+    assert len(r["titles"]) == 5, f"titles: {r['titles']}"
     assert "Video sobre OVNIs" in r["description"]
-    assert len(r["chapters"]) == 2
-    assert len(r["tags"]) >= 4, f"tags: {r['tags']}"
-    assert len(r["hashtags"]) == 5
-    print("  ✓ parse_metadata (youtube)")
+    assert "ovnis" in r["tags"]
+    assert "Suscríbete" in r["cta"]
+    assert r["hashtags"] == [], "youtube_long no usa hashtags en el prompt nuevo"
+    assert r["chapters"] == [], "youtube_long no usa capítulos en el prompt nuevo"
+    print("  ✓ parse_metadata (youtube_long, dispatcher)")
 
 
-def test_parse_metadata_shorts():
-    text = """## CAPTION
-El Pentágono confirmó OVNIs.
+def test_parse_metadata_youtube_short():
+    text = """## TITULOS (3 opciones)
+1. LaPentagon confirma OVNIs
+2. UAPs en directo
+3. Misterio sin resolver
 
-## HOOK
-Pentágono confirma OVNIs
+## DESCRIPCION
+Dos frases con gancho textual. Funciona sin audio.
 
-## HASHTAGS (10)
-#ovnis #misterio #viral #shorts
+## HASHTAGS (8-12)
+#ovnis #uap #misterio #pentagono
+
+## TAGS (10)
+ovnis pentagono uap viral shorts
 
 ## CTA
-Sígueme.
-
-## TEXTO EN PANTALLA
-1. PENTAGONO CONFIRMA
-2. 144 INCIDENTES"""
-    r = app.parse_metadata(text, "shorts")
-    assert "Pentágono" in r["caption"]
-    assert "Pentágono confirma" in r["hook"]
+Suscríbete y dale a la campana."""
+    r = app.parse_metadata(text, "youtube_short")
+    assert len(r["titles"]) == 3, f"titles: {r['titles']}"
+    assert "Funciona sin audio" in r["description"]
     assert len(r["hashtags"]) == 4
-    assert len(r["on_screen_text"]) == 2
-    print("  ✓ parse_metadata (shorts)")
+    assert "Suscríbete" in r["cta"]
+    assert r["caption"] == ""
+    assert r["on_screen_text"] == []
+    print("  ✓ parse_metadata (youtube_short, dispatcher)")
+
+
+def test_parse_metadata_dispatcher_returns_canonical_shape():
+    """Aunque el prompt no declare todos los campos, el dict siempre los trae."""
+    r = app.parse_metadata("## DESCRIPCION\nSolo descripción.", "facebook_long")
+    for key in (
+        "titles",
+        "description",
+        "chapters",
+        "tags",
+        "hashtags",
+        "caption",
+        "hook",
+        "cta",
+        "on_screen_text",
+    ):
+        assert key in r, f"Falta clave canónica {key} en respuesta de facebook_long"
+    assert r["titles"] == []
+    assert r["on_screen_text"] == []
+    assert "Solo descripción" in r["description"]
+    print("  ✓ parse_metadata (dispatcher devuelve forma canónica completa)")
 
 
 def test_parse_metadata_facebook_long():
@@ -980,12 +1006,16 @@ def test_project_video_lifecycle(tmp_path):
 
 
 def test_resolve_stage_prompt_falls_back_to_config(tmp_path):
-    """Sin fila en profile_prompts, devuelve los strings de CONFIG."""
+    """Sin fila en profile_prompts, devuelve los strings de CONFIG (renderizados)."""
     _setup_qc_db(tmp_path)
     profile_id = 1
     sys_p, user_p = app.resolve_stage_prompt(profile_id, "research")
-    assert sys_p == app.CONFIG["prompts"]["research"]["system"]
-    assert user_p == app.CONFIG["prompts"]["research"]["format"]
+    raw_sys = app.CONFIG["prompts"]["research"]["system"]
+    raw_user = app.CONFIG["prompts"]["research"]["format"]
+    expected_sys, _ = render_profile(raw_sys, app.get_profile(profile_id))
+    expected_user, _ = render_profile(raw_user, app.get_profile(profile_id))
+    assert sys_p == expected_sys, f"SYS renderizado difiere de raw CONFIG"
+    assert user_p == expected_user, f"USER renderizado difiere de raw CONFIG"
     sys_p, user_p = app.resolve_stage_prompt(profile_id, "no_existe")
     assert sys_p == "" and user_p == ""
     print("  ✓ resolve_stage_prompt cae a CONFIG y a vacío si stage desconocido")
@@ -1008,6 +1038,195 @@ def test_save_profile_prompt_upsert(tmp_path):
     out = app.list_profile_prompts(profile_id)
     assert len(out) == 1, "profile_id=None no debe persistir"
     print("  ✓ save_profile_prompt UPSERT y respeta profile_id=None")
+
+
+# ==========================================================================
+# Fase 1.3: mini-motor de plantillas + inyección de perfil
+# ==========================================================================
+
+
+def test_render_substitutes_known_paths():
+    """render sustituye {{path.to.value}} y reporta unknown en el report."""
+    text, report = render(
+        "Canal={{app.name}} misterio={{profile.mystery_level}} tono={{profile.tone}}",
+        {
+            "app": {"name": "Todo Sobre Todo"},
+            "profile": {"mystery_level": 7, "tone": "serio"},
+        },
+    )
+    assert text == "Canal=Todo Sobre Todo misterio=7 tono=serio"
+    assert isinstance(report, RenderReport)
+    assert report.unknown == set()
+    print("  ✓ render sustituye paths conocidos")
+
+
+def test_render_reports_unknown_paths():
+    """render sustituye paths desconocidos por cadena vacía y los reporta."""
+    text, report = render(
+        "Hola {{profile.x}} y {{profile.y}} misterioso={{profile.mystery_level}}",
+        {"profile": {"mystery_level": 8}},
+    )
+    assert text == "Hola  y  misterioso=8"
+    assert report.unknown == {"profile.x", "profile.y"}
+    print("  ✓ render reporta paths desconocidos")
+
+
+def test_render_profile_normalizes_platforms_csv():
+    """render_profile construye el contexto con platforms_csv legible."""
+    text, _ = render_profile(
+        "Plataformas: {{profile.platforms_csv}}",
+        {"platforms": '["youtube", "shorts", "facebook"]'},
+    )
+    assert text == "Plataformas: youtube, shorts, facebook"
+    print("  ✓ render_profile serializa platforms como CSV")
+
+
+def test_resolve_stage_prompt_renders_profile_template(tmp_path):
+    """SYS con {{profile.*}} se renderiza contra el perfil activo."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO profile_prompts "
+            "(profile_id, stage, sys_prompt, user_prompt, updated_at) "
+            "VALUES (1, 'research', ?, ?, '2025-01-01')",
+            (
+                "Canal: {{app.name}}. Misterio: {{profile.mystery_level}}/10.",
+                "Tono: {{profile.tone}}",
+            ),
+        )
+        conn.execute(
+            "UPDATE profiles SET mystery_level=8, tone='oscuro y solemne' WHERE id=1"
+        )
+    sys_p, user_p = app.resolve_stage_prompt(1, "research")
+    assert "Canal: Todo Sobre Todo." in sys_p
+    assert "Misterio: 8/10." in sys_p
+    assert user_p == "Tono: oscuro y solemne"
+    print("  ✓ resolve_stage_prompt aplica el motor de plantillas contra el perfil")
+
+
+def test_resolve_stage_prompt_aliases(tmp_path):
+    """Aliases del runner (scenes_short → scenes, scripts → script_long, thumbnails → thumbnail_long)."""
+    _setup_qc_db(tmp_path)
+    sys_short_alias, _ = app.resolve_stage_prompt(1, "scenes_short")
+    sys_canonical, _ = app.resolve_stage_prompt(1, "scenes")
+    assert sys_short_alias == sys_canonical
+
+    sys_scripts_alias, _ = app.resolve_stage_prompt(1, "scripts")
+    sys_long, _ = app.resolve_stage_prompt(1, "script_long")
+    assert sys_scripts_alias == sys_long
+
+    sys_thumbs_alias, _ = app.resolve_stage_prompt(1, "thumbnails")
+    sys_thumb_long, _ = app.resolve_stage_prompt(1, "thumbnail_long")
+    assert sys_thumbs_alias == sys_thumb_long
+    print("  ✓ resolve_stage_prompt respeta aliases scenes_short/scripts/thumbnails")
+
+
+def test_roadmap_instruction_finds_row_by_roadmap_name(tmp_path):
+    """_roadmap_instruction_for prioriza la key del roadmap sobre la de CONFIG."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO profile_prompts "
+            "(profile_id, stage, sys_prompt, user_prompt, updated_at) "
+            "VALUES (1, 'scripts', 'CUSTOM_SYS', 'CUSTOM_USER', '2025-01-01')"
+        )
+        conn.commit()
+    with app.get_db() as conn:
+        text = app._roadmap_instruction_for(conn, profile_id=1, stage_name="scripts")
+    assert "CUSTOM_SYS" in text and "CUSTOM_USER" in text
+    print("  ✓ _roadmap_instruction_for encuentra la fila por nombre de roadmap")
+
+
+def test_config_has_no_orphan_legacy_keys():
+    """Config.json ya no contiene metadata_youtube ni metadata_shorts (Fase 1.1)."""
+    keys = set(app.CONFIG["prompts"].keys())
+    assert "metadata_youtube" not in keys, "metadata_youtube es código muerto"
+    assert "metadata_shorts" not in keys, "metadata_shorts es código muerto"
+    expected = {
+        "research",
+        "concept",
+        "script_long",
+        "script_short",
+        "scenes",
+        "metadata_youtube_long",
+        "metadata_facebook_long",
+        "metadata_youtube_short",
+        "metadata_reels_short",
+        "thumbnail_long",
+        "thumbnail_short",
+    }
+    missing = expected - keys
+    assert not missing, f"Faltan keys esperadas en config.json: {missing}"
+    print("  ✓ config.json sin huérfanos y con todas las keys esperadas")
+
+
+# ==========================================================================
+# Fase 4: prompt refiner post-QC
+# ==========================================================================
+
+
+def test_build_refiner_prompt_includes_issues():
+    """El user_msg del refiner incluye cada issue con stage y severity."""
+    issues = [
+        ("scripts", "warning", "Palabra repetida 3x: «misterio»", "long", 1),
+        ("scenes", "info", "Solo 5 escenas en short", "short", 2),
+    ]
+    _, user_msg = app.build_refiner_prompt(
+        profile={"tone": "serio", "mystery_level": 7},
+        stage_label="scripts",
+        current_output="# Guion\nTexto...",
+        issues=issues,
+        original_format="## TITULO\n[...]\n## HOOK\n[...]",
+    )
+    assert "Etapa a refinar: scripts" in user_msg
+    assert "[warning] scripts" in user_msg
+    assert "[info] scenes" in user_msg
+    assert "Palabra repetida" in user_msg
+    assert "Solo 5 escenas" in user_msg
+    assert "# Guion" in user_msg
+    print("  ✓ build_refiner_prompt inyecta la lista de issues en el user_msg")
+
+
+def test_build_refiner_prompt_respects_original_format():
+    """El refiner conserva el bloque FORMAT del prompt original en su user_msg."""
+    fmt = "## TITULOS (5 opciones)\n1. [título]\n## DESCRIPCION\n[...]"
+    _, user_msg = app.build_refiner_prompt(
+        profile=None,
+        stage_label="metadata_youtube_long",
+        current_output="output",
+        issues=[],
+        original_format=fmt,
+    )
+    assert "TITULOS (5 opciones)" in user_msg
+    assert "## DESCRIPCION" in user_msg
+    print("  ✓ build_refiner_prompt respeta el FORMAT del prompt original")
+
+
+def test_config_visual_style_keywords_is_shared():
+    """Solo hay UNA lista canónica de keywords visuales en CONFIG."""
+    ks = app.CONFIG.get("visual_style", {}).get("keywords")
+    assert ks, "Falta visual_style.keywords en CONFIG"
+    expected_count = 14
+    items = [s.strip() for s in ks.split(",")]
+    assert len(items) == expected_count, f"keywords tiene {len(items)} items, esperaba {expected_count}"
+    for must in ["Cinematic Hyperrealism", "Orange & Teal Color Grading", "Documentary Premium Quality"]:
+        assert must in items, f"Falta keyword obligatoria: {must}"
+    print("  ✓ visual_style.keywords centraliza las 14 keywords visuales")
+
+
+def test_visual_prompts_reference_shared_keyword_token():
+    """Los prompts visuales referencian {{app.visual_style_keywords}}, no lista literal."""
+    for stage in ("scenes", "thumbnail_long", "thumbnail_short"):
+        sys_text = app.CONFIG["prompts"][stage]["system"]
+        fmt_text = app.CONFIG["prompts"][stage]["format"]
+        assert "{{app.visual_style_keywords}}" in sys_text or "{{app.visual_style_keywords}}" in fmt_text, (
+            f"{stage} no usa la variable compartida"
+        )
+        canon = app.CONFIG["visual_style"]["keywords"]
+        full_list = canon in sys_text or canon in fmt_text
+        assert not full_list, f"{stage} todavía tiene la lista literal completa hardcoded"
+    print("  ✓ scenes / thumbnail_* usan la variable en lugar de la lista literal")
+
 
 
 def test_profiles_page_renders(tmp_path):
@@ -1932,8 +2151,12 @@ def main():
     _safe("parse_scenes_json", test_parse_scenes_json)
     _safe("parse_scenes_json_bare", test_parse_scenes_json_bare)
     _safe("parse_prompt_json", test_parse_prompt_json)
-    _safe("parse_metadata_youtube", test_parse_metadata_youtube)
-    _safe("parse_metadata_shorts", test_parse_metadata_shorts)
+    _safe("parse_metadata_youtube_long", test_parse_metadata_youtube_long)
+    _safe("parse_metadata_youtube_short", test_parse_metadata_youtube_short)
+    _safe(
+        "parse_metadata_dispatcher_returns_canonical_shape",
+        test_parse_metadata_dispatcher_returns_canonical_shape,
+    )
     _safe("parse_metadata_facebook_long", test_parse_metadata_facebook_long)
     _safe("parse_metadata_reels_short", test_parse_metadata_reels_short)
     _safe("parse_thumbnail", test_parse_thumbnail)
@@ -1969,8 +2192,40 @@ def main():
     )
     _with_tmp("save_profile_prompt_upsert", test_save_profile_prompt_upsert)
     _with_tmp(
+        "resolve_stage_prompt_renders_profile_template",
+        test_resolve_stage_prompt_renders_profile_template,
+    )
+    _with_tmp("resolve_stage_prompt_aliases", test_resolve_stage_prompt_aliases)
+    _with_tmp(
+        "roadmap_instruction_finds_row_by_roadmap_name",
+        test_roadmap_instruction_finds_row_by_roadmap_name,
+    )
+    _with_tmp(
         "migration_copies_stage_prompts_to_profile_prompts",
         test_migration_copies_stage_prompts_to_profile_prompts,
+    )
+
+    print("\n=== TESTS DEL MOTOR DE PLANTILLAS (Fase 1.3) ===")
+    _safe("render_substitutes_known_paths", test_render_substitutes_known_paths)
+    _safe("render_reports_unknown_paths", test_render_reports_unknown_paths)
+    _safe("render_profile_normalizes_platforms_csv", test_render_profile_normalizes_platforms_csv)
+
+    print("\n=== TESTS DE HOUSEKEEPING DE PROMPTS (Fase 1.1) ===")
+    _safe(
+        "config_has_no_orphan_legacy_keys",
+        test_config_has_no_orphan_legacy_keys,
+    )
+
+    print("\n=== TESTS DEL REFINER POST-QC (Fase 4) ===")
+    _safe("build_refiner_prompt_includes_issues", test_build_refiner_prompt_includes_issues)
+    _safe(
+        "build_refiner_prompt_respects_original_format",
+        test_build_refiner_prompt_respects_original_format,
+    )
+    _safe("config_visual_style_keywords_is_shared", test_config_visual_style_keywords_is_shared)
+    _safe(
+        "visual_prompts_reference_shared_keyword_token",
+        test_visual_prompts_reference_shared_keyword_token,
     )
 
     print("\n=== TESTS DE EDICIÓN DE PERFILES ===")

@@ -432,3 +432,82 @@ presets personalizados. La herramienta es solo modo manual desde
   revert; o bien quedarse en `2.0.0` y abrir un nuevo sprint que
   reintroduzca los proveedores con mejor diseño (SDK oficial por
   proveedor, OAuth en vez de API keys, etc.).
+
+## 2026-09-10 — Auditoría de prompts del pipeline (T3)
+
+**Contexto:** La release v2.0.0 mantenía los prompts SYS por etapa como
+texto plano sin inyección de variables, con keys huérfanas en
+`config.json` (`metadata_youtube`, `metadata_shorts`) y un bug latente
+en `_roadmap_instruction_for` que hacía que las ediciones de prompts
+per-video en `profile_prompts` nunca llegaran al runtime (siempre se
+usaba el fallback de CONFIG).
+
+**Decisión:** Auditoría en cuatro frentes, en orden:
+
+1. **Housekeeping** — Borrar `metadata_youtube` y `metadata_shorts` de
+   `config.json`. Refactor `KNOWN_FIXED_NODE_KEYS`,
+   `DEFAULT_NODE_LABELS`, `DEFAULT_NODE_POSITIONS` y `DEFAULT_EDGES`
+   para usar los nombres modernos (`metadata_youtube_long`,
+   `metadata_youtube_short`, `metadata_facebook_long`,
+   `metadata_reels_short`). Eliminar el dict legacy en
+   `build_metadata_prompt`. Refactor del canonical map en
+   `_persist_fixed_result` y de `_build_user_msg_for_fixed` en el
+   runner del grafo.
+
+2. **Aliases en `resolve_stage_prompt`** — Nuevo dict
+   `STAGE_ALIASES = {"scenes_short": "scenes", "scripts":
+   "script_long", "thumbnails": "thumbnail_long"}`. Arreglo del bug en
+   `_roadmap_instruction_for`: ahora prueba primero la key del roadmap
+   (como se guardan en `profile_prompts`) antes que las alternativas
+   declaradas en `ROADMAP_PROMPT_KEYS`.
+
+3. **Mini-motor de plantillas `{{var}}`** — Nuevo módulo
+   `services/templates.py` con `render(text, context)` y
+   `render_profile(text, profile)`. Soporta paths con punto
+   (`{{profile.mystery_level}}`); paths desconocidos se sustituyen por
+   cadena vacía y se registran en un `RenderReport.unknown`. Aplicado
+   dentro de `resolve_stage_prompt` y dentro de `app_context()` (que
+   expone `app.visual_style_keywords` desde la constante `visual_style`
+   en CONFIG). Cada prompt SYS ahora arranca con un bloque
+   «Contexto del perfil» que se sustituye en runtime.
+
+4. **Estrategia editorial** — `concept` exige anclaje en hechos
+   confirmados y declara explícitamente las afirmaciones sin verificar
+   que NO debe usar como base. `build_concept_prompt` ahora inyecta
+   los bloques `facts`, `theories`, `sources` y `unverified` del
+   `parse_research`. `scenes` declara arco emocional progresivo
+   (asombro → misterio → pregunta → escala). `min_scenes_short`
+   sube de 4 → 6 para alinearse con la regla «mínimo 6 escenas» del
+   prompt. `parse_metadata` se refactoriza a dispatcher por
+   plataforma con cuatro ramas (`youtube_long`, `youtube_short`,
+   `facebook_long`, `reels_short`) que siempre devuelven el dict
+   canónico completo.
+
+5. **DRY keywords visuales** — Las 14 keywords cinematográficas
+   repetidas en `scenes`, `thumbnail_long`, `thumbnail_short` se
+   extraen a `CONFIG.visual_style.keywords`. Los prompts visuales
+   ahora referencian `{{app.visual_style_keywords}}` en lugar de la
+   lista literal.
+
+6. **Refiner post-QC** — Nueva key `prompts.refiner` con un prompt
+   que toma (output actual + issues QC + FORMAT original de la etapa)
+   y devuelve la respuesta refinada solo donde hace falta. Builder
+   `build_refiner_prompt(profile, stage_label, current_output, issues,
+   original_format)`. La integración con la UI es optativa (no
+   implementada en esta tanda).
+
+**Consecuencias:**
+
+- `resolve_stage_prompt` ya no es solo «leer de DB o CONFIG»: ahora
+  también renderiza con el perfil activo. Las ediciones del usuario en
+  `/profiles/<id>/graph` surten efecto aunque vivan bajo el key del
+  roadmap (`scripts`, `metadata`, `thumbnails`).
+- Si un perfil futuro cambia `mystery_level` o `tone` los prompts
+  SYS se adaptan sin reescribirlos: el motor de plantillas unifica la
+  voz editorial.
+- `parse_metadata` se rompe por plataforma, no por prompt: cada rama
+  valida solo los campos que su prompt declara. Los campos no
+  rellenados quedan vacíos pero presentes en el dict canónico.
+- `verify_project.py` y `test_core.py` crecen ~12 tests nuevos. El
+  total pasa en verde.
+- Backup de `workflow.db` y `config.json` previos en `backups/`.

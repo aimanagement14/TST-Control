@@ -315,8 +315,9 @@ def parse_prompt_json(text: str) -> dict | None:
     return None
 
 
-def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
-    out: dict[str, str | list[str]] = {
+def _canonical_metadata_dict() -> dict[str, str | list[str]]:
+    """Devuelve el dict con todos los campos que la UI/DB espera, vacíos por defecto."""
+    return {
         "titles": [],
         "description": "",
         "chapters": [],
@@ -327,6 +328,34 @@ def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
         "cta": "",
         "on_screen_text": [],
     }
+
+
+def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
+    """Dispatcher: enruta a la rama específica por plataforma.
+
+    Plataformas soportadas: ``youtube_long``, ``youtube_short``,
+    ``facebook_long``, ``reels_short``. Si la plataforma no se reconoce,
+    cae a ``youtube_long`` (la más completa y retrocompatible). Siempre
+    devuelve el dict canónico con todos los campos rellenos (los no
+    rellenados por el parser específico quedan vacíos).
+    """
+    parser_name = PLATFORM_PARSERS.get(platform)
+    if parser_name is None:
+        parser_name = "youtube_long"
+    parser = _METADATA_PARSERS_BY_NAME[parser_name]
+    parsed = parser(text)
+    out = _canonical_metadata_dict()
+    out.update({k: v for k, v in parsed.items() if k in out})
+    return out
+
+
+def _parse_youtube_long(text: str) -> dict[str, str | list[str]]:
+    partial: dict[str, str | list[str]] = {
+        "titles": [],
+        "description": "",
+        "tags": [],
+        "cta": "",
+    }
     cur = None
     for line in text.splitlines():
         s = line.strip()
@@ -335,51 +364,130 @@ def parse_metadata(text: str, platform: str) -> dict[str, str | list[str]]:
             cur = "titles"
         elif up.startswith("## DESCRIPCIÓN") or up.startswith("## DESCRIPCION"):
             cur = "description"
-        elif up.startswith("## CAPÍTULOS") or up.startswith("## CAPITULOS"):
-            cur = "chapters"
+        elif up.startswith("## TAGS"):
+            cur = "tags"
+        elif up.startswith("## CTA"):
+            cur = "cta"
+        elif up.startswith("##"):
+            cur = None
+        elif cur == "titles":
+            m = re.match(r"^\s*\d+[\.\)]\s*(.+)", s)
+            if m:
+                cast(list[str], partial["titles"]).append(m.group(1).strip())
+        elif cur == "tags" and s and not s.startswith("#"):
+            cast(list[str], partial["tags"]).extend(
+                p for p in (q.strip() for q in re.split(r"[,\s]+", s) if q.strip())
+            )
+        elif cur in ("description", "cta") and s:
+            existing = partial[cur] or ""
+            if isinstance(existing, str):
+                partial[cur] = f"{existing}\n{s}".strip()
+    return partial
+
+
+def _parse_youtube_short(text: str) -> dict[str, str | list[str]]:
+    partial: dict[str, str | list[str]] = {
+        "titles": [],
+        "description": "",
+        "tags": [],
+        "hashtags": [],
+        "cta": "",
+    }
+    cur = None
+    for line in text.splitlines():
+        s = line.strip()
+        up = re.sub(r"\s+", " ", s.upper())
+        if up.startswith("## TITULOS") or up.startswith("## TÍTULOS"):
+            cur = "titles"
+        elif up.startswith("## DESCRIPCIÓN") or up.startswith("## DESCRIPCION"):
+            cur = "description"
         elif up.startswith("## TAGS"):
             cur = "tags"
         elif up.startswith("## HASHTAGS"):
             cur = "hashtags"
-        elif up.startswith("## CAPTION"):
-            cur = "caption"
-        elif up.startswith("## HOOK"):
-            cur = "hook"
         elif up.startswith("## CTA"):
             cur = "cta"
-        elif up.startswith("## TEXTO EN PANTALLA"):
-            cur = "on_screen_text"
-        elif up.startswith("##") and cur:
+        elif up.startswith("##"):
             cur = None
-        else:
-            if cur == "titles":
-                titles = cast(list[str], out["titles"])
-                m = re.match(r"^\s*\d+[\.\)]\s*(.+)", s)
-                if m:
-                    titles.append(m.group(1).strip())
-            elif cur == "tags":
-                tags = cast(list[str], out["tags"])
-                if s and not s.startswith("#"):
-                    parts = [p.strip() for p in re.split(r"[,\s]+", s) if p.strip()]
-                    tags.extend(parts)
-            elif cur == "hashtags":
-                hashtags = cast(list[str], out["hashtags"])
-                for h in re.findall(r"#\w+", s):
-                    hashtags.append(h)
-            elif cur == "chapters":
-                chapters = cast(list[str], out["chapters"])
-                if s:
-                    chapters.append(s)
-            elif cur == "on_screen_text":
-                on_screen = cast(list[str], out["on_screen_text"])
-                m = re.match(r"^\s*\d+[\.\)]\s*(.+)", s)
-                if m:
-                    on_screen.append(m.group(1).strip())
-            elif cur in ("description", "caption", "hook", "cta"):
-                if s:
-                    existing = out[cur] or ""
-                    out[cur] = (existing + "\n" + s).strip() if isinstance(existing, str) else s
-    return out
+        elif cur == "titles":
+            m = re.match(r"^\s*\d+[\.\)]\s*(.+)", s)
+            if m:
+                cast(list[str], partial["titles"]).append(m.group(1).strip())
+        elif cur == "tags" and s and not s.startswith("#"):
+            cast(list[str], partial["tags"]).extend(
+                p for p in (q.strip() for q in re.split(r"[,\s]+", s) if q.strip())
+            )
+        elif cur == "hashtags":
+            cast(list[str], partial["hashtags"]).extend(re.findall(r"#\w+", s))
+        elif cur in ("description", "cta") and s:
+            existing = partial[cur] or ""
+            if isinstance(existing, str):
+                partial[cur] = f"{existing}\n{s}".strip()
+    return partial
+
+
+def _parse_facebook_long(text: str) -> dict[str, str | list[str]]:
+    """Solo descripción + hashtags + CTA; Facebook no usa títulos."""
+    partial: dict[str, str | list[str]] = {"description": "", "hashtags": [], "cta": ""}
+    cur = None
+    for line in text.splitlines():
+        s = line.strip()
+        up = re.sub(r"\s+", " ", s.upper())
+        if up.startswith("## DESCRIPCION") or up.startswith("## DESCRIPCIÓN"):
+            cur = "description"
+        elif up.startswith("## HASHTAGS"):
+            cur = "hashtags"
+        elif up.startswith("## CTA"):
+            cur = "cta"
+        elif up.startswith("##"):
+            cur = None
+        elif cur in ("description", "cta") and s:
+            existing = partial[cur] or ""
+            if isinstance(existing, str):
+                partial[cur] = f"{existing}\n{s}".strip()
+        elif cur == "hashtags":
+            cast(list[str], partial["hashtags"]).extend(re.findall(r"#\w+", s))
+    return partial
+
+
+def _parse_reels_short(text: str) -> dict[str, str | list[str]]:
+    """Reels: descripción corta + hashtags + CTA, sin títulos ni tags."""
+    partial: dict[str, str | list[str]] = {"description": "", "hashtags": [], "cta": ""}
+    cur = None
+    for line in text.splitlines():
+        s = line.strip()
+        up = re.sub(r"\s+", " ", s.upper())
+        if up.startswith("## DESCRIPCION") or up.startswith("## DESCRIPCIÓN"):
+            cur = "description"
+        elif up.startswith("## HASHTAGS"):
+            cur = "hashtags"
+        elif up.startswith("## CTA"):
+            cur = "cta"
+        elif up.startswith("##"):
+            cur = None
+        elif cur in ("description", "cta") and s:
+            existing = partial[cur] or ""
+            if isinstance(existing, str):
+                partial[cur] = f"{existing}\n{s}".strip()
+        elif cur == "hashtags":
+            cast(list[str], partial["hashtags"]).extend(re.findall(r"#\w+", s))
+    return partial
+
+
+PLATFORM_PARSERS = {
+    "youtube_long": "youtube_long",
+    "youtube_short": "youtube_short",
+    "facebook_long": "facebook_long",
+    "reels_short": "reels_short",
+}
+
+
+_METADATA_PARSERS_BY_NAME = {
+    "youtube_long": _parse_youtube_long,
+    "youtube_short": _parse_youtube_short,
+    "facebook_long": _parse_facebook_long,
+    "reels_short": _parse_reels_short,
+}
 
 
 def parse_thumbnail(text: str, script_type: str) -> dict[str, str]:

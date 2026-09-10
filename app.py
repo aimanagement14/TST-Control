@@ -648,10 +648,8 @@ ROADMAP_PROMPT_KEYS = {
     "scenes": ("scenes",),
     "metadata": (
         "metadata_youtube_long",
-        "metadata_youtube",
-        "metadata_youtube_short",
-        "metadata_shorts",
         "metadata_facebook_long",
+        "metadata_youtube_short",
         "metadata_reels_short",
     ),
     "thumbnails": ("thumbnail_long", "thumbnail_short"),
@@ -665,8 +663,14 @@ def _roadmap_instruction_for(conn, profile_id: int, stage_name: str) -> str:
     Si tanto ``sys_prompt`` como ``user_prompt`` están presentes los
     concatena en una sola instrucción; si solo uno está presente devuelve
     ese.
+
+    Orden de búsqueda (Fase 1.2): primero la key del roadmap (que es como
+    ``profile_prompts`` guarda las stages per-video `scripts`, `metadata`,
+    `thumbnails`), luego las keys alternativas de CONFIG declaradas en
+    ``ROADMAP_PROMPT_KEYS``.
     """
-    for key in ROADMAP_PROMPT_KEYS.get(stage_name, ()):
+    candidate_keys = (stage_name,) + tuple(ROADMAP_PROMPT_KEYS.get(stage_name, ()))
+    for key in candidate_keys:
         row = conn.execute(
             "SELECT sys_prompt, user_prompt FROM profile_prompts "
             "WHERE profile_id=? AND stage=?",
@@ -1128,16 +1132,30 @@ def _ensure_roadmap_integrity(conn):
 # ---------------------------------------------------------------------------
 
 
+STAGE_ALIASES = {
+    "scenes_short": "scenes",
+    "scripts": "script_long",
+    "thumbnails": "thumbnail_long",
+}
+
+
 def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
     """Devuelve (sys_prompt, user_prompt) del perfil+stage o fallback a CONFIG.
 
     Si no hay fila en `profile_prompts` y `stage` está en CONFIG["prompts"],
     devuelve los strings canónicos. Si el stage no existe, devuelve ("", "")
-    y registra un aviso por consola.
+    y registra un aviso por consola. Reconoce aliases declarados en
+    ``STAGE_ALIASES`` para que distintos nombres del runner apunten al
+    mismo prompt canónico.
+
+    Aplica el mini-motor de plantillas ``{{profile.mystery_level}}`` etc.
+    contra la fila del perfil activo. Si no hay perfil, devuelve el texto
+    sin tocar.
     """
-    # Aliases del runner: scenes_short reusa el prompt SYS/USER de scenes
-    # (mismo contrato, distinto target de persistencia).
-    stage_key = {"scenes_short": "scenes"}.get(stage, stage)
+    from services.templates import render_profile
+
+    stage_key = STAGE_ALIASES.get(stage, stage)
+    raw_sys, raw_user = "", ""
     if profile_id is not None:
         with get_db() as conn:
             row = conn.execute(
@@ -1146,12 +1164,22 @@ def resolve_stage_prompt(profile_id: int | None, stage: str) -> tuple[str, str]:
                 (profile_id, stage_key),
             ).fetchone()
             if row:
-                return row["sys_prompt"], row["user_prompt"]
-    cfg = CONFIG.get("prompts", {}).get(stage_key)
-    if cfg:
-        return cfg.get("system", ""), cfg.get("format", "")
-    log.warning("[resolve_stage_prompt] stage '%s' no existe en CONFIG['prompts']", stage)
-    return "", ""
+                raw_sys = row["sys_prompt"] or ""
+                raw_user = row["user_prompt"] or ""
+    if not raw_sys and not raw_user:
+        cfg = CONFIG.get("prompts", {}).get(stage_key)
+        if cfg:
+            raw_sys = cfg.get("system", "")
+            raw_user = cfg.get("format", "")
+    if not raw_sys and not raw_user:
+        log.warning("[resolve_stage_prompt] stage '%s' no existe en CONFIG['prompts']", stage)
+        return "", ""
+    if profile_id is None:
+        return raw_sys, raw_user
+    profile_row = get_profile(profile_id) if profile_id else None
+    sys_p, _ = render_profile(raw_sys, profile_row)
+    user_p, _ = render_profile(raw_user, profile_row)
+    return sys_p, user_p
 
 
 def save_profile_prompt(
@@ -1218,8 +1246,10 @@ KNOWN_FIXED_NODE_KEYS = [
     "script_short",
     "scenes",
     "scenes_short",
-    "metadata_youtube",
-    "metadata_shorts",
+    "metadata_youtube_long",
+    "metadata_youtube_short",
+    "metadata_facebook_long",
+    "metadata_reels_short",
     "thumbnail_long",
     "thumbnail_short",
 ]
@@ -1231,8 +1261,10 @@ DEFAULT_NODE_LABELS = {
     "script_short": "Guion 1 min",
     "scenes": "Escenas 5 min",
     "scenes_short": "Escenas 1 min",
-    "metadata_youtube": "Metadata YouTube",
-    "metadata_shorts": "Metadata Shorts",
+    "metadata_youtube_long": "Metadata YouTube 5 min",
+    "metadata_youtube_short": "Metadata YouTube 1 min",
+    "metadata_facebook_long": "Metadata Facebook 5 min",
+    "metadata_reels_short": "Metadata Reels 1 min",
     "thumbnail_long": "Miniatura 16:9",
     "thumbnail_short": "Miniatura 9:16",
 }
@@ -1244,8 +1276,10 @@ DEFAULT_NODE_POSITIONS = {
     "script_short": (560.0, 180.0),
     "scenes": (840.0, 0.0),
     "scenes_short": (840.0, 180.0),
-    "metadata_youtube": (1120.0, 0.0),
-    "metadata_shorts": (1120.0, 180.0),
+    "metadata_youtube_long": (1120.0, 0.0),
+    "metadata_facebook_long": (1120.0, 90.0),
+    "metadata_youtube_short": (1120.0, 180.0),
+    "metadata_reels_short": (1120.0, 270.0),
     "thumbnail_long": (1400.0, 0.0),
     "thumbnail_short": (1400.0, 180.0),
 }
@@ -1256,8 +1290,10 @@ DEFAULT_EDGES = [
     ("concept", "script_short"),
     ("script_long", "scenes"),
     ("script_short", "scenes_short"),
-    ("script_long", "metadata_youtube"),
-    ("script_short", "metadata_shorts"),
+    ("script_long", "metadata_youtube_long"),
+    ("script_long", "metadata_facebook_long"),
+    ("script_short", "metadata_youtube_short"),
+    ("script_short", "metadata_reels_short"),
     ("script_long", "thumbnail_long"),
     ("script_short", "thumbnail_short"),
 ]
@@ -1742,16 +1778,12 @@ def _persist_fixed_result(project_id: int, node_key: str, raw: str) -> None:
             script_type = "long" if node_key == "scenes" else "short"
             _persist_scenes(conn, project_id, script_type, parse_scenes(raw) or [], now)
         elif node_key in (
-            "metadata_youtube",
-            "metadata_shorts",
             "metadata_youtube_long",
             "metadata_youtube_short",
             "metadata_facebook_long",
             "metadata_reels_short",
         ):
             platform = {
-                "metadata_youtube": "youtube_long",
-                "metadata_shorts": "youtube_short",
                 "metadata_youtube_long": "youtube_long",
                 "metadata_youtube_short": "youtube_short",
                 "metadata_facebook_long": "facebook_long",
@@ -1920,13 +1952,21 @@ def _build_user_msg_for_fixed(
         script = _load_first_script(project_id, "short")
         _, user_msg = build_scenes_prompt(project, profile, script)
         return user_msg
-    if node_key == "metadata_youtube":
+    if node_key == "metadata_youtube_long":
         script = _load_first_script(project_id, "long")
-        _, user_msg = build_metadata_prompt(project, profile, script, "youtube")
+        _, user_msg = build_metadata_prompt(project, profile, script, "youtube_long")
         return user_msg
-    if node_key == "metadata_shorts":
+    if node_key == "metadata_facebook_long":
+        script = _load_first_script(project_id, "long")
+        _, user_msg = build_metadata_prompt(project, profile, script, "facebook_long")
+        return user_msg
+    if node_key == "metadata_youtube_short":
         script = _load_first_script(project_id, "short")
-        _, user_msg = build_metadata_prompt(project, profile, script, "shorts")
+        _, user_msg = build_metadata_prompt(project, profile, script, "youtube_short")
+        return user_msg
+    if node_key == "metadata_reels_short":
+        script = _load_first_script(project_id, "short")
+        _, user_msg = build_metadata_prompt(project, profile, script, "reels_short")
         return user_msg
     if node_key == "thumbnail_long":
         script = _load_first_script(project_id, "long")
@@ -2867,17 +2907,39 @@ def build_research_prompt(project, profile):
 
 
 def build_concept_prompt(project, profile, research):
+    """Construye el prompt para la fase de concepto, anclado en la investigación.
+
+    ``research`` es el dict que devuelve ``parse_research`` con las claves
+    ``content`` (RESUMEN), ``facts`` (HECHOS CONFIRMADOS + DATOS CLAVE),
+    ``theories`` (TEORÍAS + CONTROVERSIAS), ``sources`` y ``unverified``.
+    """
     sys_prompt = CONFIG["prompts"]["concept"]["system"]
     fmt = CONFIG["prompts"]["concept"]["format"]
+    facts = research.get("facts") or []
+    theories = research.get("theories") or []
+    sources = research.get("sources") or []
+    unverified = research.get("unverified") or []
+    facts_block = "\n".join(f"- {f}" for f in facts[:12]) or "- (sin hechos registrados)"
+    theories_block = "\n".join(f"- {t}" for t in theories[:8]) or "- (sin teorías registradas)"
+    sources_block = "\n".join(f"- {s}" for s in sources[:8]) or "- (sin fuentes registradas)"
+    unverified_block = (
+        "\n".join(f"- {u}" for u in unverified[:6])
+        if unverified
+        else "- (ninguna marcada como dudosa)"
+    )
     user_msg = (
-        f"Tema: {project['topic']}\n"
-        f"Investigación disponible:\n{research.get('content', '')[:3000]}\n\n"
+        f"Tema: {project['topic']}\n\n"
+        f"RESUMEN DE LA INVESTIGACIÓN:\n{research.get('content', '')[:2500]}\n\n"
+        f"HECHOS CONFIRMADOS (úsalos como ancla de la tesis):\n{facts_block}\n\n"
+        f"TEORÍAS Y VERSIONES:\n{theories_block}\n\n"
+        f"FUENTES DISPONIBLES:\n{sources_block}\n\n"
+        f"AFIRMACIONES QUE REQUIEREN VERIFICACIÓN (no las uses como base):\n{unverified_block}\n\n"
         f"Perfil del proyecto:\n"
         f"- Tono: {profile['tone'] if profile else 'serio'}\n"
         f"- Estilo: {profile['style'] if profile else 'cinematográfico'}\n"
         f"- Nivel de misterio: {profile['mystery_level'] if profile else 7}/10\n"
         f"- Nivel de dramatización: {profile['drama_level'] if profile else 6}/10\n\n"
-        f"Genera un concepto potente y devuelve SIEMPRE en este formato:\n\n{fmt}"
+        f"Genera un concepto potente anclado en los hechos confirmados y devuelve SIEMPRE en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
 
@@ -2935,16 +2997,11 @@ def build_metadata_prompt(project, profile, script, platform):
     """Resuelve (system, format) para la plataforma pedida.
 
     Las plataformas válidas son ``youtube_long``, ``facebook_long``,
-    ``youtube_short`` y ``reels_short``. Mantiene retrocompatibilidad con los
-    nombres antiguos ``youtube`` y ``shorts``.
+    ``youtube_short`` y ``reels_short``. Cualquier otro valor cae a
+    ``youtube_long`` como fallback silencioso.
     """
-    legacy = {"youtube": "metadata_youtube", "shorts": "metadata_shorts"}
-    key = (
-        f"metadata_{platform}"
-        if f"metadata_{platform}" in CONFIG.get("prompts", {})
-        else legacy.get(platform, f"metadata_{platform}")
-    )
-    cfg = CONFIG["prompts"].get(key)
+    key = f"metadata_{platform}"
+    cfg = CONFIG["prompts"].get(key) or CONFIG["prompts"].get("metadata_youtube_long")
     if not cfg:
         log.warning("[build_metadata_prompt] platform '%s' no tiene prompt en CONFIG", platform)
         return "", ""
@@ -2997,6 +3054,45 @@ def build_thumbnail_prompt(project, profile, script, script_type):
         f"Nivel de misterio: {profile['mystery_level'] if profile else 7}/10\n\n"
         f"Ángulo y tesis del guion:\n{script.get('body_full', '')[:2500]}\n\n"
         f"Devuelve SIEMPRE en este formato:\n\n{fmt}"
+    )
+    return sys_prompt, user_msg
+
+
+def build_refiner_prompt(profile, stage_label, current_output, issues, original_format):
+    """Construye el prompt del nodo ``refiner``.
+
+    Args:
+        profile: dict con el perfil activo (o None).
+        stage_label: nombre lógico de la etapa (p.ej. "scripts").
+        current_output: el output existente de la etapa (texto tal cual).
+        issues: lista de tuplas ``(stage, severity, message, field, video_id)``.
+        original_format: el bloque ``format`` del prompt original de la etapa,
+            para que el refiner respete la estructura de salida.
+
+    Returns:
+        Tupla ``(sys_prompt, user_msg)``.
+    """
+    if not CONFIG.get("prompts", {}).get("refiner"):
+        return "", ""
+    sys_prompt = CONFIG["prompts"]["refiner"]["system"]
+    fmt = CONFIG["prompts"]["refiner"]["format"]
+
+    issue_lines: list[str] = []
+    for stage, severity, message, field, video_id in issues:
+        stage_str = stage or "?"
+        video_str = f" video={video_id}" if video_id is not None else ""
+        field_str = f" [{field}]" if field else ""
+        issue_lines.append(f"- [{severity}] {stage_str}{video_str}{field_str}: {message}")
+    issues_block = "\n".join(issue_lines) if issue_lines else "- (sin issues reportados)"
+
+    safe_output = (current_output or "")[:8000]
+    user_msg = (
+        f"Etapa a refinar: {stage_label}\n\n"
+        f"OUTPUT ACTUAL:\n```\n{safe_output}\n```\n\n"
+        f"ISSUES REPORTADOS POR QC:\n{issues_block}\n\n"
+        f"FORMATO DE SALIDA QUE DEBE RESPETAR EL OUTPUT REFINADO (mismo que el prompt original de la etapa):\n\n"
+        f"```\n{(original_format or '').strip()}\n```\n\n"
+        f"Devuelve tu respuesta en este formato:\n\n{fmt}"
     )
     return sys_prompt, user_msg
 

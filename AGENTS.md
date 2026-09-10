@@ -20,8 +20,17 @@ Guía para agentes de IA que trabajan en este proyecto.
   configuración, gestión de BD, registro de blueprints. Conserva además los
   builders/persistencia de etapas y el ejecutor del grafo; las funciones puras
   viven fuera (ver `services/` y `blueprints/`).
-- `services/` — funciones puras extraídas en T2.1 (parsers, `call_llm`, QC).
-  **No** dependen de `request`/`g`/`session`. Cubiertas por `test_core.py`.
+- `services/` — funciones puras extraídas en T2.1 (parsers, `call_llm`, QC,
+  `sync`, `templates`). **No** dependen de `request`/`g`/`session`.
+  Cubiertas por `test_core.py`.
+  - `parsers.py` — parsers de respuestas LLM; incluye `parse_metadata`
+    refactorizado a dispatcher por plataforma (`youtube_long`,
+    `youtube_short`, `facebook_long`, `reels_short`).
+  - `templates.py` — mini-motor de plantillas `{{path.to.value}}` puro,
+    usado por `resolve_stage_prompt` para inyectar el perfil activo en
+    los prompts SYS/USER.
+  - `qc.py` — reglas QC; `error` bloquea la transición a `ready`,
+    `warning`/`info` no.
 - `blueprints/` — `graph_bp` y `runner_bp` extraídos en T2.2 como PoC del
   monolito. Cada blueprint declara su `url_prefix` y usa local imports para
   evitar ciclos con `app`.
@@ -30,7 +39,10 @@ Guía para agentes de IA que trabajan en este proyecto.
 - `static/` — JS/CSS sin bundler. `app.js` para chrome general, `graph.js`
   + `static/graph/*.js` para el editor de grafo (React Flow v12 por importmap).
 - `config.json` — única fuente para prompts SYS/USER, presets LLM, umbrales
-  QC y tema visual. No se mueve a YAML/ENV sin motivo.
+  QC y tema visual. Los prompts referencian el perfil activo vía
+  `{{profile.tone}}`, `{{profile.mystery_level}}`, etc., y comparten
+  las keywords cinematográficas vía `{{app.visual_style_keywords}}`. No se
+  mueve a YAML/ENV sin motivo.
 - `workflow.db` — SQLite. Migraciones controladas por `_schema_migrations`
   (idempotentes).
 - `projects/` — proyectos reales del usuario, **versionados**. Cada uno vive
@@ -39,7 +51,8 @@ Guía para agentes de IA que trabajan en este proyecto.
 - `examples/` — referencia canónica del pipeline. Hoy contiene solo
   `Verificacion_pipeline_2/` (y su `.zip`), snapshot del proyecto sintético
   que `verify_project.py` regenera cada vez que corre.
-- `test_core.py` — parsers, QC, utilidades, prompts por perfil, CRUD de grafo.
+- `test_core.py` — parsers, QC, utilidades, motor de plantillas, prompts
+  por perfil, dispatcher de metadata, refiner post-QC, CRUD de grafo.
 - `verify_project.py` — verificación end-to-end con datos simulados de LLM
   (`PROJECT_ID = 2`, crea proyecto sintético si no existe). Su salida
   (`projects/Verificacion_pipeline_2*`) está cubierta por `.gitignore`.
@@ -56,10 +69,20 @@ Guía para agentes de IA que trabajan en este proyecto.
 - `call_llm()` cae a modo manual si la API falla o no hay key configurada;
   nunca deja la app sin respuesta.
 - Los prompts SYS+USER viven por perfil (`profile_prompts`), leídos vía
-  `resolve_stage_prompt()` con fallback a `config.json`. Editar un prompt en
-  el editor de grafo del perfil cambia el comportamiento de todos sus
-  proyectos.
+  `resolve_stage_prompt()` con fallback a `config.json`. `resolve_stage_prompt`
+  aplica además `render_profile()` y devuelve el SYS/USER ya sustituido;
+  editar un prompt en el editor de grafo del perfil cambia el
+  comportamiento de todos sus proyectos.
+- Aliases del runner (`STAGE_ALIASES` en `app.py`): `scenes_short → scenes`,
+  `scripts → script_long`, `thumbnails → thumbnail_long`. Permiten que
+  distintos nombres usados por la UI/Grafo apunten al mismo prompt canónico.
 - QC engine: `error` bloquea la transición a `ready`; `warning` e `info` no.
+  Coherencia `min_scenes_short = 6` (Fase 2.3): iguala el mínimo exigido
+  por el prompt `scenes`.
+- Refiner post-QC: `app.build_refiner_prompt(profile, stage_label,
+  current_output, issues, original_format)` construye el SYS+USER para
+  que el LLM rehaga solo las secciones marcadas por QC. La integración
+  con la UI es opcional y todavía no está conectada.
 - La carpeta del proyecto en `projects/<safe_name>_<id>/` se sincroniza
   automáticamente con `sync_project_folder()` cada vez que se crea el
   proyecto o se guarda cualquier etapa (research, concept, scripts, scenes,
@@ -68,6 +91,25 @@ Guía para agentes de IA que trabajan en este proyecto.
 - El ZIP en `projects/<safe_name>_<id>.zip` es opcional: solo se genera
   bajo demanda desde `POST /projects/<id>/export action=zip`. Borrar un
   proyecto elimina también su carpeta.
+
+## Prompts del pipeline
+
+- Cada prompt SYS arranca con un bloque «Contexto del perfil» que se
+  sustituye en runtime: canal, tono, estilo, audiencia, mystery_level,
+  drama_level y (en guiones) narration_speed.
+- Los prompts visuales (`scenes`, `thumbnail_long`, `thumbnail_short`)
+  comparten la constante `config.visual_style.keywords` vía
+  `{{app.visual_style_keywords}}`. Editar la lista en CONFIG basta para
+  actualizar los tres sin tocar el texto de cada prompt.
+- Para añadir una nueva plataforma de metadata: crear la key
+  `metadata_<plataforma>` en `config.json`, registrarla en
+  `services/parsers.py` (`PLATFORM_PARSERS`,
+  `_METADATA_PARSERS_BY_NAME`) y, si se quiere como nodo del grafo,
+  añadirla a `KNOWN_FIXED_NODE_KEYS` y a `_build_user_msg_for_fixed`.
+- Para añadir un nodo «refiner» futuro a la UI: usar
+  `build_refiner_prompt(...)`, parsear la respuesta con un parser
+  específico (pendiente) y guardar el bloque `## OUTPUT REFINADO`
+  sobreescribiendo la etapa correspondiente.
 
 ## Frontend
 

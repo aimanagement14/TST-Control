@@ -108,8 +108,11 @@ Cero costos. Cero dependencias externas. Tú controlas qué LLM usas.
 Además del flujo guiado por etapas, cada perfil expone un lienzo
 estilo n8n en `/profiles/<id>/graph` donde puedes:
 
-- Ver y editar los prompts de las nueve etapas fijas en un solo
-  vistazo.
+- Ver y editar los prompts de las **doce** etapas fijas en un solo
+  vistazo: research, concept, script_long, script_short, scenes,
+  scenes_short, metadata_youtube_long, metadata_youtube_short,
+  metadata_facebook_long, metadata_reels_short, thumbnail_long y
+  thumbnail_short.
 - Añadir nodos custom con tus propios prompts SYS y USER y
   conectarlos entre sí para encadenar su output.
 - Mover los nodos con drag & drop; las posiciones se guardan
@@ -131,6 +134,19 @@ tipo de contenido, audiencia, tono, estilo, niveles de misterio/drama,
 velocidad de narración y plataformas objetivo.
 
 Ejemplo incluido: **Todo Sobre Todo / Misterio**.
+
+Los prompts SYS de cada etapa se inyectan con el perfil activo en
+runtime gracias al mini-motor `{{profile.*}}` / `{{app.*}}` de
+`services/templates.py`. Así, cambiar `mystery_level` o `tone` en un
+perfil adapta automáticamente la voz editorial de todos sus prompts
+sin reescribirlos.
+
+Las **keywords cinematográficas** (`Cinematic Hyperrealism`, `Orange &
+Teal Color Grading`, `Volumetric Lighting`, etc.) viven en una única
+constante compartida (`config.visual_style.keywords`) que los prompts
+visuales (`scenes`, `thumbnail_*`) referencian vía
+`{{app.visual_style_keywords}}`. Editar la lista actualiza los tres a
+la vez.
 
 ## Control de calidad automático
 
@@ -159,8 +175,10 @@ PROYECTO.zip
 ├── 04_escenas/
 │   └── escenas.md         # un único archivo: TEXTO AUDIO + IMAGEN por escena
 ├── 05_metadata/
-│   ├── metadata_youtube.md
-│   └── metadata_shorts.md
+│   ├── metadata_youtube_long.md
+│   ├── metadata_youtube_short.md
+│   ├── metadata_facebook_long.md
+│   └── metadata_reels_short.md
 ├── 06_thumbnails/
 │   ├── thumbnail_long.md  # prompt visual 16:9 para el guion 5 min
 │   └── thumbnail_short.md # prompt visual 9:16 para el guion 1 min

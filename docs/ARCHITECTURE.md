@@ -67,14 +67,15 @@ y `blueprints/`. Conserva internamente:
 |---------|-----------------|
 | Configuración | Carga `config.json`, instancia Flask, sirve `/favicon.ico`, registra los blueprints (`graph_bp`, `runner_bp`). |
 | Base de datos | Define el `SCHEMA` (13 tablas tras el editor de grafo), expone `get_db()` con rows como `sqlite3.Row` y `init_db()` para sembrar el perfil por defecto y aplicar migraciones idempotentes controladas por `_schema_migrations`. |
-| Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto, resolución de prompt por perfil (`resolve_stage_prompt`) con fallback a `config.json`. |
+| Utilidades | `now_iso`, `count_words`, `estimate_duration_seconds`, carga de perfil/proyecto, resolución de prompt por perfil (`resolve_stage_prompt`) con render del perfil activo vía `services.templates`. |
 | LLM client | Re-exporta `call_llm`, `_manual_fallback`, `llm_output_is_manual` desde `services.llm` (T2.1). |
-| Parsers | Re-exporta `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail` desde `services.parsers` (T2.1). |
+| Parsers | Re-exporta `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_prompt_json`, `parse_metadata` (dispatcher por plataforma), `parse_thumbnail` desde `services.parsers` (T2.1). |
 | QC | Re-exporta `run_qc` y `save_qc_issues` desde `services.qc` (T2.1). |
-| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 10 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), helpers de persistencia. Las rutas HTTP viven ahora en `blueprints/graph.py`. |
+| Editor de grafo | Resolución y guardado de prompts por perfil (`save_profile_prompt`, `list_profile_prompts`, `get_default_prompts_from_config`), 12 nodos fijos pre-creados (`get_or_create_fixed_graph_nodes`), `STAGE_ALIASES` para resolver nombres ambiguos del runner. Las rutas HTTP viven ahora en `blueprints/graph.py`. |
 | Runner | Lógica de `execute_graph_node` y helpers. Las rutas HTTP viven en `blueprints/runner.py`. |
 | Rutas | Vistas por etapa, dashboard, perfiles (excepto graph), settings y export. |
 | Contexto plantilla | Inyecta `app_name`, `app_tagline`, `app_version` en cada render. |
+| Refiner post-QC | `build_refiner_prompt(profile, stage_label, current_output, issues, original_format)` toma un output existente + issues QC y devuelve un SYS+USER listo para regenerar solo lo marcado por QC. |
 | Arranque | `python app.py` (dev) o `python app.py --prod` (waitress). |
 
 ### `services/`
@@ -86,9 +87,11 @@ leer `CONFIG`, `get_db` y compañía, evitando ciclos.
 
 | Archivo | Funciones |
 |---------|-----------|
-| `services/parsers.py` | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_scenes`, `parse_prompt_json`, `parse_metadata`, `parse_thumbnail`, `count_words`, `estimate_duration_seconds`. |
+| `services/parsers.py` | `parse_research`, `parse_concept`, `parse_script`, `parse_scenes_json`, `parse_scenes_tst`, `parse_scenes`, `parse_prompt_json`, `parse_metadata` (dispatcher), `parse_thumbnail`, `count_words`, `estimate_duration_seconds`. |
+| `services/templates.py` | `render`, `render_profile`, `profile_context`, `app_context`, `RenderReport`. Mini-motor `{{path.to.value}}` para inyectar el perfil activo en los prompts SYS. |
 | `services/llm.py` | `call_llm`, `_manual_fallback`, `llm_output_is_manual`. (Renombrado a `services/manual.py` en v2.0; las ramas API se eliminaron.) |
 | `services/qc.py` | `run_qc`, `save_qc_issues`. |
+| `services/sync.py` | `safe_project_dir`, `delete_project_folder`, `sync_project_folder`, `sync_project_stages_for_project`. Sincronización de la carpeta del proyecto. |
 
 ### `blueprints/`
 
@@ -105,15 +108,19 @@ de `app` para resolver helpers de dominio sin ciclos.
 
 Toda la configuración editable en runtime vive aquí:
 
-- `app`: nombre, tagline, versión, `secret_key`.
-- `llm`: provider, bloques legacy `openai` / `anthropic`, presets,
-  temperatura, max_tokens.
+- `app`: nombre, tagline, versión.
 - `prompts`: `system` + `format` por etapa (`research`, `concept`,
   `script_long`, `script_short`, `scenes`,
-  `metadata_youtube`, `metadata_shorts`,
-  `thumbnail_long`, `thumbnail_short`).
+  `metadata_youtube_long`, `metadata_youtube_short`,
+  `metadata_facebook_long`, `metadata_reels_short`,
+  `thumbnail_long`, `thumbnail_short`, `refiner`). Cada SYS arranca
+  con un bloque `{{profile.*}}` que se sustituye en runtime con los
+  valores del perfil activo del proyecto (mystery_level, drama_level,
+  tone, style, audience, narration_speed, platforms).
+- `visual_style.keywords`: lista única de 14 keywords cinematográficas
+  que los prompts visuales referencian vía `{{app.visual_style_keywords}}`.
 - `qc.checks`: umbrales de palabras, duraciones objetivo, mínimo de
-  fuentes, mínimo de escenas, umbral de repetición.
+  fuentes, mínimo de escenas (long 6, short 6), umbral de repetición.
 - `ui`: colores y paginación.
 
 ### Plantillas (`templates/`)
@@ -140,8 +147,10 @@ solo se solicita al abrir `/profiles/<id>/graph` o
 
 ### Tests
 
-- `test_core.py`: tests de parsers, utilidades, QC engine y export.
-  Sustituye `DB_PATH` por una ruta temporal durante los tests QC/export.
+- `test_core.py`: tests de parsers, utilidades, motor de plantillas,
+  QC engine, dispatcher de metadata, refiner post-QC, persistencia de
+  grafo y export. Sustituye `DB_PATH` por una ruta temporal durante
+  los tests QC/export.
 - `verify_project.py`: smoke test end-to-end que ejecuta el flujo
   completo contra `app.test_client()` con datos simulados. Crea un
   proyecto sintético con `PROJECT_ID=2` si no existe. Su salida se
@@ -153,35 +162,51 @@ solo se solicita al abrir `/profiles/<id>/graph` o
 
 13 tablas. Las entidades centrales (`projects`, `research`, `concept`,
 `scripts`, `scenes`, `metadata_records`, `thumbnail_records`) tienen
-`project_id` con `ON DELETE CASCADE`. Los prompts viven ahora a nivel
-de perfil en `profile_prompts` (`UNIQUE(profile_id, stage)`) y se
-resuelven con `resolve_stage_prompt()` buscando primero ahí y haciendo
-fallback a `config.json`. El grafo visual persiste en
-`profile_graph_nodes` (`UNIQUE(profile_id, node_key)`,
-`is_fixed` distingue los 10 nodos pre-creados de los custom) y
-`node_executions` registra cada ejecución por proyecto con su
-output, estado y duración.
+`project_id` con `ON DELETE CASCADE`. Los prompts viven a nivel de
+perfil en `profile_prompts` (`UNIQUE(profile_id, stage)`) y se
+resuelven con `resolve_stage_prompt()`, que primero busca la fila por
+el nombre lógico del roadmap (`scripts`, `metadata`, `thumbnails`,
+etc.), luego itera las alternativas declaradas en `ROADMAP_PROMPT_KEYS`
+y finalmente cae a `config.json`. Antes de devolver, aplica el motor
+de plantillas `{{profile.*}}` / `{{app.*}}` contra el perfil activo.
+
+El grafo visual persiste en `profile_graph_nodes`
+(`UNIQUE(profile_id, node_key)`, `is_fixed` distingue los 12 nodos
+pre-creados de los custom) y `node_executions` registra cada ejecución
+por proyecto con su output, estado y duración.
 
 `scripts.type` distingue `long` (5 min) de `short` (1 min).
 `scenes.script_id` vincula cada escena con su guion.
-`metadata_records.platform` distingue `youtube` de `shorts`.
+`metadata_records.platform` admite `youtube_long`, `youtube_short`,
+`facebook_long`, `reels_short`. El parser es un dispatcher por
+plataforma (`services.parsers.parse_metadata`) que siempre devuelve el
+dict canónico completo.
 `thumbnail_records.script_type` distingue `long` (16:9) de `short` (9:16).
-Las tres con `UNIQUE(project_id, type/platform/script_type)` para impedir
-duplicados.
+Las cuatro con `UNIQUE(project_id, type/platform/script_type)` para
+impedir duplicados.
 
 ## Flujo de datos
 
 1. El usuario crea un proyecto (`POST /projects/new`) → `status='research'`.
 2. Los prompts SYS + USER del proyecto los resuelve
-   `resolve_stage_prompt(project.profile_id, stage)` consultando
-   primero `profile_prompts` y cayendo a `config.json` cuando no hay
-   override. Esto significa que cualquier proyecto que use el mismo
-   perfil comparte sus prompts.
+   `resolve_stage_prompt(project.profile_id, stage)`. Primero busca en
+   `profile_prompts` por el nombre lógico del roadmap, luego por las
+   keys alternativas en `ROADMAP_PROMPT_KEYS`, finalmente en
+   `config.json`. Antes de devolver, aplica
+   `services.templates.render_profile(sys, profile)` para sustituir
+   `{{profile.mystery_level}}`, `{{profile.tone}}`, `{{app.name}}`,
+   `{{app.visual_style_keywords}}`, etc. Esto significa que cualquier
+   proyecto que use el mismo perfil comparte sus prompts y hereda su
+   voz editorial en runtime.
 3. Cada etapa expone `generate_prompt` (muestra los prompts) y `save`
    (persiste la respuesta parseada del LLM en su tabla final).
 4. `QC` (`POST /projects/<id>/qc`) corre `run_qc` y mueve el proyecto a
    `status='ready'` cuando no hay errores (warnings/infos son tolerables).
-5. `Export` (`POST /projects/<id>/export`) genera el ZIP y lo envía
+5. Si el QC detecta issues, el builder opcional
+   `build_refiner_prompt(profile, stage_label, current_output, issues,
+   original_format)` produce un SYS+USER listo para regenerar solo las
+   secciones marcadas. La integración con la UI queda pendiente.
+6. `Export` (`POST /projects/<id>/export`) genera el ZIP y lo envía
    como `send_file(as_attachment=True)`.
 
 ## Editor de grafo por perfil
@@ -189,15 +214,18 @@ duplicados.
 Dos páginas nuevas extienden el flujo clásico sin romperlo.
 
 `/profiles/<id>/graph` — Editor visual (estilo n8n) donde cada nodo es
-uno de los diez nodos fijos del pipeline (`research`, `concept`,
+uno de los **doce** nodos fijos del pipeline (`research`, `concept`,
 `script_long`, `script_short`, `scenes`, `scenes_short`,
-`metadata_youtube`, `metadata_shorts`, `thumbnail_long`,
+`metadata_youtube_long`, `metadata_youtube_short`,
+`metadata_facebook_long`, `metadata_reels_short`, `thumbnail_long`,
 `thumbnail_short`) más los nodos custom que el usuario añada. Cada nodo expone sus prompts SYS y USER,
 un nombre editable y conexiones hacia otros nodos (los custom pueden
 recibir como contexto el output de cualquier nodo previo). El grafo
 carga `@xyflow/react` por importmap, persiste posiciones con un debounce
 de 600 ms y guarda los prompts vía `POST /graph/save-node` y
-`/graph/layout`.
+`/graph/layout`. Los nombres ambiguos del runner
+(`scenes_short`, `scripts`, `thumbnails`) se resuelven vía
+`STAGE_ALIASES` al prompt canónico.
 
 `/projects/<id>/run` — Runner que instancia el mismo grafo sobre un
 proyecto. El clic en "Ejecutar" de un nodo llama a

@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app import DB_PATH, get_db, now_iso  # noqa: E402
@@ -320,11 +320,17 @@ def main():
         print(f"  loaded bundle id={pid} -> {folder.name}")
 
     stonehenge = bundles[15]
-    rs_template: dict[str, Any] = {r["name"]: r for r in stonehenge["roadmap_stages"]}
+    rs_template: dict[str, Any] = {}
+    for r in stonehenge["roadmap_stages"]:
+        key = r["name"]
+        if key == "Investigacion":
+            key = "research"
+        rs_template[key] = r
     # Map bundle's roadmap_stage_id -> stage name (so we can remap to
     # profile 1's current rs_ids when inserting Stonehenge's project_stages).
     bundle_rsid_to_name: dict[int, str] = {
-        r["id"]: r["name"] for r in stonehenge["roadmap_stages"]
+        r["id"]: ("research" if r["name"] == "Investigacion" else r["name"])
+        for r in stonehenge["roadmap_stages"]
     }
     stonehenge_ps = stonehenge["project_stages"]
     print(f"\n== Stonehenge roadmap template stage names: {list(rs_template.keys())} ==")
@@ -433,10 +439,20 @@ def main():
                     proj.get("updated_at") or now_iso(),
                 ),
             )
-            stage_map = build_legacy_stages(bundle)
-            for stage_name in ROADMAP_ORDER:
-                rs_id = new_rs_ids[stage_name]
-                entry = stage_map[stage_name]
+            bundle_ps = bundle.get("project_stages") or []
+            bundle_rsid_to_name_local = {
+                r["id"]: ("research" if r["name"] == "Investigacion" else r["name"])
+                for r in bundle["roadmap_stages"]
+            }
+            for ps in bundle_ps:
+                stage_name = bundle_rsid_to_name_local.get(ps["roadmap_stage_id"])
+                current_rsid = new_rs_ids.get(stage_name) if stage_name else None
+                if current_rsid is None:
+                    raise ValueError(
+                        f"id={pid} project_stage {ps['id']} references unknown "
+                        f"roadmap_stage_id={ps['roadmap_stage_id']} "
+                        f"(stage_name={stage_name!r})"
+                    )
                 cur.execute(
                     """
                     INSERT INTO project_stages
@@ -445,13 +461,16 @@ def main():
                     """,
                     (
                         pid,
-                        rs_id,
-                        entry["instruction"],
-                        entry["response"],
-                        now_iso(),
+                        current_rsid,
+                        ps.get("instruction") or "",
+                        ps.get("response") or "",
+                        ps.get("updated_at") or now_iso(),
                     ),
                 )
-            print(f"  id={pid:2d} {proj.get('name')!r} status={proj['status']} -> 7 project_stages")
+            print(
+                f"  id={pid:2d} {proj.get('name')!r} status={proj['status']} "
+                f"-> {len(bundle_ps)} project_stages"
+            )
 
         # 5) Insert Stonehenge (id=15). The bundle's project_stages reference
         # roadmap_stage_ids from the OLD profile 1 layout (36..42). We remap
