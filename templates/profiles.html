@@ -2,23 +2,31 @@
 {% block title %}Perfiles · {{ app_name }}{% endblock %}
 
 {% block content %}
+{% set total_stages = profiles|map(attribute='stages')|map('length')|sum %}
+{% set default_profile = profiles|selectattr('is_default')|first %}
+{% set default_name = default_profile.name if default_profile is defined else '' %}
+
 <section class="page-head">
     <div>
         <p class="eyebrow">Ajustes reutilizables</p>
         <h1>Perfiles de contenido</h1>
-        <p class="lede">Tono, estilo, intensidad y las siete etapas configurables del pipeline. Cada proyecto usa un perfil y hereda todas sus instrucciones.</p>
+        <p class="lede">Tono, intensidad y etapas del pipeline. Cada proyecto usa un perfil y hereda todas sus instrucciones.</p>
     </div>
 </section>
 
 <div class="work">
     <div>
         {% for p in profiles %}
-        <section class="panel">
+        {% set myst = p.mystery_level or 5 %}
+        {% set dram = p.drama_level or 5 %}
+        {% set wpm = p.narration_speed or 150 %}
+        {% set wpm_pct = ((wpm - 100) * 100 / 100)|int %}
+        <section class="panel profile-card">
             <form method="post">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="profile_id" value="{{ p.id }}">
                 <div class="panel-head">
-                    <h2>
+                    <h2 class="profile-title">
                         <input type="text" name="name" value="{{ p.name }}" required
                                aria-label="Nombre del perfil" class="title-input">
                         {% if p.is_default %}<span class="chip chip-done">Por defecto</span>{% endif %}
@@ -28,7 +36,52 @@
                     </div>
                 </div>
 
-                <div class="profile-grid mt-2">
+                <div class="profile-summary" role="group" aria-label="Lectura del perfil">
+                    <div class="signal-readout">
+                        <p class="signal-label">Misterio</p>
+                        <p class="signal-value">{{ myst }}<span class="signal-max">/10</span></p>
+                        <div class="bar signal-bar"><i style="width: {{ myst * 10 }}%"></i></div>
+                    </div>
+                    <div class="signal-readout">
+                        <p class="signal-label">Drama</p>
+                        <p class="signal-value">{{ dram }}<span class="signal-max">/10</span></p>
+                        <div class="bar signal-bar"><i style="width: {{ dram * 10 }}%"></i></div>
+                    </div>
+                    <div class="signal-readout">
+                        <p class="signal-label">Velocidad</p>
+                        <p class="signal-value">{{ wpm }}<span class="signal-max">ppm</span></p>
+                        <div class="bar signal-bar"><i style="width: {{ wpm_pct }}%"></i></div>
+                    </div>
+                </div>
+
+                <div class="profile-grid">
+                    <label class="field">
+                        <span class="label">Nivel de misterio</span>
+                        <span class="slider">
+                            <input type="range" name="mystery_level" min="1" max="10"
+                                   value="{{ myst }}" data-slider-output>
+                            <output>{{ myst }}</output>
+                        </span>
+                    </label>
+                    <label class="field">
+                        <span class="label">Nivel de drama</span>
+                        <span class="slider">
+                            <input type="range" name="drama_level" min="1" max="10"
+                                   value="{{ dram }}" data-slider-output>
+                            <output>{{ dram }}</output>
+                        </span>
+                    </label>
+                    <label class="field">
+                        <span class="label">Velocidad de narración (ppm)</span>
+                        <span class="slider">
+                            <input type="range" name="narration_speed" min="100" max="200" step="5"
+                                   value="{{ wpm }}" data-slider-output>
+                            <output>{{ wpm }}</output>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="profile-grid">
                     <label class="field">
                         <span class="label">Tipo de contenido</span>
                         <input type="text" name="content_type" value="{{ p.content_type or '' }}"
@@ -48,31 +101,6 @@
                         <span class="label">Estilo visual</span>
                         <input type="text" name="style" value="{{ p.style or '' }}"
                                placeholder="Cinematográfico, contrastado, penumbra">
-                    </label>
-
-                    <label class="field">
-                        <span class="label">Nivel de misterio</span>
-                        <span class="slider">
-                            <input type="range" name="mystery_level" min="1" max="10"
-                                   value="{{ p.mystery_level or 5 }}" data-slider-output>
-                            <output>{{ p.mystery_level or 5 }}</output>
-                        </span>
-                    </label>
-                    <label class="field">
-                        <span class="label">Nivel de drama</span>
-                        <span class="slider">
-                            <input type="range" name="drama_level" min="1" max="10"
-                                   value="{{ p.drama_level or 5 }}" data-slider-output>
-                            <output>{{ p.drama_level or 5 }}</output>
-                        </span>
-                    </label>
-                    <label class="field">
-                        <span class="label">Velocidad de narración (ppm)</span>
-                        <span class="slider">
-                            <input type="range" name="narration_speed" min="100" max="200" step="5"
-                                   value="{{ p.narration_speed or 150 }}" data-slider-output>
-                            <output>{{ p.narration_speed or 150 }}</output>
-                        </span>
                     </label>
                 </div>
 
@@ -109,48 +137,65 @@
                     <h3>Etapas del pipeline</h3>
                     <span class="chip">{{ p.stages|length }} etapas</span>
                 </div>
-                <p class="hint">Edita nombre, orden, instrucción y visibilidad de cada etapa. Los cambios se aplican a todos los proyectos del perfil al guardar.</p>
+                <p class="hint">Edita nombre, orden, instrucción y visibilidad. Los cambios se aplican a todos los proyectos del perfil al guardar.</p>
 
+                <ul class="stages-rundown" role="list">
                 {% for stage in p.stages %}
-                <div class="profile-stage">
-                    <form method="post">
-                        <input type="hidden" name="action" value="update_stage">
-                        <input type="hidden" name="profile_id" value="{{ p.id }}">
-                        <input type="hidden" name="stage_id" value="{{ stage.id }}">
-                        <div class="field-row">
-                            <label class="field">
-                                <span class="label">Nombre</span>
-                                <input type="text" name="name" value="{{ stage.name }}" required>
-                            </label>
-                            <label class="field">
-                                <span class="label">Orden</span>
-                                <input type="number" name="order" value="{{ stage.order }}" min="0" step="1">
-                            </label>
-                            <label class="checks">
-                                <input type="checkbox" name="active" {% if stage.active %}checked{% endif %}>
-                                Activa
-                            </label>
-                        </div>
-                        <label class="field">
-                            <span class="label">Instrucción</span>
-                            <textarea name="instruction" rows="3"
-                                      placeholder="Qué debe producir esta etapa.">{{ stage.instruction }}</textarea>
-                        </label>
-                        <div class="actions tight">
-                            <button type="submit" class="btn btn-primary btn-sm">Guardar etapa</button>
-                        </div>
-                    </form>
-                    <form method="post" class="inline-form"
-                          onsubmit="return confirm('Se elimina la etapa «{{ stage.name }}» y todas sus project_stages asociadas.')">
-                        <input type="hidden" name="action" value="delete_stage">
-                        <input type="hidden" name="profile_id" value="{{ p.id }}">
-                        <input type="hidden" name="stage_id" value="{{ stage.id }}">
-                        <button class="btn btn-ghost btn-sm" aria-label="Eliminar etapa {{ stage.name }}">Eliminar etapa</button>
-                    </form>
-                </div>
+                    <li class="stage-fold">
+                        <details>
+                            <summary class="stage-row">
+                                <span class="stage-row-num">{{ '%02d'|format(loop.index) }}</span>
+                                <span class="stage-row-name">{{ stage.name }}</span>
+                                <span class="stage-row-order">orden <b>{{ stage.order }}</b></span>
+                                {% if stage.active %}
+                                <span class="chip chip-done">Activa</span>
+                                {% else %}
+                                <span class="chip">Inactiva</span>
+                                {% endif %}
+                                <span class="stage-row-toggle" aria-hidden="true"></span>
+                            </summary>
+                            <div class="stage-editor">
+                                <form method="post">
+                                    <input type="hidden" name="action" value="update_stage">
+                                    <input type="hidden" name="profile_id" value="{{ p.id }}">
+                                    <input type="hidden" name="stage_id" value="{{ stage.id }}">
+                                    <div class="field-row">
+                                        <label class="field">
+                                            <span class="label">Nombre</span>
+                                            <input type="text" name="name" value="{{ stage.name }}" required>
+                                        </label>
+                                        <label class="field stage-order-input">
+                                            <span class="label">Orden</span>
+                                            <input type="number" name="order" value="{{ stage.order }}" min="0" step="1">
+                                        </label>
+                                        <label class="checks">
+                                            <input type="checkbox" name="active" {% if stage.active %}checked{% endif %}>
+                                            Activa
+                                        </label>
+                                    </div>
+                                    <label class="field">
+                                        <span class="label">Instrucción</span>
+                                        <textarea name="instruction" rows="3"
+                                                  placeholder="Qué debe producir esta etapa.">{{ stage.instruction }}</textarea>
+                                    </label>
+                                    <div class="actions tight">
+                                        <button type="submit" class="btn btn-primary btn-sm">Guardar etapa</button>
+                                    </div>
+                                </form>
+                                <form method="post" class="inline-form"
+                                      onsubmit="return confirm('Se elimina la etapa «{{ stage.name }}» y todas sus project_stages asociadas.')">
+                                    <input type="hidden" name="action" value="delete_stage">
+                                    <input type="hidden" name="profile_id" value="{{ p.id }}">
+                                    <input type="hidden" name="stage_id" value="{{ stage.id }}">
+                                    <button class="btn btn-ghost btn-sm" aria-label="Eliminar etapa {{ stage.name }}">Eliminar etapa</button>
+                                </form>
+                            </div>
+                        </details>
+                    </li>
                 {% endfor %}
+                </ul>
 
-                <form method="post" class="mt-2">
+                <form method="post" class="stage-add">
                     <div class="panel-head">
                         <h4>Añadir etapa</h4>
                     </div>
@@ -161,7 +206,7 @@
                             <span class="label">Nombre</span>
                             <input type="text" name="name" required placeholder="Nombre de la nueva etapa">
                         </label>
-                        <label class="field">
+                        <label class="field stage-order-input">
                             <span class="label">Orden</span>
                             <input type="number" name="order" value="{{ p.stages|length }}" min="0" step="1">
                         </label>
@@ -184,12 +229,23 @@
         {% else %}
         <div class="empty">
             <h2>Sin perfiles</h2>
-            <p>Crea el primero con el formulario de al lado: define cómo suena y cómo se ve tu canal.</p>
+            <p>Crea el primero con el formulario de la derecha: define cómo suena y cómo se ve tu canal.</p>
         </div>
         {% endfor %}
     </div>
 
     <aside class="work-aside after">
+        <div class="panel profile-stats">
+            <div class="panel-head">
+                <h3>Resumen</h3>
+            </div>
+            <ul class="data-list">
+                <li><span>Perfiles</span><b>{{ profiles|length }}</b></li>
+                <li><span>Etapas configuradas</span><b>{{ total_stages }}</b></li>
+                <li><span>Por defecto</span><b>{{ default_name or '—' }}</b></li>
+            </ul>
+        </div>
+
         <form method="post" class="panel">
             <div class="panel-head">
                 <h3>Nuevo perfil</h3>

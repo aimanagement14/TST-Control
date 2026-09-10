@@ -1385,3 +1385,161 @@ select { appearance: none; background-image: none; cursor: pointer; }
     .react-flow__node-prompt { min-width: 170px; }
     .graph-toolbar .btn-label { display: none; }
 }
+
+/* ==========================================================================
+   Perfiles: signal readout (signature) + rundown de etapas
+   Tres celdas con cifra grande y barra fina resumen el "carácter" del
+   perfil. Las etapas se muestran como una lista numerada colapsable,
+   estilo rundown del proyecto.
+   ========================================================================== */
+
+.profile-card { padding: 22px 24px; }
+.profile-card > .panel-head { margin-bottom: 16px; }
+.profile-card .profile-title {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin: 0;
+}
+.profile-card .profile-title .title-input { font-size: 1.35rem; min-width: 260px; }
+
+.profile-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 0 0 22px;
+}
+.signal-readout {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 14px 16px 12px;
+    background: var(--void);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+.signal-label {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--paper-3);
+}
+.signal-value {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1.65rem;
+    line-height: 1;
+    color: var(--paper);
+    font-variant-numeric: tabular-nums;
+}
+.signal-value .signal-max {
+    font-size: .82rem;
+    color: var(--paper-3);
+    margin-left: 4px;
+    font-weight: 400;
+}
+.signal-bar { height: 4px; margin-top: 2px; }
+
+.profile-card .profile-grid { margin-bottom: 18px; }
+
+/* ----- Etapas como rundown ----- */
+.stages-rundown {
+    list-style: none; margin: 14px 0 0; padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--slate);
+    overflow: hidden;
+}
+.stage-fold { border-top: 1px solid var(--line-soft); }
+.stage-fold:first-child { border-top: 0; }
+.stage-fold > details { margin: 0; }
+.stage-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto auto 18px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    cursor: pointer;
+    color: var(--paper);
+    list-style: none;
+    transition: background .15s;
+}
+.stage-row::-webkit-details-marker { display: none; }
+.stage-row::marker { content: ''; }
+.stage-row:hover { background: var(--slate-2); }
+.stage-fold details[open] > .stage-row {
+    background: var(--slate-2);
+    box-shadow: inset 3px 0 0 var(--amber);
+}
+.stage-row-num {
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    color: var(--paper-3);
+    letter-spacing: .04em;
+}
+.stage-row-name {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: .01em;
+    color: var(--paper);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0;
+}
+.stage-row-order {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    color: var(--paper-3);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.stage-row-order b { color: var(--paper-2); font-weight: 500; }
+.stage-row-toggle {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--paper-3);
+    text-align: right;
+    line-height: 1;
+    transition: color .15s;
+}
+.stage-row-toggle::before { content: "+"; }
+.stage-row:hover .stage-row-toggle { color: var(--amber); }
+.stage-fold details[open] > .stage-row .stage-row-toggle { color: var(--amber); }
+.stage-fold details[open] > .stage-row .stage-row-toggle::before { content: "−"; }
+
+.stage-editor {
+    padding: 16px 18px 18px;
+    background: var(--slate-2);
+    border-top: 1px solid var(--line-soft);
+    display: flex; flex-direction: column; gap: 14px;
+}
+.stage-editor .field { margin-bottom: 0; }
+.stage-editor .field-row > .field { margin-bottom: 0; }
+.stage-order-input { flex: 0 0 120px; }
+
+.stage-add {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: var(--void);
+    border: 1px dashed var(--line);
+    border-radius: var(--r-sm);
+}
+.stage-add > .panel-head { margin-bottom: 12px; padding-bottom: 8px; }
+.stage-add .field-row > .field { margin-bottom: 0; }
+
+.profile-stats { padding: 18px 20px; }
+.profile-stats .data-list li { padding: 8px 0; font-size: .88rem; }
+.profile-stats .data-list li:last-child { border-bottom: 0; }
+.profile-stats .data-list b {
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+}
+
+@media (max-width: 720px) {
+    .profile-summary { grid-template-columns: 1fr; }
+    .signal-value { font-size: 1.4rem; }
+    .stage-row { grid-template-columns: 32px 1fr auto auto 16px; gap: 10px; }
+    .stage-row-order { display: none; }
+    .profile-card { padding: 18px 18px; }
+}
