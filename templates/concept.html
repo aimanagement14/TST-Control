@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'concept' %}
-{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Concepto · {{ project.name }}{% endblock %}
 
 {% set concept_md %}## ÁNGULO

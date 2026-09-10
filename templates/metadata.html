@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'metadata' %}
-{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Metadata · {{ project.name }}{% endblock %}
 
 {% macro meta_panel(video, platform, saved) %}

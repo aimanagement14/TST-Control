@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'thumbnails' %}
-{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Miniaturas · {{ project.name }}{% endblock %}
 
 {% macro thumb_panel(video, saved) %}

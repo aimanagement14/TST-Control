@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% set current_stage = 'scripts' %}
-{% set graph_url = url_for('graph.profile_graph', profile_id=profile.id) if profile else None %}
 {% block title %}Guiones · {{ project.name }}{% endblock %}
 
 {% set wpm = (profile.narration_speed if profile else 0) or qc_checks.default_wpm %}
