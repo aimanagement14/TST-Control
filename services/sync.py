@@ -183,18 +183,18 @@ def _write_new_model(
     # 00_RESUMEN.md
     rel = "00_RESUMEN.md"
     with open(out_dir / rel, "w", encoding="utf-8") as f:
-        f.write(f"# {project['name']}\n\n")
-        f.write(f"**Tema:** {project['topic']}\n\n")
-        f.write(f"**Estado:** {project['status']}\n\n")
-        f.write(f"**Creado:** {project['created_at']}\n\n")
+        f.write(f"# {project['name']}\n")
+        f.write(f"Tema: {project['topic']}\n")
+        f.write(f"Estado: {project['status']}\n")
+        f.write(f"Creado: {project['created_at']}\n")
         if profile:
-            f.write(f"**Perfil:** {profile['name']}\n\n")
-            f.write(f"- Tipo: {profile.get('content_type', '')}\n")
-            f.write(f"- Tono: {profile.get('tone', '')}\n")
-            f.write(f"- Estilo: {profile.get('style', '')}\n")
-            f.write(f"- Misterio: {profile.get('mystery_level', '')}/10\n")
-            f.write(f"- Dramatización: {profile.get('drama_level', '')}/10\n")
-            f.write(f"- Velocidad: {profile.get('narration_speed', '')} ppm\n")
+            f.write(f"Perfil: {profile['name']}\n")
+            f.write(f"Tipo: {profile.get('content_type', '') or '-'}\n")
+            f.write(f"Tono: {profile.get('tone', '') or '-'}\n")
+            f.write(f"Estilo: {profile.get('style', '') or '-'}\n")
+            f.write(f"Misterio: {profile.get('mystery_level', '')}/10\n")
+            f.write(f"Dramatización: {profile.get('drama_level', '')}/10\n")
+            f.write(f"Velocidad: {profile.get('narration_speed', '')} ppm\n")
     written.append(rel)
 
     roadmap_stages: list[dict] = []
@@ -203,12 +203,12 @@ def _write_new_model(
         rel = f"stage_{row['rs_id']}.md"
         instruction = row.get("ps_instruction") or row.get("rs_instruction") or ""
         with open(out_dir / rel, "w", encoding="utf-8") as f:
-            f.write(f"# {row['name']}\n\n")
-            f.write(f"**Etapa:** {row['name']}\n\n")
-            f.write("## Instrucción\n\n")
-            f.write(instruction + "\n\n")
-            f.write("## Respuesta\n\n")
-            f.write((row.get("response") or "") + "\n")
+            f.write(f"# {row['name']}\n")
+            f.write(f"Etapa: {row['name']}\n")
+            f.write("## Instrucción\n")
+            f.write(instruction.rstrip() + "\n")
+            f.write("## Respuesta\n")
+            f.write((row.get("response") or "").rstrip() + "\n")
         written.append(rel)
 
         roadmap_stages.append(
@@ -273,29 +273,29 @@ def _write_legacy_model(
     # 00_RESUMEN.md
     rel = "00_RESUMEN.md"
     with open(out_dir / rel, "w", encoding="utf-8") as f:
-        f.write(f"# {project['name']}\n\n")
-        f.write(f"**Tema:** {project['topic']}\n\n")
-        f.write(f"**Estado:** {project['status']}\n\n")
-        f.write(f"**Creado:** {project['created_at']}\n\n")
+        f.write(f"# {project['name']}\n")
+        f.write(f"Tema: {project['topic']}\n")
+        f.write(f"Estado: {project['status']}\n")
+        f.write(f"Creado: {project['created_at']}\n")
         if profile:
-            f.write(f"**Perfil:** {profile['name']}\n\n")
-            f.write(f"- Tipo: {profile.get('content_type', '')}\n")
-            f.write(f"- Tono: {profile.get('tone', '')}\n")
-            f.write(f"- Estilo: {profile.get('style', '')}\n")
-            f.write(f"- Misterio: {profile.get('mystery_level', '')}/10\n")
-            f.write(f"- Dramatización: {profile.get('drama_level', '')}/10\n")
-            f.write(f"- Velocidad: {profile.get('narration_speed', '')} ppm\n")
+            f.write(f"Perfil: {profile['name']}\n")
+            f.write(f"Tipo: {profile.get('content_type', '') or '-'}\n")
+            f.write(f"Tono: {profile.get('tone', '') or '-'}\n")
+            f.write(f"Estilo: {profile.get('style', '') or '-'}\n")
+            f.write(f"Misterio: {profile.get('mystery_level', '')}/10\n")
+            f.write(f"Dramatización: {profile.get('drama_level', '')}/10\n")
+            f.write(f"Velocidad: {profile.get('narration_speed', '')} ppm\n")
     written.append(rel)
 
     # 01_investigacion.md
     if research_obj and research_obj.get("content"):
         rel = "01_investigacion.md"
         with open(out_dir / rel, "w", encoding="utf-8") as f:
-            f.write(f"# Investigación — {project['name']}\n\n")
-            f.write((research_obj.get("content") or "") + "\n\n")
+            f.write(f"# Investigación — {project['name']}\n")
+            f.write((research_obj.get("content") or "").rstrip() + "\n")
             sources = json.loads(research_obj.get("sources") or "[]")
             if sources:
-                f.write("## Fuentes\n\n")
+                f.write("## Fuentes\n")
                 for s in sources:
                     f.write(f"- {s}\n")
         written.append(rel)
@@ -304,32 +304,29 @@ def _write_legacy_model(
     if concept_obj and concept_obj.get("angle"):
         rel = "02_concepto.md"
         with open(out_dir / rel, "w", encoding="utf-8") as f:
-            f.write(f"# Concepto — {project['name']}\n\n")
-            f.write(f"## Ángulo\n{concept_obj.get('angle', '')}\n\n")
-            f.write(f"## Tesis\n{concept_obj.get('thesis', '')}\n\n")
+            f.write(f"# Concepto — {project['name']}\n")
+            f.write(f"## Ángulo\n{concept_obj.get('angle', '')}\n")
+            f.write(f"## Tesis\n{concept_obj.get('thesis', '')}\n")
             kp = json.loads(concept_obj.get("key_points") or "[]")
             if kp:
-                f.write("## Puntos clave\n\n")
+                f.write("## Puntos clave\n")
                 for i, p in enumerate(kp, 1):
                     f.write(f"{i}. {p}\n")
-                f.write("\n")
             if concept_obj.get("emotional_hook"):
-                f.write(f"## Gancho emocional\n{concept_obj['emotional_hook']}\n\n")
+                f.write(f"## Gancho emocional\n{concept_obj['emotional_hook']}\n")
             wl = json.loads(concept_obj.get("what_they_learn") or "[]")
             if wl:
-                f.write("## Qué aprenden\n\n")
+                f.write("## Qué aprenden\n")
                 for p in wl:
                     f.write(f"- {p}\n")
-                f.write("\n")
             wf = json.loads(concept_obj.get("what_they_feel") or "[]")
             if wf:
-                f.write("## Qué sienten\n\n")
+                f.write("## Qué sienten\n")
                 for p in wf:
                     f.write(f"- {p}\n")
-                f.write("\n")
             rk = json.loads(concept_obj.get("risks") or "[]")
             if rk:
-                f.write("## Riesgos\n\n")
+                f.write("## Riesgos\n")
                 for p in rk:
                     f.write(f"- {p}\n")
         written.append(rel)
@@ -341,20 +338,20 @@ def _write_legacy_model(
         for s in scripts_rows:
             rel = f"03_guiones/guion_{s['type']}.md"
             with open(gdir / Path(rel).name, "w", encoding="utf-8") as f:
-                f.write(f"# {s.get('title', '')}\n\n")
-                f.write(f"**Tipo:** {s['type']} ({s.get('word_count', 0)} palabras)\n\n")
+                f.write(f"# {s.get('title', '')}\n")
+                f.write(f"Tipo: {s['type']} ({s.get('word_count', 0)} palabras)\n")
                 if s.get("hook"):
-                    f.write(f"## Hook\n{s['hook']}\n\n")
+                    f.write(f"## Hook\n{s['hook']}\n")
                 if s.get("context"):
-                    f.write(f"## Contexto\n{s['context']}\n\n")
+                    f.write(f"## Contexto\n{s['context']}\n")
                 if s.get("development"):
-                    f.write(f"## Desarrollo\n{s['development']}\n\n")
+                    f.write(f"## Desarrollo\n{s['development']}\n")
                 if s.get("revelations"):
-                    f.write(f"## Revelaciones\n{s['revelations']}\n\n")
+                    f.write(f"## Revelaciones\n{s['revelations']}\n")
                 if s.get("conclusion"):
-                    f.write(f"## Conclusión\n{s['conclusion']}\n\n")
+                    f.write(f"## Conclusión\n{s['conclusion']}\n")
                 if s.get("cta"):
-                    f.write(f"## CTA\n{s['cta']}\n\n")
+                    f.write(f"## CTA\n{s['cta']}\n")
             written.append(rel)
 
     # 04_escenas/
@@ -373,8 +370,8 @@ def _write_legacy_model(
             for s in scenes_rows:
                 imagen = s.get("visual_description", "").strip()
                 f.write(f"## ESCENA {s['scene_number']}\n")
-                f.write(f"**TEXTO AUDIO:** {s.get('narration', '').strip()}\n")
-                f.write(f"**IMAGEN:** {imagen}\n")
+                f.write(f"TEXTO AUDIO: {s.get('narration', '').strip()}\n")
+                f.write(f"IMAGEN: {imagen}\n")
                 f.write(
                     f"_Cámara: {s.get('camera_movement', '')} · "
                     f"Transición: {s.get('transition', '')} · "
@@ -390,36 +387,34 @@ def _write_legacy_model(
         for m in meta_rows:
             rel = f"05_metadata/metadata_{m['platform']}.md"
             with open(mdir / f"metadata_{m['platform']}.md", "w", encoding="utf-8") as f:
-                f.write(f"# Metadata — {m['platform']}\n\n")
+                f.write(f"# Metadata — {m['platform']}\n")
                 titles = json.loads(m.get("titles") or "[]")
                 if titles:
-                    f.write("## Títulos\n\n")
+                    f.write("## Títulos\n")
                     for i, t in enumerate(titles, 1):
                         f.write(f"{i}. {t}\n")
-                    f.write("\n")
                 if m.get("description"):
-                    f.write(f"## Descripción\n{m['description']}\n\n")
+                    f.write(f"## Descripción\n{m['description']}\n")
                 chapters = json.loads(m.get("chapters") or "[]")
                 if chapters:
-                    f.write("## Capítulos\n\n")
+                    f.write("## Capítulos\n")
                     for c in chapters:
                         f.write(f"{c}\n")
-                    f.write("\n")
                 tags = json.loads(m.get("tags") or "[]")
                 if tags:
-                    f.write(f"## Tags\n{', '.join(tags)}\n\n")
+                    f.write(f"## Tags\n{', '.join(tags)}\n")
                 hashtags = json.loads(m.get("hashtags") or "[]")
                 if hashtags:
-                    f.write(f"## Hashtags\n{' '.join(hashtags)}\n\n")
+                    f.write(f"## Hashtags\n{' '.join(hashtags)}\n")
                 if m.get("caption"):
-                    f.write(f"## Caption\n{m['caption']}\n\n")
+                    f.write(f"## Caption\n{m['caption']}\n")
                 if m.get("hook"):
-                    f.write(f"## Hook\n{m['hook']}\n\n")
+                    f.write(f"## Hook\n{m['hook']}\n")
                 if m.get("cta"):
-                    f.write(f"## CTA\n{m['cta']}\n\n")
+                    f.write(f"## CTA\n{m['cta']}\n")
                 ost = json.loads(m.get("on_screen_text") or "[]")
                 if ost:
-                    f.write("## Texto en pantalla\n\n")
+                    f.write("## Texto en pantalla\n")
                     for i, t in enumerate(ost, 1):
                         f.write(f"{i}. {t}\n")
             written.append(rel)
@@ -433,8 +428,8 @@ def _write_legacy_model(
             aspect = "16:9 (horizontal)" if stype == "long" else "9:16 (vertical)"
             rel = f"06_thumbnails/thumbnail_{stype}.md"
             with open(tdir / f"thumbnail_{stype}.md", "w", encoding="utf-8") as f:
-                f.write(f"# Miniatura — guion {stype} ({aspect})\n\n")
-                f.write(f"_Actualizado: {t['updated_at']}_\n\n")
+                f.write(f"# Miniatura — guion {stype} ({aspect})\n")
+                f.write(f"_Actualizado: {t['updated_at']}_\n")
                 f.write("```\n")
                 f.write((t.get("prompt") or "").strip())
                 f.write("\n```\n")
@@ -459,19 +454,19 @@ def _write_legacy_model(
         }
         rel = "07_prompts_usados.md"
         with open(out_dir / rel, "w", encoding="utf-8") as f:
-            f.write(f"# Prompts usados en {project['name']}\n\n")
+            f.write(f"# Prompts usados en {project['name']}\n")
             f.write(
-                "Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n\n"
+                "Estos son los prompts que se generaron y editaron durante el proyecto. Sirven como referencia y para reproducir el contenido.\n"
             )
             for stage, p in stage_prompts.items():
                 label = stage_labels.get(stage, stage)
-                f.write(f"## {label}\n\n")
-                f.write(f"_Actualizado: {p['updated_at']}_\n\n")
-                f.write("### Prompt del sistema\n\n```\n")
-                f.write(p.get("sys_prompt", ""))
-                f.write("\n```\n\n### Prompt del usuario\n\n```\n")
-                f.write(p.get("user_prompt", ""))
-                f.write("\n```\n\n---\n\n")
+                f.write(f"## {label}\n")
+                f.write(f"_Actualizado: {p['updated_at']}_\n")
+                f.write("### Prompt del sistema\n```\n")
+                f.write((p.get("sys_prompt", "") or "").rstrip())
+                f.write("\n```\n### Prompt del usuario\n```\n")
+                f.write((p.get("user_prompt", "") or "").rstrip())
+                f.write("\n```\n\n---\n")
         written.append(rel)
 
     # 08_paquete_completo.json

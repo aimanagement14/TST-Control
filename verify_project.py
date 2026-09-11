@@ -52,61 +52,63 @@ VERIFY_PROFILE_NAME = "__verify_project__"
 STAGE_FIXTURES = {
     "research": (
         "Investiga el tema con hechos verificables y fuentes.",
-        "# Investigación\n\n"
-        "## Resumen\n\nTexto de la investigación sintética del flujo "
-        "genérico de siete etapas.\n\n"
-        "## Hechos confirmados\n\n"
+        "# Investigación\n"
+        "## Resumen\n"
+        "Texto de la investigación sintética del flujo genérico de siete etapas.\n"
+        "## Hechos confirmados\n"
         "- Hecho verificable A con su fuente.\n"
         "- Hecho verificable B con su fuente.\n"
-        "- Hecho verificable C con su fuente.\n\n"
-        "## Fuentes\n\n"
+        "- Hecho verificable C con su fuente.\n"
+        "## Fuentes\n"
         "- https://example.org/fuente-1\n"
         "- https://example.org/fuente-2\n"
         "- https://example.org/fuente-3\n",
     ),
     "concept": (
         "Define ángulo, tesis y ganchos del documental.",
-        "# Concepto\n\n"
-        "## Ángulo\n\nSeparar la realidad verificable del ruido viral.\n\n"
-        "## Tesis\n\nLa realidad geológica es más asombrosa que el mito.\n\n"
-        "## Puntos clave\n\n"
+        "# Concepto\n"
+        "## Ángulo\n"
+        "Separar la realidad verificable del ruido viral.\n"
+        "## Tesis\n"
+        "La realidad geológica es más asombrosa que el mito.\n"
+        "## Puntos clave\n"
         "1. Punto uno del concepto.\n"
         "2. Punto dos del concepto.\n",
     ),
     "scripts": (
         "Escribe el guion completo del documental.",
-        "# Guiones\n\n"
+        "# Guiones\n"
         "Representación genérica del contenido de guiones para el pipeline "
         "de siete etapas. Incluye el cuerpo necesario para verificar la "
         "persistencia del bloque Markdown en la nueva ``project_stage``.\n",
     ),
     "scenes": (
         "Convierte el guion en una lista de escenas visuales.",
-        "# Escenas\n\n"
+        "# Escenas\n"
         "## ESCENA 1\n"
-        "**TEXTO AUDIO:** Frase de prueba de la primera escena.\n"
-        "**IMAGEN:** Imagen representativa de la escena uno.\n"
-        "_Cámara: estático · Transición: corte seco · Duración: 15s_\n\n"
+        "TEXTO AUDIO: Frase de prueba de la primera escena.\n"
+        "IMAGEN: Imagen representativa de la escena uno.\n"
+        "_Cámara: estático · Transición: corte seco · Duración: 15s_\n"
         "## ESCENA 2\n"
-        "**TEXTO AUDIO:** Frase de la segunda escena.\n"
-        "**IMAGEN:** Imagen representativa de la escena dos.\n"
+        "TEXTO AUDIO: Frase de la segunda escena.\n"
+        "IMAGEN: Imagen representativa de la escena dos.\n"
         "_Cámara: travelling · Transición: fundido · Duración: 20s_\n",
     ),
     "metadata": (
         "Genera metadata publicable (títulos, descripción, tags).",
-        "# Metadata\n\n"
+        "# Metadata\n"
         "Representación genérica del contenido de metadata para el pipeline "
         "de siete etapas. Cubre títulos, descripción, capítulos y tags.\n",
     ),
     "thumbnails": (
         "Genera prompts visuales para las miniaturas.",
-        "# Miniaturas\n\n"
+        "# Miniaturas\n"
         "Representación genérica del contenido de miniaturas para el "
         "pipeline de siete etapas, con prompts visuales cinematográficos.\n",
     ),
     "qc": (
         "Revisa el paquete y emite el informe de calidad.",
-        "# Control de calidad\n\n"
+        "# Control de calidad\n"
         "- [info] Revisión representativa del paquete del pipeline "
         "genérico de siete etapas.\n",
     ),
