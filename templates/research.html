@@ -20,7 +20,7 @@
         {{ ui.prompt_editor(
             sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
             user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
-            saved_prompt, graph_url=graph_url) }}
+            saved_prompt) }}
         {% else %}
         <div class="empty-inline">
             <p>Genera el prompt de investigación y cópialo en tu LLM, o pega directamente lo que ya tengas.</p>

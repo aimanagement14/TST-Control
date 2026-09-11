@@ -13,7 +13,7 @@ No genera imágenes, videos ni audio. Solo planifica y prepara.
 TodoSobreTodo/
 ├── app.py            # pieza central: rutas, BD, registro de blueprints
 ├── services/         # funciones puras (parsers, llm, qc) extraídas del monolito
-├── blueprints/       # graph_bp y runner_bp (editor de grafo + runner por proyecto)
+├── blueprints/       # profiles_bp (CRUD de perfiles y roadmap_stages)
 ├── config.json       # configuración, perfiles, plantillas de prompts
 ├── workflow.db       # base de datos SQLite (se crea al arrancar)
 ├── templates/        # HTML Jinja2
@@ -102,30 +102,6 @@ Cero costos. Cero dependencias externas. Tú controlas qué LLM usas.
 > integración con OpenAI / Anthropic / presets personalizados debe
 > quedarse en la rama 1.x. Ver `CHANGELOG.md` y ADR
 > `2026-09-07` en `docs/DECISIONS.md`.
-
-## Editor visual de grafo (por perfil)
-
-Además del flujo guiado por etapas, cada perfil expone un lienzo
-estilo n8n en `/profiles/<id>/graph` donde puedes:
-
-- Ver y editar los prompts de las **doce** etapas fijas en un solo
-  vistazo: research, concept, script_long, script_short, scenes,
-  scenes_short, metadata_youtube_long, metadata_youtube_short,
-  metadata_facebook_long, metadata_reels_short, thumbnail_long y
-  thumbnail_short.
-- Añadir nodos custom con tus propios prompts SYS y USER y
-  conectarlos entre sí para encadenar su output.
-- Mover los nodos con drag & drop; las posiciones se guardan
-  solas.
-- Ejecutar el grafo paso a paso sobre un proyecto desde
-  `/projects/<id>/run`: el runner reutiliza los builders y parsers
-  existentes para los nodos fijos y muestra el output en un panel
-  lateral con el estado de cada nodo (`idle` / `running` / `ok` /
-  `error`).
-
-El grafo se renderiza con React Flow v12 cargado por importmap desde
-`esm.sh`, así que no hace falta build step ni dependencias NPM.
-Más detalle en `docs/ARCHITECTURE.md` y `docs/DECISIONS.md`.
 
 ## Perfiles
 

@@ -5,7 +5,7 @@
 
 {% set wpm = (profile.narration_speed if profile else 0) or qc_checks.default_wpm %}
 
-{% macro script_section(video, script, saved, is_open, min_words, max_words, graph_url=none) %}
+{% macro script_section(video, script, saved, is_open, min_words, max_words) %}
 {% set words = (script.word_count if script else 0) or 0 %}
 {% set state = '' if not words else ('is-over' if words > max_words else ('is-warn' if words < min_words else 'is-ok')) %}
 {% set duration_label = '5 min' if video.script_type == 'long' else '1 min' %}
@@ -47,8 +47,7 @@
             user_prompt if is_open else (saved.user_prompt if saved else ''),
             saved,
             hidden={'video_id': video.id},
-            title='Prompt del guion ' ~ video.name,
-            graph_url=graph_url) }}
+            title='Prompt del guion ' ~ video.name) }}
     </details>
     {% endif %}
 
@@ -134,7 +133,7 @@
         {% set min_words = qc_checks.min_words_short %}
         {% set max_words = qc_checks.max_words_short %}
     {% endif %}
-    {{ script_section(video, script, saved, gen_video_id == video.id, min_words, max_words, graph_url) }}
+    {{ script_section(video, script, saved, gen_video_id == video.id, min_words, max_words) }}
 {% endfor %}
 {% endif %}
 {% endblock %}

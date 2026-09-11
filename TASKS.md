@@ -71,6 +71,8 @@ publicarse una versión.
 - [x] T2.2 — Blueprints `blueprints/graph.py` (`graph_bp`) y
   `blueprints/runner.py` (`runner_bp`) con las 4 + 3 rutas
   aisladas. Local imports en handlers para romper ciclos.
+  **Purgado en v2.1.0 (ADR 2026-09-11)**: ambos blueprints fuera
+  de scope, código muerto eliminado.
 - [x] T2.3 — ADR-010 (`docs/DECISIONS.md`) documenta la PoC
   con contexto, decisión, consecuencias y reversibilidad
   explícita. `docs/ARCHITECTURE.md` actualizado con el diagrama
@@ -80,37 +82,48 @@ publicarse una versión.
 
 - [x] T3.1 — Logging en `except Exception:` silenciosos. Cubre
   ~20 casos en `app.py` (rollback teardown, json.loads en parser
-  best-effort, JSON.parse de platforms, persistencia de error en
-  `node_executions`, etc.) y los 7 de `services/parsers.py` /
-  `services/llm.py`. Criterio: `log.exception` para críticos de
-  mutación, `log.warning` para recuperables, `log.debug` para
-  silenciosos legítimos con comentario.
-- [x] T3.2 — `static/graph.js` dividido en 4 módulos ESM bajo
-  `static/graph/` (`nodes.js`, `api.js`, `layout.js`,
-  `index.js`). El `graph.js` queda como re-export de 6 líneas
-  para no tocar las plantillas. Smoke test del editor y del
-  runner OK.
+  best-effort, JSON.parse de platforms, etc.) y los 7 de
+  `services/parsers.py` / `services/llm.py`. Criterio:
+  `log.exception` para críticos de mutación, `log.warning` para
+  recuperables, `log.debug` para silenciosos legítimos con
+  comentario. Las referencias a `node_executions` se retiraron
+  con la purga del runner en v2.1.0.
+- [x] T3.2 — ~~`static/graph.js` dividido en 4 módulos ESM bajo
+  `static/graph/`~~. **Purgado en v2.1.0** al retirarse el editor
+  de grafo y el runner; el árbol vuelve a tener un único
+  `app.js` + `copy-fields.js` sin dependencias externas.
 - [x] T3.3 — Muestra oficial `Todo_sobre_los_Fosiles_1/` movida
   a `examples/` con `git mv` (preserva historial). `projects/`
   queda con `.gitkeep` que explica que su contenido lo genera la
   app en runtime. `app.py` ya usaba `PROJECTS_DIR`, sin paths
   hardcodeados.
 
-- [x] Generar las escenas del guion corto (1 min) en proyectos que ya
-  tienen escenas solo para el guion largo. Se añade el nodo fijo
-  `scenes_short` (paralelo a `scenes`) en el editor de grafo y en el
-  runner. Helper `_persist_scenes(conn, project_id, script_type, ...)`
-  reutilizado por ambos. La etapa Escenas exige ambos sets antes de
-  marcarse como lista.
-- [ ] Sustituir importmap de esm.sh por bundles locales en
-  `static/vendor/` si se requiere soporte offline. Evaluar primero
-  con `chrome://network` cuánto pesa cada recarga en una red lenta.
-- [x] Añadir tests E2E del runner vía `app.test_client()` que
+- [x] ~~Generar las escenas del guion corto (1 min) en proyectos
+  que ya tienen escenas solo para el guion largo. Se añade el
+  nodo fijo `scenes_short` (paralelo a `scenes`) en el editor de
+  grafo y en el runner. Helper `_persist_scenes(...)` reutilizado
+  por ambos.~~ **Purgado en v2.1.0**: el runner no existe y la
+  página `/scenes` ya cubría guion corto vía el helper de escenas
+  per-video del modelo `videos` (introducido en la auditoría de
+  roadmap). El QC de short-form exige ≥ 6 escenas (alineado con
+  el prompt `scenes`).
+- [ ] ~~Sustituir importmap de esm.sh por bundles locales en
+  `static/vendor/`~~. **Cancelado**: la dependencia de `esm.sh`
+  desapareció con el editor de grafo.
+- [x] ~~Añadir tests E2E del runner vía `app.test_client()` que
   verifiquen cambio de estado `idle → running → ok` en
-  `node_executions` para los nodos fijos (ahora 10: 9 originales
-  + `scenes_short`).
+  `node_executions` para los nodos fijos~~. **Purgado en v2.1.0**
+  junto con el runner.
 
-### Editor de grafo 2026-09-01
+### Editor de grafo 2026-09-01 — retirado en v2.1.0
+
+Las tareas marcadas como `[x]` describían el sprint original que
+introdujo `profile_graph_nodes`, `node_executions`, los blueprints
+huérfanos y los siete endpoints `/profiles/<id>/graph/*` y
+`/projects/<id>/run/*`. Tras la auditoría 2026-09-11 esos endpoints
+nunca se llegaron a registrar: la sección completa se considera
+histórica y se conserva aquí solo para preservar el rastro de
+decisiones que motivaron la purga del ADR 2026-09-11.
 
 - [x] Migrar `stage_prompts` por proyecto a `profile_prompts` por
   perfil; migración idempotente en `init_db()` con backup
@@ -120,38 +133,9 @@ publicarse una versión.
   para usarla; eliminada la acción POST `save_prompt` y los helpers
   `get_saved_prompt` / `save_stage_prompt` /
   `list_saved_prompts` / `_ensure_stage_prompt` /
-  `backfill_stage_prompts`.
-- [x] Tablas nuevas `profile_graph_nodes` (con `is_fixed`, posiciones,
-  `inputs_json`) y `node_executions` (estado, output, duración).
-- [x] Siete rutas nuevas: `/profiles/<id>/graph` (GET),
-  `/profiles/<id>/graph/save-node` (POST),
-  `/profiles/<id>/graph/delete-node` (POST),
-  `/profiles/<id>/graph/layout` (POST),
-  `/projects/<id>/run` (GET),
-  `/projects/<id>/run/execute` (POST),
-  `/projects/<id>/run/reset-node` (POST).
-- [x] Ejecutor unificado `execute_graph_node()` que despacha a los
-  builders/parsers existentes para los nueve nodos fijos y hace
-  `call_llm` directo para los custom, interpolando `{{ inputs.x }}`.
-- [x] `templates/profile_graph.html` y `templates/project_run.html`
-  con layout split, importmap a `@xyflow/react@12.11.6` desde
-  `esm.sh`, panel lateral de edición y barra de estado por nodo.
-- [x] `static/graph.js` como módulo ESM con el componente React
-  Flow, nodos custom (add/remove), persistencia de posiciones con
-  debounce 600 ms y mocks `TODO` para los endpoints hasta la
-  integración final.
-- [x] `templates/project.html` reemplaza el panel «Prompts
-  guardados» por un enlace al editor de grafo del perfil.
-- [x] `static/style.css` con estilos del chrome del grafo y los
-  estados idle/running/ok/error (variables CSS del tema).
-- [x] Tests: `resolve_stage_prompt` con fallback, UPSERT de
-  `save_profile_prompt`, copia de `stage_prompts` a
-  `profile_prompts`, `get_or_create_fixed_graph_nodes`, save+delete
-  de nodo custom, `update_graph_layout`, y `execute_graph_node`
-  para un fijo y un custom en modo manual.
-- [x] Documentación: `docs/ARCHITECTURE.md` (sección Editor de
-  grafo), `docs/DECISIONS.md` (ADRs 2026-09-01), `TASKS.md`,
-  `CHANGELOG.md` y `README.md`.
+  `backfill_stage_prompts`. `STAGE_ALIASES` se mantiene como única
+  pieza viva de este sprint: lo usa `resolve_stage_prompt` para
+  resolver nombres ambiguos del roadmap.
 
 ### Etapa Miniaturas 2026-08-29
 

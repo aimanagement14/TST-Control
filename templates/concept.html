@@ -34,7 +34,7 @@
         {{ ui.prompt_editor(
             sys_prompt or (saved_prompt.sys_prompt if saved_prompt is mapping else ''),
             user_prompt or (saved_prompt.user_prompt if saved_prompt is mapping else ''),
-            saved_prompt, graph_url=graph_url) }}
+            saved_prompt) }}
         {% else %}
         <div class="empty-inline">
             <p>El prompt de concepto parte de la investigación guardada. Genéralo y llévalo a tu LLM.</p>

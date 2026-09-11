@@ -1014,8 +1014,8 @@ def test_resolve_stage_prompt_falls_back_to_config(tmp_path):
     raw_user = app.CONFIG["prompts"]["research"]["format"]
     expected_sys, _ = render_profile(raw_sys, app.get_profile(profile_id))
     expected_user, _ = render_profile(raw_user, app.get_profile(profile_id))
-    assert sys_p == expected_sys, f"SYS renderizado difiere de raw CONFIG"
-    assert user_p == expected_user, f"USER renderizado difiere de raw CONFIG"
+    assert sys_p == expected_sys, "SYS renderizado difiere de raw CONFIG"
+    assert user_p == expected_user, "USER renderizado difiere de raw CONFIG"
     sys_p, user_p = app.resolve_stage_prompt(profile_id, "no_existe")
     assert sys_p == "" and user_p == ""
     print("  ✓ resolve_stage_prompt cae a CONFIG y a vacío si stage desconocido")
@@ -1502,7 +1502,6 @@ def test_new_project_seeds_seven_project_stages(tmp_path):
         assert len(stages) == 7, f"esperaba 7 project_stages, hay {len(stages)}"
         names = [s["name"] for s in stages]
         assert names == list(app.DEFAULT_ROADMAP_STAGES), names
-        with_inst = [s for s in stages if (s["instruction"] or "").strip()]
         with_response = [s for s in stages if (s["response"] or "").strip()]
         assert len(with_response) == 0, (
             f"las project_stages nuevas deben tener response vacía: {with_response}"
@@ -1755,9 +1754,6 @@ def test_qc_state_pending_analyzed_skipped(tmp_path):
     with app.get_db() as conn:
         long_id = conn.execute(
             "SELECT id FROM videos WHERE project_id=1 AND key='long'"
-        ).fetchone()["id"]
-        short_id = conn.execute(
-            "SELECT id FROM videos WHERE project_id=1 AND key='short'"
         ).fetchone()["id"]
 
     from services.stages import video_stage_status
@@ -2056,8 +2052,6 @@ def test_new_project_export_uses_stage_files(tmp_path):
 
         zf = zipfile.ZipFile(io.BytesIO(r.data))
         names = zf.namelist()
-        stage_files = [n for n in names if n.endswith("stage_1.md") or
-                       any(f"/stage_{i}.md" in n for i in range(1, 8))]
         plain_stages = [n for n in names if "/stage_" in n and n.endswith(".md")]
         assert len(plain_stages) == 7, (
             f"esperaba 7 stage_*.md en el ZIP, hay {len(plain_stages)}: {plain_stages}"

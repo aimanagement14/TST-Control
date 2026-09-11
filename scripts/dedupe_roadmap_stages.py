@@ -84,7 +84,7 @@ def main() -> None:
         project_ids = [r["id"] for r in cur.fetchall()]
 
         for pid in project_ids:
-            for stage_name, small_id, big_id in PAIRS:
+            for _stage_name, small_id, big_id in PAIRS:
                 cur.execute(
                     "SELECT id, response, instruction, updated_at "
                     "FROM project_stages WHERE project_id=? AND roadmap_stage_id=?",

@@ -23,7 +23,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-
 _TEMPLATE_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\s*\}\}")
 
 

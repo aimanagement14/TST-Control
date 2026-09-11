@@ -38,13 +38,13 @@ def view():
     from app import (
         CONFIG,
         DEFAULT_ROADMAP_STAGES,
+        _roadmap_instruction_for,
         get_db,
         log,
         now_iso,
         sync_project_folder,
         sync_project_stages_for_project,
     )
-    from app import _roadmap_instruction_for
 
     if request.method == "POST":
         action = request.form.get("action")

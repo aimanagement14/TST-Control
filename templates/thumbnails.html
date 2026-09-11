@@ -45,8 +45,7 @@
             user_prompt if is_active else (saved.user_prompt if saved else ''),
             saved,
             hidden={'video_id': video.id},
-            title='Prompt de miniatura de ' ~ video.name,
-            graph_url=graph_url) }}
+            title='Prompt de miniatura de ' ~ video.name) }}
     </details>
     {% endif %}
 

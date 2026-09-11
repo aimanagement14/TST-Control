@@ -165,6 +165,70 @@ el versionado [Semantic Versioning](https://semver.org/lang/es/).
   reescrito como un único párrafo cohesionado de 60-100 palabras
   con la guía de estilo integrada.
 
+## [2.1.0] - 2026-09-11
+
+### Removed
+
+- **Editor de grafo + runner del proyecto**: los blueprints
+  `blueprints/graph.py` (`graph_bp`) y `blueprints/runner.py`
+  (`runner_bp`) existían en `app.py:4261-4265` con un comentario
+  marcando que «no se registran a propósito», pero el monolito y
+  toda la documentación (`README.md`, `docs/ARCHITECTURE.md`,
+  `docs/DECISIONS.md`, `AGENTS.md`, `TASKS.md`, `CHANGELOG.md`) los
+  presentaban como features activas. Purga completa:
+  - Blueprints: `blueprints/graph.py`, `blueprints/runner.py`.
+  - Templates huérfanas: `templates/profile_graph.html`,
+    `templates/project_run.html`.
+  - JS del editor: `static/graph.js` + `static/graph/` (4 módulos
+    ESM, React Flow v12 por importmap desde `esm.sh`).
+  - CRUD de nodos en `app.py`: `KNOWN_FIXED_NODE_KEYS`,
+    `DEFAULT_NODE_LABELS`, `DEFAULT_NODE_POSITIONS`, `DEFAULT_EDGES`,
+    `MAX_OUTPUT_BYTES`, `get_or_create_fixed_graph_nodes`,
+    `fetch_graph_nodes`, `fetch_graph_edges_as_eedges`,
+    `save_graph_node`, `delete_graph_node`, `update_graph_layout`,
+    `_interpolate_inputs`, `_truncate_to_bytes`, `_persist_scenes`,
+    `_persist_fixed_result`, `_load_first_script`,
+    `_build_user_msg_for_fixed`, `execute_graph_node` (~830 LOC).
+  - Parámetro `graph_url` en `_macros.html:prompt_editor` y los
+    seis call-sites (`concept`, `metadata`, `scenes`, `thumbnails`,
+    `research`, `scripts`). El botón "Editar en el grafo" estaba
+    siempre oculto porque `graph_url` nunca se asignaba en el
+    contexto del template.
+  - Tablas huérfanas `profile_graph_nodes` y `node_executions`
+    creadas/dropeadas en cada arranque de `init_db()`: ahora se
+    dropean en arranque y se omiten del `SCHEMA`. Las migraciones
+    idempotentes mantienen el backup defensivo para BDs legacy que
+    pudieran tener restos.
+- Bloque "Editor visual de grafo (por perfil)" en `README.md`:
+  la sección describía una feature que no estaba en la build.
+
+### Changed
+
+- `app.py`: 4 339 → 3 502 líneas (-19%). El monolito vuelve a
+  acercarse al tamaño post-T2.2 (2 477 líneas) declarado en el
+  ADR-010. Las funciones puras siguen viviendo en `services/`; los
+  blueprints activos son solo `profiles_bp`.
+- `docs/ARCHITECTURE.md` reescrito: ya no menciona `graph_bp` /
+  `runner_bp` / `profile_graph_nodes` / `node_executions` /
+  `templates/profile_graph.html` / `static/graph.js`. La tabla de
+  servicios incluye `services/stages.py` (estado per-video), la
+  sección de estáticos refleja el JS actual sin dependencias
+  externas en runtime.
+- `AGENTS.md`: `blueprints/` describe solo `profiles_bp`; `static/`
+  describe `app.js` + `copy-fields.js` sin el editor de grafo.
+- `ruff check`: 14 errores históricos → 0. 10 auto-fix (`ruff check
+  --fix`), 4 manuales (1 `F401`, 3 `F841`).
+
+### Fixed
+
+- `app.py:4257-4258` y `4261-4265`: dos comentarios marcaban rutas
+  que ya no existen (`/settings` en `blueprints/settings.py`,
+  grafo y runner fuera de scope). Sustituidos por un único
+  comentario en la sección de registro de blueprints que explica
+  el motivo.
+- Drift de `profile_graph.html:12` ("Nueve etapas obligatorias")
+  con el número real (12 nodos fijos).
+
 ## [Unreleased]
 
 ### Added

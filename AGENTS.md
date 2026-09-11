@@ -18,8 +18,8 @@ Guía para agentes de IA que trabajan en este proyecto.
 
 - `app.py` — pieza central del monolito (ADR-001): rutas clásicas por etapa,
   configuración, gestión de BD, registro de blueprints. Conserva además los
-  builders/persistencia de etapas y el ejecutor del grafo; las funciones puras
-  viven fuera (ver `services/` y `blueprints/`).
+  builders/persistencia de etapas; las funciones puras viven fuera (ver
+  `services/` y `blueprints/`).
 - `services/` — funciones puras extraídas en T2.1 (parsers, `call_llm`, QC,
   `sync`, `templates`). **No** dependen de `request`/`g`/`session`.
   Cubiertas por `test_core.py`.
@@ -31,13 +31,13 @@ Guía para agentes de IA que trabajan en este proyecto.
     los prompts SYS/USER.
   - `qc.py` — reglas QC; `error` bloquea la transición a `ready`,
     `warning`/`info` no.
-- `blueprints/` — `graph_bp` y `runner_bp` extraídos en T2.2 como PoC del
+- `blueprints/` — `profiles_bp` con las rutas `/profiles` extraído del
   monolito. Cada blueprint declara su `url_prefix` y usa local imports para
   evitar ciclos con `app`.
 - `templates/` — Jinja2. `_macros.html`, `_rail.html`, `_stepper.html` para
   piezas reutilizables; el resto son páginas por etapa.
-- `static/` — JS/CSS sin bundler. `app.js` para chrome general, `graph.js`
-  + `static/graph/*.js` para el editor de grafo (React Flow v12 por importmap).
+- `static/` — JS/CSS sin bundler. `app.js` para chrome general y `copy-fields.js`
+  para el copy/paste de prompts. Sin editor de grafo en runtime.
 - `config.json` — única fuente para prompts SYS/USER, presets LLM, umbrales
   QC y tema visual. Los prompts referencian el perfil activo vía
   `{{profile.tone}}`, `{{profile.mystery_level}}`, etc., y comparten
@@ -65,17 +65,17 @@ Guía para agentes de IA que trabajan en este proyecto.
   `close_db` (teardown) la cierra. Fuera de contexto (CLI, tests) abre
   conexión transitoria.
 - `init_db()` activa `PRAGMA journal_mode=WAL` y `busy_timeout=5000` para
-  tolerar clicks rápidos en el runner del grafo.
+  tolerar clicks rápidos en la app.
 - `call_llm()` cae a modo manual si la API falla o no hay key configurada;
   nunca deja la app sin respuesta.
 - Los prompts SYS+USER viven por perfil (`profile_prompts`), leídos vía
   `resolve_stage_prompt()` con fallback a `config.json`. `resolve_stage_prompt`
   aplica además `render_profile()` y devuelve el SYS/USER ya sustituido;
-  editar un prompt en el editor de grafo del perfil cambia el
-  comportamiento de todos sus proyectos.
-- Aliases del runner (`STAGE_ALIASES` en `app.py`): `scenes_short → scenes`,
+  editar un prompt del perfil (directamente en `profile_prompts` o vía
+  `/profiles`) cambia el comportamiento de todos sus proyectos.
+- Aliases del roadmap (`STAGE_ALIASES` en `app.py`): `scenes_short → scenes`,
   `scripts → script_long`, `thumbnails → thumbnail_long`. Permiten que
-  distintos nombres usados por la UI/Grafo apunten al mismo prompt canónico.
+  distintos nombres usados por la UI apunten al mismo prompt canónico.
 - QC engine: `error` bloquea la transición a `ready`; `warning` e `info` no.
   Coherencia `min_scenes_short = 6` (Fase 2.3): iguala el mínimo exigido
   por el prompt `scenes`.
@@ -102,10 +102,10 @@ Guía para agentes de IA que trabajan en este proyecto.
   `{{app.visual_style_keywords}}`. Editar la lista en CONFIG basta para
   actualizar los tres sin tocar el texto de cada prompt.
 - Para añadir una nueva plataforma de metadata: crear la key
-  `metadata_<plataforma>` en `config.json`, registrarla en
+  `metadata_<plataforma>` en `config.json` y registrarla en
   `services/parsers.py` (`PLATFORM_PARSERS`,
-  `_METADATA_PARSERS_BY_NAME`) y, si se quiere como nodo del grafo,
-  añadirla a `KNOWN_FIXED_NODE_KEYS` y a `_build_user_msg_for_fixed`.
+  `_METADATA_PARSERS_BY_NAME`). No hay grafo: la nueva plataforma
+  aparece automáticamente en la página `/projects/<id>/metadata`.
 - Para añadir un nodo «refiner» futuro a la UI: usar
   `build_refiner_prompt(...)`, parsear la respuesta con un parser
   específico (pendiente) y guardar el bloque `## OUTPUT REFINADO`

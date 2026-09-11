@@ -23,7 +23,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app import DB_PATH, get_db, now_iso  # noqa: E402
+from app import DB_PATH, now_iso  # noqa: E402
 
 REAL_PREFIXES = {
     1: "Todo_sobre_los_Fosiles",
@@ -467,7 +467,7 @@ def main():
             print("\n== Delete synthetic projects 1 and 2 ==")
             cur.execute("DELETE FROM project_stages WHERE project_id IN (1, 2)")
             cur.execute("DELETE FROM projects WHERE id IN (1, 2)")
-            print(f"  removed projects 1, 2 (and their project_stages)")
+            print("  removed projects 1, 2 (and their project_stages)")
 
             # 3) Seed 7 roadmap_stages for profile_id=1.
             # IMPORTANT: preserve existing IDs 1 (research) and 2 (concept) so
@@ -634,7 +634,7 @@ def main():
                 )
             # Clear any stray prompts for profile 3
             cur.execute("DELETE FROM profile_prompts WHERE profile_id=3")
-            print(f"  profile_prompts seeded (7 rows for profile 1)")
+            print("  profile_prompts seeded (7 rows for profile 1)")
 
         conn.commit()
         print("\n== Transaction committed ==")

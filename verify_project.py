@@ -503,7 +503,7 @@ def main():
             print(f"    - {name}")
         print("=" * 60)
         sys.exit(1)
-    print(f"  Todas las comprobaciones pasaron en verde")
+    print("  Todas las comprobaciones pasaron en verde")
     print(f"  ZIP: {len(names)} archivos, {len(r.data)} bytes")
     print("=" * 60)
 

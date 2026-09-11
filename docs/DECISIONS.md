@@ -511,3 +511,95 @@ usaba el fallback de CONFIG).
 - `verify_project.py` y `test_core.py` crecen ~12 tests nuevos. El
   total pasa en verde.
 - Backup de `workflow.db` y `config.json` previos en `backups/`.
+
+## 2026-09-11 — Purga del editor de grafo y del runner (v2.1.0)
+
+**Contexto:** La auditoría arquitectónica 2026-09-11 descubrió que los
+blueprints `blueprints/graph.py` (`graph_bp`) y `blueprints/runner.py`
+(`runner_bp`) — extraídos en T2.2 (ADR 2026-09-01) y descritos como
+features activas en `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`,
+`docs/DECISIONS.md`, `CHANGELOG.md`, `TASKS.md` y `PRODUCT.md` —
+**no se registraban en `app.py:94`**. El comentario explícito en
+`app.py:4261-4265` lo declaraba, pero el resto de la documentación
+seguía presentándolas como rutas accesibles al usuario.
+
+El monolito arrastraba ~830 líneas de código muerto: el CRUD de
+`profile_graph_nodes` y `node_executions` (incluidos `KNOWN_FIXED_NODE_KEYS`,
+`DEFAULT_NODE_LABELS`, `DEFAULT_NODE_POSITIONS`, `DEFAULT_EDGES`,
+`get_or_create_fixed_graph_nodes`, `fetch_graph_nodes`,
+`fetch_graph_edges_as_eedges`, `save_graph_node`, `delete_graph_node`,
+`update_graph_layout`, `_interpolate_inputs`, `_truncate_to_bytes`,
+`_persist_scenes`, `_persist_fixed_result`, `_load_first_script`,
+`_build_user_msg_for_fixed`, `execute_graph_node`), dos templates
+huérfanas (`profile_graph.html`, `project_run.html`) y cuatro módulos
+ESM en `static/graph/` (~34 KB). `init_db()` ya ejecutaba
+`DROP TABLE IF EXISTS profile_graph_nodes / node_executions` en cada
+arranque porque las tablas nunca se creaban, lo que confirmaba que el
+código CRUD siempre operaba sobre tablas vacías.
+
+El parámetro `graph_url` de `_macros.html:prompt_editor` nunca se
+asignaba en el contexto del template, así que el botón "Editar en el
+grafo" estaba siempre oculto. `STAGE_ALIASES` se conserva (lo usa
+`resolve_stage_prompt` para resolver nombres ambiguos del roadmap
+a prompts canónicos).
+
+**Decisión:** Eliminar todo el código muerto del monolito y alinear
+docs con el estado real de la build. Mantener la dirección tomada
+en v2.0 (modo manual exclusivo, monolito con `services/` y
+`blueprints/`) sin reintroducir el editor de grafo ni el runner.
+
+Alcance del borrado:
+
+- Blueprints: `blueprints/graph.py`, `blueprints/runner.py`.
+- Templates: `templates/profile_graph.html`, `templates/project_run.html`.
+- Estáticos: `static/graph.js`, `static/graph/` (cuatro módulos ESM).
+- `app.py`: ~830 líneas del CRUD de grafo + ejecutor + helpers
+  (`_persist_scenes`, `_persist_fixed_result`, `_load_first_script`,
+  `_build_user_msg_for_fixed`, `_truncate_to_bytes`, etc.). El
+  monolito pasa de 4 339 a 3 502 líneas (-19 %), más cerca del
+  tamaño declarado por el ADR-010 (2 477 líneas tras T2.2).
+- `_macros.html:prompt_editor`: parámetro `graph_url` eliminado.
+  Seis call-sites limpios (`concept`, `metadata`, `scenes`,
+  `thumbnails`, `research`, `scripts`).
+- `init_db()` y `_migrate_to_roadmap_model`: las dos
+  `DROP TABLE IF EXISTS` para `profile_graph_nodes` /
+  `node_executions` se mantienen en `init_db()` por compatibilidad
+  con BDs legacy que aún tengan restos. El SCHEMA no las crea.
+- `services/templates.py`, `services/parsers.py`, `services/qc.py`,
+  `services/sync.py`, `services/stages.py`, `services/manual.py`
+  intactos: el editor de grafo no los tocaba.
+- `blueprints/profiles.py` intacto: era el único blueprint
+  registrado y sigue cubriendo las rutas `/profiles`.
+- Documentación alineada: `README.md` pierde la sección "Editor
+  visual de grafo (por perfil)"; `AGENTS.md` reescribe las
+  descripciones de `blueprints/` y `static/`; `docs/ARCHITECTURE.md`
+  reescrito (tabla de servicios, blueprints activos, modelo de
+  datos sin `profile_graph_nodes` ni `node_executions`); este ADR
+  cierra el ciclo. `CHANGELOG.md` publica la release `2.1.0`.
+- Linter limpio: `ruff check` baja de 14 errores históricos a 0
+  (10 auto-fix vía `ruff check --fix`, 4 manuales: 1 `F401`, 3 `F841`).
+
+**Consecuencias:**
+
+- Si en el futuro alguien quiere reactivar el editor de grafo o el
+  runner, lo hará desde cero: el código está fuera del árbol, no
+  en un feature flag. La reintroducción requerirá reintroducir las
+  tablas `profile_graph_nodes` y `node_executions`, el SCHEMA, las
+  migraciones, los blueprints, los templates, el JS y los tests E2E.
+- La documentación vuelve a ser una fuente única de verdad: lo que
+  dice el `README` existe en la build. El próximo onboarding ya no
+  se va a topar con la inconsistencia.
+- Bump menor (SemVer 2.0.x → 2.1.0) por cambio no-rompedible: la API
+  pública del usuario no cambia, solo se elimina código inaccesible.
+
+**Reversibilidad:**
+
+- `git revert` del commit de purga restaura el código en su forma
+  previa al audit. Las tablas se recrean implícitamente la próxima
+  vez que se ejecute `init_db()` si el SCHEMA las incluye (no las
+  incluye hoy), pero los blueprints huérfanos vuelven a fallar al
+  no estar registrados — exactamente la misma situación pre-purga.
+- Si la reintroducción se aborda como nuevo sprint, partir del ADR
+  original (`## 2026-09-01 — Editor visual de grafo por perfil`)
+  y rehacer las decisiones obsoletas (React Flow por importmap →
+  bundle local, alias del runner, etc.) en un ADR propio.

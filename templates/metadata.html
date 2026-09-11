@@ -56,8 +56,7 @@
             user_prompt if is_active else (saved.user_prompt if saved else ''),
             saved,
             hidden={'video_id': video.id, 'platform': platform},
-            title='Prompt de metadata de ' ~ video.name,
-            graph_url=graph_url) }}
+            title='Prompt de metadata de ' ~ video.name) }}
     </details>
     {% endif %}
 

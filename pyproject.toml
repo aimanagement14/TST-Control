@@ -1,6 +1,6 @@
 [project]
 name = "tst-control"
-version = "2.0.0"
+version = "2.1.0"
 description = "Todo Sobre Todo — Centro de producción de contenido. Pipeline local de preproducción para un canal de documentales (tema → ZIP)."
 requires-python = ">=3.11,<3.14"
 readme = "README.md"
