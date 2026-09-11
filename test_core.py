@@ -1597,6 +1597,98 @@ def test_project_stage_post_saves_instruction_and_response(tmp_path):
         app.PROJECTS_DIR = original
 
 
+def test_project_stage_save_mirrors_research_and_concept_legacy(tmp_path):
+    """Save en la ruta genérica también popula research/content y concept/angle.
+
+    Ver incongruencia #1: la ruta ``/projects/<id>/stages/<id>`` debe
+    mantener en sincronía las tablas legacy ``research`` y ``concept``
+    con las que ``run_qc`` detecta "Falta la investigación" / "Falta el
+    concepto". La solución vive en la ruta (no en QC) para no contaminar
+    el motor de reglas.
+    """
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                "INSERT INTO projects (id, name, topic, profile_id, status, "
+                "created_at, updated_at) "
+                "VALUES (1, 'Mirror Test', 'Tema', 1, 'research', "
+                "'2025-01-01', '2025-01-01')"
+            )
+        app.sync_project_stages_for_project(1)
+        with app.get_db() as conn:
+            research_id = conn.execute(
+                "SELECT ps.id FROM project_stages ps JOIN roadmap_stages rs "
+                "ON rs.id=ps.roadmap_stage_id "
+                "WHERE ps.project_id=1 AND rs.name='research'"
+            ).fetchone()["id"]
+            concept_id = conn.execute(
+                "SELECT ps.id FROM project_stages ps JOIN roadmap_stages rs "
+                "ON rs.id=ps.roadmap_stage_id "
+                "WHERE ps.project_id=1 AND rs.name='concept'"
+            ).fetchone()["id"]
+        research_resp = (
+            "## RESUMEN\nFrase resumen.\n\n"
+            "## HECHOS CONFIRMADOS\n- Hecho uno.\n- Hecho dos.\n\n"
+            "## TEORÍAS Y VERSIONES\n- Teoría uno.\n\n"
+            "## FUENTES\n- Wilkinson, 2020.\n- Allen, 2021.\n\n"
+            "## AFIRMACIONES QUE REQUIEREN VERIFICACIÓN\n- Rumor.\n"
+        )
+        concept_resp = (
+            "## ÁNGULO\nMirar el caso como un cold case.\n\n"
+            "## TESIS\nLa batería no prueba ni descarta nada.\n\n"
+            "## PUNTOS CLAVE\n1. Réplicas funcionales.\n2. Sin fuentes.\n\n"
+            "## GANCHO EMOCIONAL\nUn objeto equivocado en mil años.\n\n"
+            "## LO QUE EL ESPECTADOR DEBE APRENDER\nQue la hipótesis galvánica descansa solo en réplicas.\n\n"
+            "## RIESGOS\n- Pseudoarqueología.\n"
+        )
+        with app.app.test_client() as c:
+            r1 = c.post(
+                f"/projects/1/stages/{research_id}",
+                data={"action": "save", "response": research_resp},
+                follow_redirects=False,
+            )
+            r2 = c.post(
+                f"/projects/1/stages/{concept_id}",
+                data={"action": "save", "response": concept_resp},
+                follow_redirects=False,
+            )
+            assert r1.status_code == 302, r1.status_code
+            assert r2.status_code == 302, r2.status_code
+        with app.get_db() as conn:
+            rs = dict(
+                conn.execute(
+                    "SELECT * FROM research WHERE project_id=1"
+                ).fetchone()
+            )
+            cs = dict(
+                conn.execute(
+                    "SELECT * FROM concept WHERE project_id=1"
+                ).fetchone()
+            )
+            issues = app.run_qc(1)
+        assert "Frase resumen" in rs["content"], rs
+        assert "Wilkinson, 2020" in rs["sources"], rs
+        assert rs["facts"] and "Hecho uno" in rs["facts"], rs
+        assert rs["unverified"] and "Rumor" in rs["unverified"], rs
+        assert "cold case" in cs["angle"], cs
+        assert "Réplicas funcionales" in cs["key_points"], cs
+        assert "Pseudoarqueología" in cs["risks"], cs
+        assert not any(
+            i[0] == "research" and i[1] == "error" for i in issues
+        ), issues
+        assert not any(
+            i[0] == "concept" and i[1] == "error" for i in issues
+        ), issues
+        print("  ✓ stage save mirror: research y concept quedan pobladas para el QC")
+    finally:
+        app.PROJECTS_DIR = original
+
+
 def test_non_empty_response_marks_stage_done(tmp_path):
     """Una respuesta no vacía en project_stages marca la etapa como hecha."""
     _setup_qc_db(tmp_path)
@@ -2106,7 +2198,113 @@ def test_legacy_project_export_keeps_legacy_layout(tmp_path):
         assert not plain_stages, (
             f"proyecto legacy no debe usar stage_<id>.md: {plain_stages}"
         )
+        bundle_blob = zf.read(
+            [n for n in names if n.endswith("08_paquete_completo.json")][0]
+        )
+        bundle = json.loads(bundle_blob.decode("utf-8"))
+        for key in ("scripts", "scenes", "metadata", "thumbnails"):
+            assert key in bundle, (
+                f"modelo legacy no debe añadir '{key}' al bundle (keys: {list(bundle)})"
+            )
         print("  ✓ export de proyecto legacy mantiene el layout legacy")
+    finally:
+        app.PROJECTS_DIR = original
+
+
+def test_new_project_export_bundle_includes_legacy_data(tmp_path):
+    """El bundle 08_paquete_completo.json del modelo nuevo también lleva scripts/scenes/metadata/thumbnails.
+
+    Ver incongruencia #2: cuando un proyecto tiene ``project_stages``
+    (modelo genérico), los guiones, escenas, metadata y miniaturas viven
+    en sus tablas dedicadas y antes NO aparecían en el JSON de exportación.
+    La ampliación enriquece solo el JSON (no duplica 03_guiones/, etc.)
+    para que el bundle sea autocontenido.
+    """
+    import io
+    import json as jsonlib
+    import zipfile
+
+    _setup_qc_db(tmp_path)
+    test_projects = tmp_path / "projects"
+    test_projects.mkdir()
+    original = app.PROJECTS_DIR
+    app.PROJECTS_DIR = test_projects
+    try:
+        with app.get_db() as conn:
+            conn.execute(
+                "INSERT INTO projects (id, name, topic, profile_id, status, "
+                "created_at, updated_at) VALUES (1, 'NewModel', 'tema', 1, "
+                "'ready', '2025-01-01', '2025-01-01')"
+            )
+        app.sync_project_stages_for_project(1)
+        with app.get_db() as conn:
+            conn.execute(
+                "INSERT INTO videos (project_id, key, name, script_type, format, "
+                "sort_order, created_at, updated_at) "
+                "VALUES (1, 'long', 'Video 5 min', 'long', '16:9 horizontal', "
+                "0, '2025-01-01', '2025-01-01'), "
+                "(1, 'short', 'Video 1 min', 'short', '9:16 vertical', "
+                "1, '2025-01-01', '2025-01-01')"
+            )
+            sid_long = conn.execute(
+                "INSERT INTO scripts (project_id, type, title, body_full, word_count, "
+                "updated_at, video_id) VALUES (1, 'long', 'Guion long', 'texto long', "
+                "10, '2025-01-01', 1)"
+            ).lastrowid
+            sid_short = conn.execute(
+                "INSERT INTO scripts (project_id, type, title, body_full, word_count, "
+                "updated_at, video_id) VALUES (1, 'short', 'Guion short', 'texto short', "
+                "5, '2025-01-01', 2)"
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO scenes (project_id, script_id, scene_number, narration, "
+                "visual_description, duration_seconds, updated_at) VALUES "
+                "(1, ?, 1, 'narracion', 'imagen', 10, '2025-01-01'), "
+                "(1, ?, 2, 'narracion2', 'imagen2', 12, '2025-01-01')",
+                (sid_long, sid_long),
+            )
+            conn.execute(
+                "INSERT INTO metadata_records (project_id, platform, titles, "
+                "description, tags, hashtags, updated_at, video_id) VALUES "
+                "(1, 'youtube_long', '[\"T1\"]', 'desc', '[\"a\"]', '[\"#b\"]', "
+                "'2025-01-01', 1)"
+            )
+            conn.execute(
+                "INSERT INTO thumbnail_records (project_id, script_type, prompt, "
+                "updated_at, video_id) VALUES (1, 'long', 'prompt uno', "
+                "'2025-01-01', 1)"
+            )
+        folder, written = app.sync_project_folder(1)
+        bundle_path = folder / "08_paquete_completo.json"
+        assert bundle_path.exists(), f"falta {bundle_path}"
+        bundle = jsonlib.loads(bundle_path.read_text(encoding="utf-8"))
+        for key in ("scripts", "scenes", "metadata", "thumbnails"):
+            assert key in bundle, (
+                f"bundle debe incluir '{key}' (keys: {list(bundle)})"
+            )
+        assert len(bundle["scripts"]) == 2, bundle["scripts"]
+        assert len(bundle["scenes"]) == 2, bundle["scenes"]
+        assert any(
+            m["platform"] == "youtube_long" for m in bundle["metadata"]
+        ), bundle["metadata"]
+        assert any(
+            t["script_type"] == "long" for t in bundle["thumbnails"]
+        ), bundle["thumbnails"]
+        assert "stage_prompts" in bundle
+        zf = zipfile.ZipFile(
+            io.BytesIO(
+                app.app.test_client()
+                .post("/projects/1/export", follow_redirects=False)
+                .data
+            )
+        )
+        zip_bundle_name = next(
+            n for n in zf.namelist() if n.endswith("08_paquete_completo.json")
+        )
+        zip_bundle = jsonlib.loads(zf.read(zip_bundle_name).decode("utf-8"))
+        assert len(zip_bundle["scripts"]) == 2
+        assert len(zip_bundle["scenes"]) == 2
+        print("  ✓ export de proyecto nuevo enriquece bundle con datos legacy")
     finally:
         app.PROJECTS_DIR = original
 
@@ -2234,6 +2432,10 @@ def main():
     _with_tmp("new_project_seeds_seven", test_new_project_seeds_seven_project_stages)
     _with_tmp("project_stage_get_renders", test_project_stage_get_renders)
     _with_tmp("project_stage_post_saves", test_project_stage_post_saves_instruction_and_response)
+    _with_tmp(
+        "project_stage_save_mirrors_legacy",
+        test_project_stage_save_mirrors_research_and_concept_legacy,
+    )
     _with_tmp("non_empty_response_marks_done", test_non_empty_response_marks_stage_done)
     _with_tmp("update_stage", test_update_stage_renames_reorders_activates_deactivates)
     _with_tmp("delete_stage_cascades", test_delete_stage_cascades_project_stages)
@@ -2241,6 +2443,10 @@ def main():
     _with_tmp("stage_file_stable_id", test_stage_file_uses_stable_roadmap_id)
     _with_tmp("export_uses_stage_files", test_new_project_export_uses_stage_files)
     _with_tmp("legacy_export_keeps_layout", test_legacy_project_export_keeps_legacy_layout)
+    _with_tmp(
+        "new_export_bundle_includes_legacy",
+        test_new_project_export_bundle_includes_legacy_data,
+    )
 
     print("\n=== TESTS DE ESTADO POR VIDEO ===")
     _with_tmp("video_stage_status_breakdown", test_video_stage_status_per_video_breakdown)

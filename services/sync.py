@@ -163,7 +163,7 @@ def _load_legacy_data(conn, project_id: int) -> dict:
 def _write_new_model(
     project: dict, profile: dict | None, ps_rows: list[dict]
 ) -> tuple[Path, list[str]]:
-    from app import get_db, now_iso
+    from app import get_db, list_profile_prompts, now_iso
 
     with get_db() as conn:
         videos = [
@@ -173,6 +173,8 @@ def _write_new_model(
                 (project["id"],),
             ).fetchall()
         ]
+        legacy = _load_legacy_data(conn, project["id"])
+        stage_prompts = list_profile_prompts(project["profile_id"])
     out_dir = safe_project_dir(project["id"], project["name"])
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -241,6 +243,13 @@ def _write_new_model(
         "videos": videos,
         "roadmap_stages": roadmap_stages,
         "project_stages": project_stages,
+        "research": legacy["research"],
+        "concept": legacy["concept"],
+        "scripts": legacy["scripts"],
+        "scenes": legacy["scenes"],
+        "metadata": legacy["metadata"],
+        "thumbnails": legacy["thumbnails"],
+        "stage_prompts": stage_prompts,
         "exported_at": now_iso(),
     }
     with open(out_dir / rel, "w", encoding="utf-8") as f:

@@ -1836,6 +1836,80 @@ def get_or_create_concept(project_id):
         return dict(row) if row else {"project_id": project_id}
 
 
+def _ensure_research_row(conn, project_id: int) -> None:
+    row = conn.execute(
+        "SELECT 1 FROM research WHERE project_id=?", (project_id,)
+    ).fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO research (project_id, updated_at) VALUES (?, ?)",
+            (project_id, now_iso()),
+        )
+
+
+def _ensure_concept_row(conn, project_id: int) -> None:
+    row = conn.execute(
+        "SELECT 1 FROM concept WHERE project_id=?", (project_id,)
+    ).fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO concept (project_id, updated_at) VALUES (?, ?)",
+            (project_id, now_iso()),
+        )
+
+
+def _mirror_research_legacy(conn, project_id: int, response_text: str) -> None:
+    """Parsea una respuesta de investigación y la persiste en la tabla legacy ``research``.
+
+    La ruta genérica de etapas (``/projects/<id>/stages/<id>``) escribe
+    solo en ``project_stages.response``, pero ``run_qc`` lee desde
+    ``research.content`` / ``concept.angle``. Esta función mantiene las
+    tablas legacy en sincronía para que el QC engine (y cualquier
+    consumidor legacy) siga viendo el contenido.
+    """
+    from services.parsers import parse_research
+
+    parsed = parse_research(response_text)
+    _ensure_research_row(conn, project_id)
+    conn.execute(
+        "UPDATE research SET content=?, sources=?, facts=?, theories=?, "
+        "unverified=?, updated_at=? WHERE project_id=?",
+        (
+            parsed["content"] or response_text,
+            json.dumps(parsed["sources"], ensure_ascii=False),
+            json.dumps(parsed["facts"], ensure_ascii=False),
+            json.dumps(parsed["theories"], ensure_ascii=False),
+            json.dumps(parsed["unverified"], ensure_ascii=False),
+            now_iso(),
+            project_id,
+        ),
+    )
+
+
+def _mirror_concept_legacy(conn, project_id: int, response_text: str) -> None:
+    """Parsea una respuesta de concepto y la persiste en la tabla legacy ``concept``."""
+    from services.parsers import parse_concept
+
+    parsed = parse_concept(response_text)
+    _ensure_concept_row(conn, project_id)
+    conn.execute(
+        "UPDATE concept SET angle=?, thesis=?, key_points=?, emotional_hook=?, "
+        "what_they_learn=?, what_they_feel=?, risks=?, updated_at=? "
+        "WHERE project_id=?",
+        (
+            parsed["angle"],
+            parsed["thesis"],
+            json.dumps(parsed["key_points"], ensure_ascii=False),
+            parsed["emotional_hook"],
+            json.dumps(parsed["what_they_learn"], ensure_ascii=False),
+            json.dumps(parsed["what_they_feel"], ensure_ascii=False),
+            json.dumps(parsed["risks"], ensure_ascii=False),
+            now_iso(),
+            project_id,
+        ),
+    )
+
+
 def _ensure_project_videos(conn, project_id, seed_defaults=False):
     if not conn.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
         return []
@@ -2480,6 +2554,7 @@ def project_stage(project_id, stage_id):
             response_text = request.form.get("response", "").strip()
             instruction_text = (request.form.get("instruction") or "").strip()
             now = now_iso()
+            stage_name = current.get("stage_name") or ""
             with get_db() as conn:
                 if instruction_text:
                     conn.execute(
@@ -2493,6 +2568,11 @@ def project_stage(project_id, stage_id):
                         "WHERE id=? AND project_id=?",
                         (response_text, now, stage_id, project_id),
                     )
+                if response_text:
+                    if stage_name == "research":
+                        _mirror_research_legacy(conn, project_id, response_text)
+                    elif stage_name == "concept":
+                        _mirror_concept_legacy(conn, project_id, response_text)
                 conn.execute(
                     "UPDATE projects SET updated_at=? WHERE id=?",
                     (now, project_id),
