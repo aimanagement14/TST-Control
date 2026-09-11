@@ -1,4 +1,10 @@
-"""Recover the 7 real projects from projects/ back into workflow.db.
+"""Recover the 8 real projects from projects/ back into workflow.db.
+
+Idempotent. On a fresh DB it does the full recovery (profile setup,
+roadmap_stages seeding, project inserts, prompt UPSERT). If the DB
+already has the recovery (Stonehenge at id=15), it switches to patch
+mode and only inserts projects from REAL_PREFIXES that are missing
+(e.g. id=16 Área 51).
 
 Single transaction. On failure the DB stays untouched (the backup in
 backups/ is the safety net). See top-of-file mapping rules.
@@ -27,6 +33,7 @@ REAL_PREFIXES = {
     13: "Todo_sobre_La_Piedra_R",
     14: "Todo_sobre_Jacobo_Grinberg",
     15: "Todo_sobre_Stonehenge",
+    16: "Todo_sobre_el_Área_51",
 }
 
 FORCED_STATUS = {
@@ -37,6 +44,7 @@ FORCED_STATUS = {
     13: "metadata",
     14: "scripts",
     15: "metadata",
+    16: "scenes",
 }
 
 ROADMAP_ORDER = ("research", "concept", "scripts", "scenes", "metadata", "thumbnails", "qc")
@@ -341,115 +349,252 @@ def main():
     try:
         cur = conn.cursor()
 
-        # 1) Profile 1: rename + restore to Stonehenge values
-        print("\n== Update profile 1 ==")
-        prof = stonehenge["profile"]
-        cur.execute(
-            """
-            UPDATE profiles SET
-                name = ?, content_type = ?, audience = ?, tone = ?,
-                style = ?, mystery_level = ?, drama_level = ?,
-                narration_speed = ?, platforms = ?, notes = ?,
-                is_default = 1
-            WHERE id = 1
-            """,
-            (
-                prof.get("name") or "Todo Sobre Todo / Misterio",
-                prof.get("content_type"),
-                prof.get("audience"),
-                prof.get("tone"),
-                prof.get("style"),
-                prof.get("mystery_level"),
-                prof.get("drama_level"),
-                prof.get("narration_speed"),
-                prof.get("platforms"),
-                prof.get("notes") or "",
-            ),
+        # Detect whether the recovery has already been done on this DB.
+        # Stonehenge (id=15) is our canary: if it's already in `projects`,
+        # we are re-running and must skip the destructive steps (DELETE,
+        # UPDATE profile 1, INSERT roadmap_stages, UPSERT profile_prompts)
+        # and only insert the projects from REAL_PREFIXES that are missing.
+        already_recovered = (
+            cur.execute("SELECT 1 FROM projects WHERE id=15").fetchone() is not None
         )
-        print(f"  rows updated: {cur.rowcount}")
 
-        # 2) Delete synthetic projects 1 & 2 + their project_stages
-        # (FK ON DELETE CASCADE handles project_stages; explicit delete is harmless.)
-        print("\n== Delete synthetic projects 1 and 2 ==")
-        cur.execute("DELETE FROM project_stages WHERE project_id IN (1, 2)")
-        cur.execute("DELETE FROM projects WHERE id IN (1, 2)")
-        print(f"  removed projects 1, 2 (and their project_stages)")
-
-        # 3) Seed 7 roadmap_stages for profile_id=1.
-        # IMPORTANT: preserve existing IDs 1 (research) and 2 (concept) so
-        # Stonehenge's project_stages (which reference rs_id=1..7) stay
-        # joined. UPDATE 1,2 in place and INSERT new rows for 3..7.
-        print("\n== Seed roadmap_stages for profile_id=1 ==")
-        cur.execute(
-            """
-            UPDATE roadmap_stages
-            SET instruction=?, sort_order=0, is_active=1, updated_at=?
-            WHERE id=1
-            """,
-            (rs_template["research"]["instruction"], now_iso()),
-        )
-        cur.execute(
-            """
-            UPDATE roadmap_stages
-            SET instruction=?, sort_order=1, is_active=1, updated_at=?
-            WHERE id=2
-            """,
-            (rs_template["concept"]["instruction"], now_iso()),
-        )
-        new_rs_ids: dict[str, int] = {"research": 1, "concept": 2}
-        for sort_idx, name in enumerate(("scripts", "scenes", "metadata", "thumbnails", "qc"), start=2):
-            r = rs_template[name]
+        if already_recovered:
+            print("\n== Patch mode: Stonehenge already present, inserting missing projects only ==")
             cur.execute(
                 """
-                INSERT INTO roadmap_stages
-                    (profile_id, name, instruction, sort_order, is_active,
-                     created_at, updated_at)
-                VALUES (1, ?, ?, ?, 1, ?, ?)
+                SELECT id, name FROM roadmap_stages
+                WHERE profile_id=1 AND is_active=1
+                ORDER BY sort_order, id
+                """
+            )
+            new_rs_ids: dict[str, int] = {}
+            for r in cur.fetchall():
+                if r["name"] not in new_rs_ids:
+                    new_rs_ids[r["name"]] = r["id"]
+            print(f"  detected roadmap_stage ids: {new_rs_ids}")
+            missing = [name for name in ROADMAP_ORDER if name not in new_rs_ids]
+            if missing:
+                raise RuntimeError(
+                    f"profile 1 is missing active roadmap_stages for: {missing}. "
+                    f"Run the fresh-recovery path first to seed them."
+                )
+
+            for pid in REAL_PREFIXES:
+                if cur.execute("SELECT 1 FROM projects WHERE id=?", (pid,)).fetchone():
+                    print(f"  id={pid:2d} already in DB, skipping")
+                    continue
+                bundle = bundles[pid]
+                proj = dict(bundle["project"])
+                proj["status"] = FORCED_STATUS[pid]
+                cur.execute(
+                    """
+                    INSERT INTO projects
+                        (id, name, topic, profile_id, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pid,
+                        proj.get("name") or "",
+                        proj.get("topic") or "",
+                        1,
+                        proj["status"],
+                        proj.get("created_at") or now_iso(),
+                        proj.get("updated_at") or now_iso(),
+                    ),
+                )
+                bundle_rsid_to_name_local = {
+                    r["id"]: ("research" if r["name"] == "Investigacion" else r["name"])
+                    for r in bundle["roadmap_stages"]
+                }
+                bundle_ps = bundle.get("project_stages") or []
+                for ps in bundle_ps:
+                    stage_name = bundle_rsid_to_name_local.get(ps["roadmap_stage_id"])
+                    current_rsid = new_rs_ids.get(stage_name) if stage_name else None
+                    if current_rsid is None:
+                        raise ValueError(
+                            f"id={pid} project_stage {ps['id']} references unknown "
+                            f"roadmap_stage_id={ps['roadmap_stage_id']} "
+                            f"(stage_name={stage_name!r})"
+                        )
+                    cur.execute(
+                        """
+                        INSERT INTO project_stages
+                            (project_id, roadmap_stage_id, instruction, response, updated_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            pid,
+                            current_rsid,
+                            ps.get("instruction") or "",
+                            ps.get("response") or "",
+                            ps.get("updated_at") or now_iso(),
+                        ),
+                    )
+                print(
+                    f"  inserted id={pid:2d} {proj.get('name')!r} "
+                    f"status={proj['status']} ({len(bundle_ps)} project_stages)"
+                )
+        else:
+            # 1) Profile 1: rename + restore to Stonehenge values
+            print("\n== Update profile 1 ==")
+            prof = stonehenge["profile"]
+            cur.execute(
+                """
+                UPDATE profiles SET
+                    name = ?, content_type = ?, audience = ?, tone = ?,
+                    style = ?, mystery_level = ?, drama_level = ?,
+                    narration_speed = ?, platforms = ?, notes = ?,
+                    is_default = 1
+                WHERE id = 1
                 """,
                 (
-                    name,
-                    r["instruction"],
-                    sort_idx,
-                    now_iso(),
-                    now_iso(),
+                    prof.get("name") or "Todo Sobre Todo / Misterio",
+                    prof.get("content_type"),
+                    prof.get("audience"),
+                    prof.get("tone"),
+                    prof.get("style"),
+                    prof.get("mystery_level"),
+                    prof.get("drama_level"),
+                    prof.get("narration_speed"),
+                    prof.get("platforms"),
+                    prof.get("notes") or "",
                 ),
             )
-            new_rs_ids[name] = cur.lastrowid or 0
-        print(f"  roadmap_stage ids: {new_rs_ids}")
+            print(f"  rows updated: {cur.rowcount}")
 
-        # 4) Insert 6 legacy projects
-        print("\n== Insert 6 legacy projects ==")
-        legacy_ids = [1, 9, 11, 12, 13, 14]
-        for pid in legacy_ids:
-            bundle = bundles[pid]
-            proj = dict(bundle["project"])
-            proj["status"] = FORCED_STATUS[pid]
+            # 2) Delete synthetic projects 1 & 2 + their project_stages
+            # (FK ON DELETE CASCADE handles project_stages; explicit delete is harmless.)
+            print("\n== Delete synthetic projects 1 and 2 ==")
+            cur.execute("DELETE FROM project_stages WHERE project_id IN (1, 2)")
+            cur.execute("DELETE FROM projects WHERE id IN (1, 2)")
+            print(f"  removed projects 1, 2 (and their project_stages)")
+
+            # 3) Seed 7 roadmap_stages for profile_id=1.
+            # IMPORTANT: preserve existing IDs 1 (research) and 2 (concept) so
+            # Stonehenge's project_stages (which reference rs_id=1..7) stay
+            # joined. UPDATE 1,2 in place and INSERT new rows for 3..7.
+            print("\n== Seed roadmap_stages for profile_id=1 ==")
+            cur.execute(
+                """
+                UPDATE roadmap_stages
+                SET instruction=?, sort_order=0, is_active=1, updated_at=?
+                WHERE id=1
+                """,
+                (rs_template["research"]["instruction"], now_iso()),
+            )
+            cur.execute(
+                """
+                UPDATE roadmap_stages
+                SET instruction=?, sort_order=1, is_active=1, updated_at=?
+                WHERE id=2
+                """,
+                (rs_template["concept"]["instruction"], now_iso()),
+            )
+            new_rs_ids: dict[str, int] = {"research": 1, "concept": 2}
+            for sort_idx, name in enumerate(("scripts", "scenes", "metadata", "thumbnails", "qc"), start=2):
+                r = rs_template[name]
+                cur.execute(
+                    """
+                    INSERT INTO roadmap_stages
+                        (profile_id, name, instruction, sort_order, is_active,
+                         created_at, updated_at)
+                    VALUES (1, ?, ?, ?, 1, ?, ?)
+                    """,
+                    (
+                        name,
+                        r["instruction"],
+                        sort_idx,
+                        now_iso(),
+                        now_iso(),
+                    ),
+                )
+                new_rs_ids[name] = cur.lastrowid or 0
+            print(f"  roadmap_stage ids: {new_rs_ids}")
+
+            # 4) Insert 7 legacy projects (including id=16 Área 51)
+            print("\n== Insert 7 legacy projects ==")
+            legacy_ids = [1, 9, 11, 12, 13, 14, 16]
+            for pid in legacy_ids:
+                bundle = bundles[pid]
+                proj = dict(bundle["project"])
+                proj["status"] = FORCED_STATUS[pid]
+                cur.execute(
+                    """
+                    INSERT INTO projects (id, name, topic, profile_id, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pid,
+                        proj.get("name") or "",
+                        proj.get("topic") or "",
+                        1,
+                        proj["status"],
+                        proj.get("created_at") or now_iso(),
+                        proj.get("updated_at") or now_iso(),
+                    ),
+                )
+                bundle_ps = bundle.get("project_stages") or []
+                bundle_rsid_to_name_local = {
+                    r["id"]: ("research" if r["name"] == "Investigacion" else r["name"])
+                    for r in bundle["roadmap_stages"]
+                }
+                for ps in bundle_ps:
+                    stage_name = bundle_rsid_to_name_local.get(ps["roadmap_stage_id"])
+                    current_rsid = new_rs_ids.get(stage_name) if stage_name else None
+                    if current_rsid is None:
+                        raise ValueError(
+                            f"id={pid} project_stage {ps['id']} references unknown "
+                            f"roadmap_stage_id={ps['roadmap_stage_id']} "
+                            f"(stage_name={stage_name!r})"
+                        )
+                    cur.execute(
+                        """
+                        INSERT INTO project_stages
+                            (project_id, roadmap_stage_id, instruction, response, updated_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            pid,
+                            current_rsid,
+                            ps.get("instruction") or "",
+                            ps.get("response") or "",
+                            ps.get("updated_at") or now_iso(),
+                        ),
+                    )
+                print(
+                    f"  id={pid:2d} {proj.get('name')!r} status={proj['status']} "
+                    f"-> {len(bundle_ps)} project_stages"
+                )
+
+            # 5) Insert Stonehenge (id=15). The bundle's project_stages reference
+            # roadmap_stage_ids from the OLD profile 1 layout (36..42). We remap
+            # each row by stage name to the CURRENT profile 1 ids so the joins
+            # work. Instruction and response content are taken as-is from the
+            # bundle (per spec: "mantener exactamente esos valores").
+            print("\n== Insert Stonehenge (id=15) ==")
+            proj15 = dict(stonehenge["project"])
+            proj15["status"] = FORCED_STATUS[15]
             cur.execute(
                 """
                 INSERT INTO projects (id, name, topic, profile_id, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    pid,
-                    proj.get("name") or "",
-                    proj.get("topic") or "",
+                    15,
+                    proj15.get("name") or "",
+                    proj15.get("topic") or "",
                     1,
-                    proj["status"],
-                    proj.get("created_at") or now_iso(),
-                    proj.get("updated_at") or now_iso(),
+                    proj15["status"],
+                    proj15.get("created_at") or now_iso(),
+                    proj15.get("updated_at") or now_iso(),
                 ),
             )
-            bundle_ps = bundle.get("project_stages") or []
-            bundle_rsid_to_name_local = {
-                r["id"]: ("research" if r["name"] == "Investigacion" else r["name"])
-                for r in bundle["roadmap_stages"]
-            }
-            for ps in bundle_ps:
-                stage_name = bundle_rsid_to_name_local.get(ps["roadmap_stage_id"])
+            for ps in stonehenge_ps:
+                stage_name = bundle_rsid_to_name.get(ps["roadmap_stage_id"])
                 current_rsid = new_rs_ids.get(stage_name) if stage_name else None
                 if current_rsid is None:
                     raise ValueError(
-                        f"id={pid} project_stage {ps['id']} references unknown "
+                        f"Stonehenge project_stage {ps['id']} references unknown "
                         f"roadmap_stage_id={ps['roadmap_stage_id']} "
                         f"(stage_name={stage_name!r})"
                     )
@@ -460,87 +605,36 @@ def main():
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
-                        pid,
+                        15,
                         current_rsid,
                         ps.get("instruction") or "",
                         ps.get("response") or "",
                         ps.get("updated_at") or now_iso(),
                     ),
                 )
-            print(
-                f"  id={pid:2d} {proj.get('name')!r} status={proj['status']} "
-                f"-> {len(bundle_ps)} project_stages"
-            )
+            print(f"  inserted Stonehenge project + {len(stonehenge_ps)} project_stages")
 
-        # 5) Insert Stonehenge (id=15). The bundle's project_stages reference
-        # roadmap_stage_ids from the OLD profile 1 layout (36..42). We remap
-        # each row by stage name to the CURRENT profile 1 ids so the joins
-        # work. Instruction and response content are taken as-is from the
-        # bundle (per spec: "mantener exactamente esos valores").
-        print("\n== Insert Stonehenge (id=15) ==")
-        proj15 = dict(stonehenge["project"])
-        proj15["status"] = FORCED_STATUS[15]
-        cur.execute(
-            """
-            INSERT INTO projects (id, name, topic, profile_id, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                15,
-                proj15.get("name") or "",
-                proj15.get("topic") or "",
-                1,
-                proj15["status"],
-                proj15.get("created_at") or now_iso(),
-                proj15.get("updated_at") or now_iso(),
-            ),
-        )
-        for ps in stonehenge_ps:
-            stage_name = bundle_rsid_to_name.get(ps["roadmap_stage_id"])
-            current_rsid = new_rs_ids.get(stage_name) if stage_name else None
-            if current_rsid is None:
-                raise ValueError(
-                    f"Stonehenge project_stage {ps['id']} references unknown "
-                    f"roadmap_stage_id={ps['roadmap_stage_id']} "
-                    f"(stage_name={stage_name!r})"
+            # 6) profile_prompts UPSERT for profile_id=1
+            print("\n== UPSERT profile_prompts for profile_id=1 ==")
+            cur.execute("DELETE FROM profile_prompts WHERE profile_id=1")
+            for stage_name in ROADMAP_ORDER:
+                entry = rs_template[stage_name]
+                cur.execute(
+                    """
+                    INSERT INTO profile_prompts
+                        (profile_id, stage, sys_prompt, user_prompt, updated_at)
+                    VALUES (?, ?, ?, '', ?)
+                    """,
+                    (
+                        1,
+                        stage_name,
+                        entry["instruction"],
+                        now_iso(),
+                    ),
                 )
-            cur.execute(
-                """
-                INSERT INTO project_stages
-                    (project_id, roadmap_stage_id, instruction, response, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    15,
-                    current_rsid,
-                    ps.get("instruction") or "",
-                    ps.get("response") or "",
-                    ps.get("updated_at") or now_iso(),
-                ),
-            )
-        print(f"  inserted Stonehenge project + {len(stonehenge_ps)} project_stages")
-
-        # 6) profile_prompts UPSERT for profile_id=1
-        print("\n== UPSERT profile_prompts for profile_id=1 ==")
-        cur.execute("DELETE FROM profile_prompts WHERE profile_id=1")
-        for stage_name in ROADMAP_ORDER:
-            entry = rs_template[stage_name]
-            cur.execute(
-                """
-                INSERT INTO profile_prompts
-                    (profile_id, stage, sys_prompt, user_prompt, updated_at)
-                VALUES (?, ?, ?, '', ?)
-                """,
-                (
-                    1,
-                    stage_name,
-                    entry["instruction"],
-                    now_iso(),
-                ),
-            )
-        # Clear any stray prompts for profile 3
-        cur.execute("DELETE FROM profile_prompts WHERE profile_id=3")
-        print(f"  profile_prompts seeded (7 rows for profile 1)")
+            # Clear any stray prompts for profile 3
+            cur.execute("DELETE FROM profile_prompts WHERE profile_id=3")
+            print(f"  profile_prompts seeded (7 rows for profile 1)")
 
         conn.commit()
         print("\n== Transaction committed ==")
