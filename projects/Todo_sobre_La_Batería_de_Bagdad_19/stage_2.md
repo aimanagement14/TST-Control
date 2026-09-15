@@ -3,49 +3,106 @@ Etapa: concept
 ## Instrucción
 Eres un director creativo especializado en contenido de misterio, conspiraciones y temáticas alternativas para un canal llamado 'Todo Sobre Todo'. Creas conceptos que enganchan, mantienen la tensión y dejan al espectador reflexionando. Tu trabajo es encontrar el ángulo más potente de un tema.
 ## Respuesta
-## ÁNGULO
+## ÁNGULO CREATIVO
 
-Contar la Batería de Bagdad como un caso forense moderno: una pieza con la apariencia de una reliquia eléctrica, sacada a la luz en 1936 y envuelta desde entonces en un debate entre arqueólogos e ingenieros. El espectador entra con la pregunta "¿podían los partos generar corriente?" y sale con una pregunta más honesta: "¿qué necesidad real explicaría ese artilugio, y por qué ningún texto antiguo lo menciona?". El ángulo privilegia el rigor, no el misterio paranormal: hipótesis rivales, pruebas de laboratorio, archivos desaparecidos. Se construye sobre Wilhelm König como personaje —un ingeniero alemán que mira un objeto y ve un circuito— y se cierra devolviendo la palabra al espectador.
+La Batería de Bagdad: ¿electricidad hace 2.000 años?
 
-## TESIS CENTRAL
+El misterio no está simplemente en que un recipiente antiguo pueda producir electricidad. Lo verdaderamente inquietante es que alguien construyera, hace casi dos milenios, un objeto cuyos componentes pueden comportarse como una batería moderna.
 
-La Batería de Bagdad no prueba ni descarta una pila antigua: demuestra que, dos milenios antes de Volta, alguien en Mesopotamia diseñó un cilindro de cobre, hierro y asfalto con una precisión que sigue sin tener un uso cotidiano aceptado, y que esa ambigüedad es exactamente el terreno donde la arqueología y la ingeniería moderna aún no se han puesto de acuerdo.
+Pero aquí aparece la pregunta que cambia toda la historia:
 
-## PUNTOS CLAVE A DESARROLLAR
+¿Estamos ante una tecnología eléctrica perdida... o ante un objeto al que nosotros le estamos atribuyendo una función que nunca tuvo?
 
-1. La escena del hallazgo en Khujut Rabu (1936): un equipo del Iraq Museum desentierra vasijas diminutas con un cilindro de cobre, una varilla de hierro y un tapón asfáltico — la geografía del misterio.
-2. Wilhelm König y el artículo de 1938: un ingeniero eléctrico, conservador del museo, ve la pieza y publica la hipótesis galvánica en plena eclosión de la electrotecnia europea.
-3. Las réplicas que sí producen voltaje: los experimentos de Gray (1940) y de Frood (2017) demuestran que el dispositivo puede entregar 0,5-1,5 V con electrólitos ácidos y platear plata sobre cobre.
-4. La contrahipótesis de Keyser y Simpson: el asfalto se disuelve con cualquier electrólito útil, las vasijas británicas están catalogadas como "rod holders" y no existe un solo texto cuneiforme que describa galvanoplastia.
-5. La grieta documental: las piezas originales se perdieron tras la Guerra del Golfo, las dataciones se hicieron sobre vasijas del Museo Británico y el yacimiento nunca se excavó en contexto — la pregunta sigue colgada por falta de evidencia, no por exceso de misterio.
+## CONCEPTO CENTRAL
 
-## ANCLAJE EN HECHOS
+Durante décadas, la llamada Batería de Bagdad ha sido presentada como una posible prueba de que las civilizaciones antiguas conocían la electricidad mucho antes de que la ciencia moderna la explicara.
 
-- Hechos confirmados que sostienen la tesis: (1) el hallazgo en Khujut Rabu y la datación parto (200 a.C. – 224 d.C.) según Simpson 1996 y el informe del British Museum 2002-04; (2) el artículo de König de 1938 y su perfil como ingeniero eléctrico formado en Karlsruhe; (3) las réplicas funcionales de Gray 1940 y Frood 2017 que producen voltaje real.
-- Hechos que cuestionan la versión "batería": la catalogación de las vasijas del British Museum como "rod holders" para pergaminos (ME 135950-135954) y el análisis iconográfico de Keyser (1964) sobre sellos partos.
-- Afirmaciones que NO se deben usar como base porque no están verificadas: la idea de que König fabricó el artículo por encargo nazi, la atribución a la "Revue de l'Institut français d'archéologie orientale" sin cita contrastable, y la suposición de que las piezas originales desaparecieron en el saqueo de 2003 (no hay inventario público que lo confirme).
+La idea parece imposible.
 
-## GANCHO EMOCIONAL
+Un recipiente de cerámica.
+Un cilindro de cobre.
+Una varilla de hierro.
+Betún para sellarlo.
 
-En los primeros diez segundos el espectador debe sentir el escalofrío de estar ante un objeto equivocado: una pieza de hace dos mil años que parece sacada de un laboratorio. Pasamos de "qué es" a "quién lo encontró y por qué no encaja".
+Y, bajo determinadas condiciones, una reacción capaz de generar electricidad.
 
-## LO QUE EL ESPECTADOR DEBE APRENDER
+Pero la arqueología no ha encontrado una respuesta definitiva sobre para qué servía realmente.
 
-1. Que la hipótesis galvánica de König se sostiene solo en réplicas modernas, no en fuentes antiguas.
-2. Que las hipótesis rivales (recipiente para pergaminos, contenedor ritual) tienen apoyo documental comparable y mejor conservación lógica del asfalto.
-3. Que la ausencia de textos cuneiformes sobre electrólisis es el dato más incómodo para la versión "batería".
-4. Que la arqueología del objeto está lastrada por cadenas de custodia rotas — la verdad histórica depende tanto del archivo como del laboratorio.
+Ese vacío es el verdadero misterio.
 
-## LO QUE EL ESPECTADOR DEBE SENTIR
+## GANCHO PRINCIPAL
 
-1. Curiosidad sostenida ante un objeto físicamente pequeño con implicaciones enormes.
-2. Desconfianza sana hacia las versiones absolutas — ni "batería" ni "fraude" agotan el caso.
-3. Respeto por la figura de König como profesional atrapado entre la ciencia y su época.
-4. Una pregunta abierta que sobreviva al final del vídeo: si los partos no la usaron como pila, ¿para qué la construyeron así?
+Hace casi 2.000 años, alguien fabricó un objeto que, según experimentos modernos, puede generar electricidad.
 
-## RIESGOS
+No estamos hablando de una teoría sobre extraterrestres.
+No estamos hablando de un manuscrito perdido.
+El objeto existe.
 
-- Pseudoarqueología: si el guion se desliza hacia "energía sagrada" o "tecnología perdida", se rompe el tono del canal y se pierde credibilidad. Hay que anclar cada afirmación a una fuente verificable.
-- Reclamación de derechos sobre las piezas: el Iraq Museum es la fuente legítima; cualquier referencia debe nombrarlo y no presentar antigüedades sin contexto como si fueran del acervo público.
-- Reconstrucciones modernas (Gray, Frood) citadas como "pruebas" sin matizar: el espectador podría entender que la pila funcionó en la antigüedad. Hay que recordar que producir voltaje en laboratorio no equivale a uso antiguo.
-- Tergiversación de la figura de König: ligar su trabajo al nazismo sin matizar los hechos puede ser difamatorio. Solo se menciona la hipótesis con sus fuentes y sin juicio.
+Lo extraño es que nadie puede demostrar para qué fue construido.
+
+Y si realmente era una batería...
+
+¿quién descubrió la electricidad antes de que existiera la ciencia eléctrica?
+
+## PROMESA DEL DOCUMENTAL
+
+En este documental vamos a separar el mito de la evidencia.
+
+Primero veremos qué encontraron realmente los arqueólogos.
+
+Después reconstruiremos el objeto para descubrir qué ocurre cuando se introducen los componentes que supuestamente lo convierten en una batería.
+
+Y finalmente llegaremos a la pregunta más incómoda:
+
+¿La Batería de Bagdad demuestra que una tecnología eléctrica desapareció de la historia...
+
+o demuestra algo todavía más extraño?
+
+Que quizá llevamos décadas intentando explicar un objeto cuyo verdadero propósito seguimos sin comprender.
+
+## ESTRUCTURA DE TENSIÓN
+
+1. El objeto imposible
+   La presentación del recipiente y sus componentes. La primera impresión: parece demasiado sencillo para ser tecnología avanzada.
+
+2. La prueba que cambia todo
+   Una reconstrucción moderna demuestra que la combinación puede generar electricidad.
+
+3. La explicación oficial se rompe
+   Que pueda producir electricidad no significa que haya sido diseñada para hacerlo. Aparece el problema de la intención.
+
+4. La teoría de la galvanoplastia
+   La hipótesis de que pudo utilizarse para recubrir metales. Se presentan sus argumentos y sus principales objeciones.
+
+5. La teoría médica
+   La posibilidad de utilizar pequeñas corrientes eléctricas con fines analgésicos. Una hipótesis mucho menos conocida.
+
+6. El tercer camino
+   La posibilidad de que el objeto tuviera una función ritual o completamente diferente y que su comportamiento eléctrico fuera accidental.
+
+7. El misterio arqueológico
+   Si realmente era una batería, ¿por qué no encontramos una tecnología eléctrica asociada?
+
+8. La pregunta final
+   La evidencia demuestra que el diseño puede producir electricidad.
+
+Lo que no demuestra es que sus creadores lo supieran.
+
+Y esa diferencia convierte a la Batería de Bagdad en uno de los enigmas tecnológicos más fascinantes de la arqueología.
+
+## IDEA DE TÍTULO
+
+La Batería de Bagdad: ¿Electricidad Hace 2.000 Años?
+
+## IDEA DE MINIATURA
+
+Un recipiente antiguo abierto, con el cilindro de cobre y la varilla de hierro visibles.
+
+Una pequeña chispa entre los metales.
+
+Texto corto:
+
+¿ELECTRICIDAD
+HACE 2.000 AÑOS?
+
+La clave visual debe ser el contraste entre un objeto aparentemente primitivo y una manifestación eléctrica moderna. La miniatura promete una anomalía, pero el documental debe ganarse la conspiración con evidencia, no inventándola.

@@ -27,67 +27,131 @@ Sin prólogo. Sin posdata.
 ## Respuesta
 ## RESUMEN
 
-La llamada "Batería de Bagdad" es un conjunto de vasijas cilíndricas descubiertas en las afueras de la capital iraquí en 1936, compuestas por un cilindro de cobre, una varilla de hierro y un tapón asfáltico. En 1938 el alemán Wilhelm König, conservador del Museo Nacional de Irak, publicó un artículo sugiriendo que el objeto funcionaba como una célula galvánica primitiva capaz de generar corriente continua, lo que reabriría un debate que hoy sigue vivo: si los partos conocían la electrólisis dos milenios antes de Volta o si se trata de un simple recipiente para guardar manuscritos.
+La llamada **Batería de Bagdad** es un conjunto de artefactos arqueológicos procedentes de Khujut Rabu, cerca de la antigua Ctesifonte, en el actual Irak. El ejemplar más famoso consiste en un recipiente cerámico, un cilindro de cobre y una varilla de hierro, unidos y aislados parcialmente mediante betún. Su función original no está demostrada. La interpretación que la convirtió en una supuesta batería antigua fue propuesta por Wilhelm König a finales de la década de 1930, quien planteó que podía tratarse de un elemento galvánico. ([Wikipedia][1])
 
-La pieza ha sido replicada en laboratorio y ha producido voltajes pequeños con electrólitos ácidos como el vinagre. Sin embargo, ningún texto antiguo describe su uso eléctrico y los análisis arqueológicos posteriores (Paul Keyser en 1964, St. John Simpson en 1996-2002) lo clasifican como contenedor de pergaminos o barras rituales. La controversia sigue abierta porque el yacimiento original nunca fue excavado en contexto y la cadena de custodia se interrumpió tras el saqueo de los años noventa.
-
-Para el canal interesa porque combina misterio verificable, fuentes académicas sólidas y un arco narrativo con giro: empezamos mostrando la "pila imposible" y cerramos con la hipótesis rival, dejando al espectador con la pregunta encendida. La pieza tiene fuerza visual (metal oxidado, ámbar asfáltico, arenas mesopotámicas) y un héroe de libro: Wilhelm König, cuya historia personal se cruza con el apogeo del Tercer Reich.
+La posibilidad resulta científicamente interesante porque una reconstrucción con dos metales diferentes y un electrolito ácido puede producir electricidad. Sin embargo, **demostrar que un objeto puede funcionar electroquímicamente no demuestra que sus fabricantes lo diseñaran para producir electricidad**. La principal hipótesis de König, el uso para galvanoplastia, ha sido cuestionada; otros investigadores han propuesto analgesia mediante estimulación eléctrica o un uso ritual/mágico relacionado con recipientes para textos. En 2026, un nuevo estudio experimental de Alexander Bazes volvió a defender con resultados superiores a 1,4 voltios la interpretación electroquímica, pero ese resultado sigue siendo evidencia experimental sobre una reconstrucción, no una prueba histórica de la intención original. ([RCNi Company Limited][2])
 
 ## HECHOS CONFIRMADOS
 
-- En 1936 un equipo del Iraq Museum Directorate excavó en la colina artificial de Khujut Rabu ("Khujut Rabu"), a unos 15 km al sudeste de Bagdad, un conjunto de vasijas de cobre datadas en el período parto (≈ 250 a.C. – 224 d.C.) (St. John Simpson, "Göttinger Miszellen" 150, 1996, pp. 91-97).
-- Las vasijas miden entre 5 y 13 cm de alto, con diámetro de 2,5 a 4 cm; contienen un cilindro de cobre con una varilla de hierro oxidada en su eje y un tapón superior de asfalto que sella la boca (Wilhelm König, "Ein galvanisches Element aus der Partherzeit?", publicado en la revista "Zeitschrift für Ägyptische und Orientalische Archäologie", vol. 4, 1938, pp. 116-118).
-- Wilhelm König (1889-1964), ingeniero eléctrico formado en la Technische Hochschule de Karlsruhe, dirigió entre 1935 y 1938 la sección técnica del Museo Nacional de Irak, donde examinó las piezas y publicó la hipótesis galvánica en 1938 (König, 1938; perfil biográfico en "The Baghdad Battery: Myth or Reality?", American University of Iraq, 2014).
-- Willard F. M. Gray, ingeniero de la General Electric, reprodujo réplicas en 1940 con electrólitos de sulfato de cobre y jugo de uva y registró voltajes entre 0,5 y 1,5 V durante días (Willard F. M. Gray, "An Oriental Mystery", GE Research Notes, 1940, archivado en Schenectady Engineering Society).
-- Paul Keyser publicó en 1964 un análisis iconográfico de sellos partos donde aparecen objetos idénticos usados como recipientes para guardar pequeñas barras rituales o fragmentos de pergamino (Paul Keyser, "The Baghdad Battery: A Case Study in Pseudoscience", Skeptical Inquirer, vol. 4 n.º 2, 1964).
-- El Museo Británico conserva cinco vasijas casi idénticas adquiridas en Mesopotamia entre 1900 y 1934, catalogadas como "rod holders" (soportes de varillas) para el almacenaje de rollos de papiro en su inventario del departamento de Oriente Medio (British Museum, registro ME 135950-135954, base de datos pública, consultada 2024).
-- Arran Frood, egiptólogo de la Universidad de Pensilvania, dirigió en 2017 una serie de réplicas funcionales que galvanizaron una fina capa de plata sobre cobre en menos de dos horas, simulando el posible uso para platear objetos rituales (Arran Frood, "Ancient Electrochemistry", Penn Museum Magazine, primavera 2018).
-- La datación por radiocarbono de fibras atrapadas en el asfalto de tres vasijas del lote original arrojó fechas comprendidas entre 200 a.C. y 220 d.C., coherentes con el período parto (British Museum Scientific Research Report 2002-04, ISBN 0-86159-150-7).
+* El artefacto asociado a la llamada Batería de Bagdad procede de **Khujut Rabu**, un yacimiento próximo a Bagdad y relacionado con el mundo parto. (Wilhelm König; síntesis histórica y arqueológica) ([Wikipedia][1])
+
+* El conjunto descrito por König incluía un **recipiente cerámico**, un cilindro de cobre y una varilla de hierro situada dentro del cilindro. (Paul T. Keyser, *Journal of Near Eastern Studies*, 1993) ([RCNi Company Limited][2])
+
+* El recipiente medía aproximadamente **14 cm de altura y 8 cm de diámetro**, mientras que el cilindro de cobre descrito por Keyser medía unos 9,8 cm de largo y 2,6 cm de diámetro. (Keyser, 1993) ([ResearchGate][3])
+
+* El conjunto utilizaba **betún/asfalto** para sellar y fijar sus componentes. El uso de este material forma parte de la descripción arqueológica del objeto, no de una reconstrucción moderna. (Keyser; registros históricos del artefacto) ([ResearchGate][3])
+
+* **Wilhelm König fue quien propuso la interpretación como elemento galvánico**, publicando la hipótesis de que el objeto podía ser una forma antigua de batería. (König; Keyser, 1993) ([Wikipedia][4])
+
+* La hipótesis original de König vinculaba el supuesto dispositivo con la **galvanoplastia**, es decir, la posibilidad de utilizar corriente eléctrica para depositar metales sobre otros objetos. (Keyser, 1993) ([RCNi Company Limited][2])
+
+* Las reconstrucciones modernas han demostrado que una configuración de **cobre + hierro + electrolito ácido** puede producir una diferencia de potencial eléctrico. Por tanto, la posibilidad física de obtener electricidad mediante una réplica no es ficticia. (Bazes, *Sino-Platonic Papers*, 2026) ([Sino-Platonic Papers][5])
+
+* Un estudio de Emmerich Pászthory concluyó que los objetos de este tipo no debían interpretarse como dispositivos de galvanoplastia y propuso, en cambio, un **contexto mágico/ritual**. El Smithsonian Museum Conservation Institute conserva la referencia bibliográfica y el resumen de este trabajo. ([Museo Comunitario de Insectos][6])
+
+* Paul T. Keyser publicó en 1993 un estudio específico sobre las llamadas células galvánicas partas y rechazó la explicación de la galvanoplastia, proponiendo como alternativa un posible **uso analgésico mediante electricidad** inspirado en el conocimiento antiguo de los peces eléctricos. ([RCNi Company Limited][2])
+
+* En enero de **2026**, Alexander Bazes publicó un estudio experimental en *Sino-Platonic Papers* que sostiene que una reconstrucción del dispositivo puede superar **1,4 voltios** y producir reacciones electroquímicas observables y potencialmente útiles. ([Sino-Platonic Papers][5])
+
+* El resultado de una réplica experimental demuestra que una configuración similar **puede funcionar como célula electroquímica**, pero por sí mismo no demuestra que el artefacto antiguo fuera construido con esa finalidad. Esta distinción es central en la controversia arqueológica. (Comparación de la evidencia experimental con Pászthory y Keyser) ([Museo Comunitario de Insectos][6])
 
 ## TEORÍAS Y VERSIONES
 
-- **Teoría de la pila galvánica (König, 1938):** Wilhelm König propuso que el conjunto cilindro-varilla-asfalto funcionaba como pila primaria al añadir un electrólito ácido. Argumentos a favor: las réplicas de Gray (1940) y Frood (2017) producen corriente útil. Argumentos en contra: ningún texto antiguo describe el dispositivo ni menciona galvanoplastia; el asfalto sería destruido por cualquier electrólito ácido en pocas horas (Keyser, 1964).
-- **Hipótesis del recipiente para pergaminos (Keyser, 1964; Simpson, 1996):** Paul Keyser y St. John Simpson argumentan que las vasijas servían para guardar pequeñas barras metálicas rituales o fragmentos enrollados de papiro sellados con asfalto para protegerlos de la humedad. Argumentos a favor: el Museo Británico conserva piezas idénticas catalogadas con ese uso; la corrosión interna es compatible con materiales orgánicos, no con electrólisis. Argumentos en contra: no explica por qué algunas vasijas contienen solo la varilla de hierro sin material orgánico visible (Frood, 2018).
-- **Hipótesis médico-terapéutica:** Algunos investigadores sugieren que el dispositivo, conectado a la piel, produciría suaves descargas eléctricas usadas como tratamiento contra la artritis o el dolor crónico, técnica que aparece en textos médicos griegos posteriores pero no partos. Argumentos a favor: textos médicos persas del siglo X mencionan descargas eléctricas leves con fines anestésicos. Argumentos en contra: la energía producida es demasiado débil para estimular nervios humanos, según cálculos de Gray (1940).
-- **Hipótesis del objeto ritual-religioso:** Otros investigadores, liderados por el asiriólogo alemán Eckhard Unger en 1936, propusieron que las vasijas eran instrumental ceremonial para invocar a deidades mediante "fuego líquido" generado por electrólisis. Argumentos a favor: textos cuneiformes mencionan "fuego líquido" en contextos rituales. Argumentos en contra: ningún paralelismo iconográfico en relieves partos conocidos (Unger, "Das klassische Altertum und die Anfänge der Chemie", 1936).
-- **Hipótesis del fraude historiográfico:** Autores como Peter James y Nick Thorpe sostienen que König publicó la teoría galvánica como propaganda nazi para vincular a la "ra aria" con la electricidad antes que Volta, aprovechando su cercanía al régimen. Argumentos a favor: el artículo de König se publicó en 1938 y nunca volvió a defenderlo con nuevos experimentos. Argumentos en contra: König era ingeniero eléctrico de carrera y mantuvo correspondencia privada donde describe mediciones reales (James & Thorpe, "Ancient Inventions", 1994, pp. 412-415).
-- **Hipótesis del electro-plateado ritual:** Arran Frood (2017) propuso que la pieza se usaba para depositar una capa de plata sobre cobre en objetos votivos de pequeño tamaño. Argumentos a favor: sus réplicas lo lograron en menos de dos horas con vinagre y sales de plata. Argumentos en contra: no se han encontrado objetos mesopotámicos con capas de plata de grosor anómalo que sugieran electrodeposición (Frood, 2018).
-- **Hipótesis del acumulador/clavo parlante:** Investigadores aficionados sugieren que las vasijas funcionarían como acumuladores recargables mediante frotamiento, no como pilas primarias. Argumentos a favor: algunos textos árabes medievales mencionan dispositivos de almacenamiento eléctrico. Argumentos en contra: ningún experimento moderno ha logrado recargar una réplica con técnicas antiguas plausibles (debunk en "Skeptical Inquirer" vol. 36 n.º 4, 2012).
-- **Hipótesis del contenedor para cosméticos perfumados:** Los arqueólogos del Iraq Museum propusieron inicialmente que las vasijas guardaban esencias aromáticas mezcladas con asfalto para fijar aromas. Argumentos a favor: la tradición mesopotámica de ungüentos rituales es muy rica. Argumentos en contra: la presencia sistemática de la varilla de hierro oxidada es difícil de explicar si solo se buscaba conservar líquidos (notas de campo de Louis Charles Watelin, 1934-1936, British School of Archaeology in Iraq archive).
+* **Batería o célula galvánica para galvanoplastia.**
+  **Quién la sostiene:** Wilhelm König y defensores posteriores de la interpretación eléctrica.
+  **A favor:** la disposición de dos metales diferentes separados por un recipiente aislante es compatible con una célula electroquímica; las réplicas producen electricidad.
+  **En contra:** no se ha establecido arqueológicamente que existiera un circuito, terminales, cables o un procedimiento de galvanoplastia asociado a estos recipientes. Keyser consideró específicamente que la galvanoplastia propuesta por König no era viable como explicación. ([RCNi Company Limited][2])
+
+* **Dispositivo eléctrico para analgesia.**
+  **Quién la sostiene:** Paul T. Keyser.
+  **A favor:** Keyser relacionó la posibilidad de generar corriente con el conocimiento antiguo de los peces eléctricos utilizados con fines terapéuticos y con la estimulación eléctrica moderna.
+  **En contra:** no existe evidencia directa que conecte estos recipientes con una práctica médica eléctrica. La hipótesis depende de una cadena de inferencias históricas y tecnológicas. ([RCNi Company Limited][2])
+
+* **Recipiente para textos, papiros o materiales rituales.**
+  **Quién la sostiene:** investigaciones arqueológicas alternativas como las asociadas a Pászthory.
+  **A favor:** existen recipientes comparables de Mesopotamia que contienen materiales orgánicos enrollados y componentes metálicos, lo que ofrece un contexto arqueológico menos extraordinario.
+  **En contra:** no explica de manera definitiva por qué determinados ejemplares presentan una configuración que puede comportarse como célula electroquímica. ([Museo Comunitario de Insectos][6])
+
+* **Objeto relacionado con magia o prácticas rituales.**
+  **Quién la sostiene:** Emmerich Pászthory y la interpretación arqueológica citada por el Smithsonian.
+  **A favor:** la combinación de recipientes sellados, metales y posibles materiales orgánicos encaja con determinados contextos de prácticas mágicas mesopotámicas.
+  **En contra:** la hipótesis no puede descartar absolutamente que alguno de estos objetos tuviera además una función electroquímica desconocida. ([Museo Comunitario de Insectos][6])
+
+* **Contenedor especializado cuyo funcionamiento eléctrico fue accidental.**
+  **Quién la sostiene:** es una interpretación derivada de las objeciones arqueológicas a la hipótesis de la batería.
+  **A favor:** que una configuración produzca electricidad no implica que esa fuera su función prevista; la arqueología conoce numerosos objetos cuyo comportamiento físico puede ser diferente de su finalidad cultural.
+  **En contra:** el ajuste geométrico de los componentes y el aislamiento mediante betún son utilizados por los defensores de la hipótesis eléctrica como indicios de diseño intencional. ([Sino-Platonic Papers][5])
+
+* **Tecnología electroquímica conocida deliberadamente por los antiguos.**
+  **Quién la sostiene:** defensores modernos de la interpretación experimental, incluido Alexander Bazes.
+  **A favor:** el estudio de 2026 afirma haber reproducido reacciones electroquímicas visibles y útiles con una reconstrucción que supera 1,4 V.
+  **En contra:** la evidencia experimental moderna no establece que los habitantes de Khujut Rabu conocieran el concepto de circuito eléctrico ni que utilizaran sistemáticamente el dispositivo. ([Sino-Platonic Papers][5])
+
+* **Precursor tecnológico aislado, sin una tradición eléctrica conocida.**
+  **Quién la sostiene:** es una posibilidad implícita en algunas interpretaciones favorables a la batería.
+  **A favor:** la historia tecnológica contiene descubrimientos que aparecen antes de que exista una teoría científica completa que los explique.
+  **En contra:** hasta ahora no existe una cadena arqueológica clara de herramientas, instalaciones o textos que muestre una tecnología eléctrica mesopotámica desarrollada. ([RCNi Company Limited][2])
+
+* **“La primera batería del mundo”.**
+  **Quién la sostiene:** divulgación popular, algunos medios y fuentes que presentan el objeto como una batería antigua. Guinness World Records incluso registra las llamadas “Parthian Batteries” como una forma de “first battery”.
+  **A favor:** las réplicas pueden producir voltaje y la configuración es compatible con una célula galvánica.
+  **En contra:** “puede producir electricidad” y “fue una batería diseñada y utilizada por sus fabricantes” son afirmaciones diferentes. La segunda carece de demostración arqueológica concluyente. ([Guinness World Records][7])
 
 ## CONTROVERSIAS
 
-- Punto 1: La cadena de custodia se rompió tras la Guerra del Golfo (1991) y la invasión de 2003; parte de las piezas originales desaparecieron o fueron reinsertadas en el mercado de antigüedades sin contexto arqueológico verificable.
-- Punto 2: Ningún texto cuneiforme, ni en acadio ni en arameo parto, describe el uso eléctrico de un dispositivo de cobre y hierro. La ausencia documental es el principal argumento de los escépticos.
-- Punto 3: El asfalto del tapón es soluble en muchos electrólitos propuestos (vinagre, ácido cítrico), lo que limitaría la vida útil de una "pila" a horas, no a años. Keyser (1964) lo consideró una prueba de que no se buscaba generar corriente.
-- Punto 4: La datación radiocarbónica de 2002 se realizó sobre tres vasijas del lote del Museo Británico, no sobre las piezas originales de Khujut Rabu. Algunos autores cuestionan que sean estrictamente contemporáneas.
+* **La función original continúa sin demostrarse.** La discusión no gira principalmente sobre si una réplica puede producir electricidad, sino sobre si esa capacidad explica realmente la finalidad del objeto antiguo.
+
+* **La interpretación de König ha tenido una enorme influencia**, pero las publicaciones posteriores han cuestionado especialmente la idea de que se utilizara para galvanoplastia. Keyser rechazó esa finalidad y Pászthory propuso una explicación ritual. ([RCNi Company Limited][2])
+
+* **La evidencia arqueológica contextual es insuficiente para cerrar el caso.** Las descripciones modernas dependen en gran medida de los registros y publicaciones derivados del trabajo de König, lo que limita la posibilidad de reconstruir con absoluta seguridad el contexto original del hallazgo. ([ResearchGate][3])
+
+* **Los experimentos modernos pueden demostrar posibilidad, pero no intención histórica.** El estudio de Bazes de 2026 fortalece considerablemente el argumento de que el diseño puede funcionar electroquímicamente, pero no demuestra por sí solo que esa fuera su función original. ([Sino-Platonic Papers][5])
+
+* **La desaparición de los ejemplares originales dificulta nuevas pruebas.** Las afirmaciones sobre su pérdida durante el saqueo del Museo Nacional de Irak en 2003 aparecen en fuentes secundarias y deben distinguirse de la evidencia directamente publicada sobre el estado actual de cada pieza. Por ello, la situación exacta de los ejemplares originales requiere una fuente museística primaria adicional antes de presentarla como absolutamente establecida.
 
 ## DATOS CLAVE
 
-- Materiales: cobre (>95 %), hierro forjado, asfalto bituminoso.
-- Dimensiones típicas: 5-13 cm de alto, 2,5-4 cm de diámetro.
-- Voltaje medido en réplicas: 0,5-1,5 V (Gray 1940, Frood 2017).
-- Período datado: 200 a.C. – 220 d.C. (Partia sasánida temprana).
-- Localización original: Khujut Rabu, gobernación de Bagdad, Irak.
-- Investigador clave: Wilhelm König (1889-1964), ingeniero y conservador del Iraq Museum.
-- Publicación seminal: König, 1938.
-- Réplicas modernas verificadas: Gray 1940, Frood 2017.
-- Piezas en colecciones públicas: Iraq Museum (Bagdad), British Museum (Londres), University of Pennsylvania Museum (Filadelfia).
+* **Nombre popular:** Batería de Bagdad / Batería Parta.
+* **Lugar:** Khujut Rabu, cerca de Bagdad y de la antigua Ctesifonte, Irak. ([Wikipedia][1])
+* **Hallazgo:** década de 1930; las fuentes consultadas sitúan el descubrimiento principal en **1936**, aunque algunas divulgaciones posteriores utilizan 1938 al referirse a la publicación o investigación de König. ([Wikipedia][1])
+* **Investigador asociado al hallazgo y primera interpretación eléctrica:** **Wilhelm König**. ([Wikipedia][4])
+* **Material principal:** cerámica, cobre, hierro y betún/asfalto. ([ResearchGate][3])
+* **Altura aproximada del recipiente:** **14 cm**. ([ResearchGate][3])
+* **Diámetro aproximado:** **8 cm**. ([ResearchGate][3])
+* **Longitud aproximada del cilindro de cobre:** **9,8 cm**. ([ResearchGate][3])
+* **Diámetro aproximado del cilindro:** **2,6 cm**. ([ResearchGate][3])
+* **Periodo propuesto:** principalmente **periodo parto**, aunque la atribución cronológica de objetos comparables puede abarcar periodos posteriores. ([Wikipedia][1])
+* **Publicación de Keyser:** 1993, *Journal of Near Eastern Studies*, volumen 52, número 2, pp. 81–98. ([RCNi Company Limited][2])
+* **Estudio experimental reciente:** Alexander Bazes, *Sino-Platonic Papers*, n.º 377, enero de 2026. ([Sino-Platonic Papers][5])
+* **Voltaje reportado por el estudio de Bazes:** más de **1,4 V** en su reconstrucción experimental. ([Sino-Platonic Papers][5])
+* **Dato crucial:** ninguna de estas cifras demuestra por sí sola que el objeto antiguo fuera utilizado como batería.
 
 ## FUENTES
 
-- Wilhelm König, "Ein galvanisches Element aus der Partherzeit?", "Zeitschrift für Ägyptische und Orientalische Archäologie", vol. 4, 1938, pp. 116-118.
-- Willard F. M. Gray, "An Oriental Mystery", General Electric Engineering Notes, archivo Schenectady Engineering Society, 1940.
-- Paul Keyser, "A Case Study in Pseudoscience", "The Skeptical Inquirer", vol. 4, núm. 2, 1964, pp. 18-23.
-- St. John Simpson, "A Note on the Khujut Rabu 'Batteries'", "Göttinger Miszellen", vol. 150, 1996, pp. 91-97.
-- British Museum Scientific Research Report 2002-04, "Scientific Examination of the 'Baghdad Battery' Vessels", ISBN 0-86159-150-7.
-- Peter James & Nick Thorpe, "Ancient Inventions", Ballantine Books, 1994, capítulo 12.
-- Arran Frood, "Ancient Electrochemistry: Replicating the Khujut Rabu Cells", "Penn Museum Magazine", primavera 2018, pp. 22-29.
-- British Museum Collection Online, registros ME 135950-135954 (rod holders, Mesopotamia, 200 a.C.-200 d.C.), consultado en línea 2024: https://www.britishmuseum.org/collection.
+* Wilhelm König, *Ein galvanisches Element aus der Partherzeit?*, publicación inicial de la interpretación como elemento galvánico, 1930s. Referenciada en la bibliografía histórica del caso. ([Wikipedia][4])
+* Paul T. Keyser, **“The Purpose of the Parthian Galvanic Cells: A First-Century A.D. Electric Battery Used for Analgesia”**, *Journal of Near Eastern Studies*, vol. 52, n.º 2, 1993, pp. 81–98. DOI 10.1086/373610. ([RCNi Company Limited][2])
+* Emmerich Pászthory, **“Electricity generation or magic? The analysis of an unusual group of finds from Mesopotamia”**, MASCA Research Papers in Science and Archaeology, vol. 6, pp. 31–38. Registro del Smithsonian Museum Conservation Institute. ([Museo Comunitario de Insectos][6])
+* Alexander Bazes, **“The Baghdad Battery: Experimental Verification of a 2,000-Year-Old Device Capable of Driving Visible and Useful Electrochemical Reactions at over 1.4 Volts”**, *Sino-Platonic Papers*, n.º 377, enero de 2026. [PDF del estudio de Sino-Platonic Papers](https://sino-platonic.org/complete/spp377_baghdad_battery.pdf?utm_source=chatgpt.com) ([Sino-Platonic Papers][5])
+* [Journal of Near Eastern Studies / University of Chicago Press](https://www.journals.uchicago.edu/doi/10.1086/373610?utm_source=chatgpt.com), registro editorial del estudio de Keyser. ([RCNi Company Limited][2])
+* [PubMed, registro bibliográfico de Keyser](https://pubmed.ncbi.nlm.nih.gov/16468202/?utm_source=chatgpt.com), PMID 16468202. ([PubMed][8])
+* [Smithsonian Museum Conservation Institute, registro de Pászthory](https://mci.si.edu/node/1230025?utm_source=chatgpt.com). ([Museo Comunitario de Insectos][6])
+* Manual de estrategia narrativa proporcionado para **Todo Sobre Todo**, utilizado como referencia metodológica para el tratamiento documental y separación entre evidencia y afirmaciones. 
 
 ## AFIRMACIONES QUE REQUIEREN VERIFICACIÓN
 
-- "El artículo original de König apareció en 'Revue de l'Institut français d'archéologie orientale' y luego fue suprimido por orden nazi." Esta versión circula en sitios divulgativos pero no aparece documentada en archivos académicos verificables; hay que contrastarla con los catálogos de la BNF y del IFAO.
-- "Existen textos cuneiformes que mencionan 'fuego líquido' obtenido electrónicamente." La expresión aparece en himnos sumerios a Marduk pero no está demostrada su relación con dispositivos técnicos concretos.
-- "Las piezas originales se perdieron durante el saqueo del Iraq Museum en 2003." El museo confirma robos parciales, pero el inventario preciso de las vasijas de Khujut Rabu no se ha hecho público, así que no se puede afirmar categóricamente que las piezas eléctricas originales desaparecieron.
-- "Wilhelm König falsificó mediciones para encajar con la propaganda aria." Las cartas privadas de König conservadas en el Deutsches Museum de Múnich sugieren lo contrario, pero el archivo no se ha publicado íntegro.
+* **“La Batería de Bagdad fue utilizada para galvanizar oro sobre plata.”** Es una hipótesis de König, no un hecho demostrado. Keyser la rechazó expresamente y el estudio de Pászthory llegó a una interpretación diferente. ([RCNi Company Limited][2])
+
+* **“Los habitantes de Mesopotamia descubrieron la electricidad hace unos 2.000 años.”** La evidencia experimental moderna demuestra que una reconstrucción puede producir electricidad, pero no demuestra que los antiguos comprendieran el fenómeno ni que lo utilizaran deliberadamente. ([Sino-Platonic Papers][5])
+
+* **“La Batería de Bagdad producía 1,4 V.”** Esta cifra procede de un experimento moderno de Alexander Bazes, no de una medición realizada sobre el artefacto arqueológico original. Presentarla como el voltaje histórico del objeto sería incorrecto. ([Sino-Platonic Papers][5])
+
+* **“El objeto era una batería y no podía tener otra función.”** La evidencia disponible no permite afirmarlo. Existen interpretaciones alternativas publicadas, entre ellas el uso ritual/mágico y el posible uso analgésico, mientras que la finalidad original sigue sin estar establecida de manera concluyente. ([RCNi Company Limited][2])
+
+[1]: https://en.wikipedia.org/wiki/Baghdad_Battery?utm_source=chatgpt.com "Baghdad Battery"
+[2]: https://www.journals.uchicago.edu/doi/10.1086/373610?utm_source=chatgpt.com "The Purpose of the Parthian Galvanic Cells: A First-Century A. D. Electric Battery Used for Analgesia | Journal of Near Eastern Studies: Vol 52, No 2"
+[3]: https://www.researchgate.net/publication/7306633_The_Purpose_of_the_Parthian_Galvanic_Cells_A_First-Century_A_D_Electric_Battery_Used_for_Analgesia?utm_source=chatgpt.com "(PDF) The Purpose of the Parthian Galvanic Cells: A First-Century A. D. Electric Battery Used for Analgesia"
+[4]: https://en.wikipedia.org/wiki/Wilhelm_K%C3%B6nig?utm_source=chatgpt.com "Wilhelm König"
+[5]: https://sino-platonic.org/complete/spp377_baghdad_battery.pdf?utm_source=chatgpt.com "The Baghdad Battery: Experimental Verification of a 2,000-Year-Old Device Capable of Driving Visible and Useful Electrochemical Reactions at over 1.4 Volts"
+[6]: https://mci.si.edu/node/1230025?utm_source=chatgpt.com "20805 | Museum Conservation Institute"
+[7]: https://www.guinnessworldrecords.com/world-records/106610-first-battery?utm_source=chatgpt.com "First battery | Guinness World Records"
+[8]: https://pubmed.ncbi.nlm.nih.gov/16468202/?utm_source=chatgpt.com "The purpose of the Parthian Galvanic cells: a first-century A.D. electric battery used for analgesia."

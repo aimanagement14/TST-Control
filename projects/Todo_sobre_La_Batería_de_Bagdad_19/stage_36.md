@@ -3,44 +3,133 @@ Etapa: scripts
 ## Instrucción
 Eres guionista de documentales cinematográficos de 5 minutos para el canal 'Todo Sobre Todo'. Escribes para ser narrado en voz en off, con pausas marcadas, ritmo y tensión creciente. No usas lenguaje técnico innecesario. Combinas datos con atmósfera.
 ## Respuesta
-# Guiones
-
-## Video 5 min
-
-En las afueras de Bagdad duerme un cilindro de cobre que, según algunos, encendió la electricidad dos mil años antes de Volta. Lo desenterraron en 1936. Y todo cambió.
-
-En 1936, un equipo del Iraq Museum excavó en la colina artificial de Khujut Rabu, a unos quince kilómetros al sudeste de Bagdad. Bajo capas de sedimento aparecieron vasijas de cobre pulido, con varilla de hierro oxidada y tapón asfáltico. Eran objetos rituales partos, datados entre doscientos a.C. y doscientos d.C. Nadie les prestó atención hasta que, dos años después, el conservador del museo, el ingeniero eléctrico alemán Wilhelm König, publicó un artículo proponiendo que aquellas vasijas funcionaban como células galvánicas primitivas. La pregunta explotó: si tenía razón, los partos habían descubierto la electrólisis mucho antes que Volta.
-
-### BLOQUE 1: El artículo que lo cambió todo
-
-König no era un charlatán. Era un ingeniero eléctrico formado en la Technische Hochschule de Karlsruhe, conservador del Iraq Museum entre 1935 y 1938. En su artículo de 1938 describía las vasijas con precisión técnica: cilindro de cobre de cinco a trece centímetros, varilla de hierro forjado en el eje, tapón asfáltico aislante. Argumentaba que, al añadir un electrólito ácido —vinagre, jugo de uva, ácidos orgánicos disponibles en Mesopotamia— el conjunto podía generar corriente continua capaz de depositar capas de plata sobre cobre. Era, sobre el papel, una pila voltaica perfecta. La afirmación llegó al público en plena eclosión de la electrotecnia europea.
-
-### BLOQUE 2: Las réplicas que sí funcionaron
-
-En 1940, Willard Gray, ingeniero de la General Electric, construyó réplicas exactas de las vasijas de Bagdad. Llenó el cilindro con sulfato de cobre, introdujo la varilla de hierro y registró un voltaje estable de entre cero coma cinco y uno coma cinco voltios durante varios días. Casi ochenta años después, en 2017, el egiptólogo Arran Frood repitió el experimento en la Universidad de Pensilvania y logró platear una fina capa de plata sobre cobre en menos de dos horas. Técnicamente, la pila funcionaba. La pregunta es si alguien en Mesopotamia la usó así.
-
-### BLOQUE 3: La grieta del asfalto y los textos ausentes
-
-Pero hay un problema. El asfalto del tapón —el aislante que König consideró clave— se disuelve en contacto con cualquier electrólito ácido útil. En horas, no en años. Si la vasija se hubiera usado como pila, el sellado habría fallado al primer uso. Y hay otro silencio más incómodo: en más de dos mil años de textos cuneiformes, ni un solo acadio, ni un solo arameo parto, describe un dispositivo eléctrico. No hay taller de galvanoplastia, ni ritual documentado con fuego líquido aplicado a metales. La ausencia pesa tanto como cualquier réplica de laboratorio.
-
-### BLOQUE 4: Lo que el Museo Británico tenía guardado
-
-En los archivos del Museo Británico aparecen cinco vasijas casi idénticas, compradas a principios del siglo XX, catalogadas con un nombre muy prosaico: rod holders, soportes de varillas. Se usaban, según la ficha, para guardar pequeñas barras rituales o fragmentos enrollados de papiro protegidos por asfalto. El arqueólogo Paul Keyser, en 1964, comparó las vasijas británicas con los sellos partos y concluyó que la hipótesis del contenedor explicaba mejor la corrosión interna que la electrólisis. St. John Simpson retomó la idea en 1996 y la consolidó.
-
-En 2002, el British Museum publicó un informe científico. Radiocarbono de fibras atrapadas en el asfalto de tres vasijas: entre el año doscientos antes de Cristo y el doscientos veinte después de Cristo. Coherente con el período parto. Pero las piezas datadas no eran las de Khujut Rabu. Eran las británicas, de procedencia comercial. Y aquí aparece la grieta final: el yacimiento original nunca se excavó en contexto, las piezas se perdieron tras la Guerra del Golfo y la invasión de dos mil tres, y la cadena de custodia se rompió. La pregunta, entonces, no es solo si los partos conocían la electricidad. Es si todavía podemos saberlo. Las réplicas de Gray y Frood producen voltaje: eso es un hecho. Pero producir voltaje en un laboratorio moderno con materiales actuales no demuestra que se produjera en un taller parto hace dos mil años. La carga de la prueba sigue recayendo sobre quien afirma.
-
-Tal vez no era una pila. Tal vez era un contenedor de pergaminos, una vasija ritual, un objeto que cumplió funciones que hoy no alcanzamos a leer. Pero sigue siendo un cilindro de cobre y hierro con tapón asfáltico, fabricado con una precisión que ningún uso casual explica del todo. Esa ambigüedad es lo que hace que dos mil años despuéssigamos hablando de ella.
-
-Si quieres que sigamos investigando misterios como este, suscríbete al canal y activa la campana. El siguiente vídeo empieza justo donde este se apaga.
-
-## Video 1 min
-
-Una batería. Dos mil años antes de Volta. Enterrada en Bagdad.
-
-En 1936, en Khujut Rabu, el Iraq Museum desenterró vasijas de cobre con varilla de hierro y tapón asfáltico. Dos años después, Wilhelm König, ingeniero eléctrico, propuso que aquel cilindro era una célula galvánica. Willard Gray registró entre cero coma cinco y uno coma cinco voltios con réplicas.
-
-Pero el asfalto se disuelve en cualquier electrólito útil en horas. Y ningún texto cuneiforme describe un dispositivo eléctrico. Las vasijas idénticas del Museo Británico están catalogadas como soportes de pergaminos, no como pilas. La pieza no prueba ni descarta nada: demuestra que seguimos sin saber qué uso tenía.
-
-Un cilindro diminuto. Dos mil años. Y una pregunta que ningún laboratorio ha cerrado.
-
-Suscríbete y dale a la campana. El próximo misterio empieza donde este se apaga.
+Hace casi 2.000 años, alguien construyó un objeto que, bajo determinadas condiciones, puede producir electricidad.
+No parece una máquina.
+No tiene cables.
+No tiene interruptores.
+Es apenas un recipiente de cerámica, un cilindro de cobre y una pequeña varilla de hierro.
+Y, sin embargo, cuando los investigadores modernos reconstruyen su diseño y añaden un líquido adecuado...
+algo sucede.
+Se genera electricidad.
+El objeto es conocido como la Batería de Bagdad.
+Y aquí comienza el verdadero misterio.
+Porque demostrar que puede producir electricidad es relativamente sencillo.
+Lo difícil es demostrar que alguien, hace casi dos milenios, sabía que podía hacerlo.
+El objeto fue encontrado en Khujut Rabu, cerca de Bagdad, en lo que hoy es Irak.
+Su estructura parece extrañamente deliberada.
+Un recipiente de cerámica.
+Dentro, un cilindro de cobre.
+Y en el centro, una varilla de hierro.
+Todo parcialmente sellado con betún.
+Una combinación que, vista con ojos modernos, recuerda inmediatamente a una batería.
+Pero hay un problema.
+No sabemos con certeza para qué fue fabricada.
+Y esa pequeña duda cambia completamente la historia.
+Porque durante décadas, una de las teorías más famosas sostuvo que aquel extraño recipiente podía haber sido una especie de batería antigua.
+Wilhelm König fue quien propuso esta interpretación en la década de 1930.
+La idea era extraordinaria.
+Los antiguos podrían haber descubierto una forma rudimentaria de electricidad mucho antes de que la ciencia moderna comprendiera el fenómeno.
+Pero todavía faltaba una cosa.
+Había que demostrar que el objeto podía funcionar.
+Y entonces llegaron las reconstrucciones.
+Cuando se coloca un electrolito adecuado dentro de una réplica, el hierro y el cobre pueden generar una diferencia de potencial.
+En otras palabras...
+electricidad.
+Un estudio experimental publicado en 2026 llevó esta idea todavía más lejos.
+Alexander Bazes informó que una reconstrucción podía superar los 1,4 voltios y producir reacciones electroquímicas observables.
+La imagen resulta fascinante.
+Un objeto antiguo.
+Dos metales.
+Un líquido.
+Y electricidad.
+Pero aquí es donde debemos detenernos.
+Porque existe una diferencia enorme entre decir:
+“Este objeto puede producir electricidad”.
+Y decir:
+“Sus constructores lo fabricaron para producir electricidad”.
+La primera afirmación puede probarse experimentalmente.
+La segunda necesita evidencia histórica.
+Y esa evidencia...
+no está.
+La teoría original de König tenía una propuesta todavía más ambiciosa.
+La galvanoplastia.
+Es decir, utilizar electricidad para depositar una capa de metal sobre otro objeto.
+La idea parecía explicar por qué alguien necesitaría una fuente eléctrica tan pequeña.
+Pero otros investigadores comenzaron a cuestionarla.
+Paul T. Keyser, por ejemplo, rechazó la idea de que el dispositivo hubiera sido utilizado para galvanoplastia.
+En su lugar propuso algo todavía más extraño.
+Analgesia.
+Una pequeña corriente eléctrica utilizada con fines terapéuticos.
+Keyser relacionó esta posibilidad con el conocimiento antiguo de los peces eléctricos, conocidos por producir descargas capaces de afectar al cuerpo humano.
+La idea resulta intrigante.
+Pero nuevamente aparece el mismo problema.
+No existe evidencia directa que demuestre que estos recipientes fueran utilizados como instrumentos médicos eléctricos.
+Y entonces aparece una tercera posibilidad.
+Quizá nunca fueron baterías.
+Emmerich Pászthory analizó objetos de este tipo y llegó a una interpretación diferente.
+En lugar de dispositivos eléctricos, propuso relacionarlos con prácticas mágicas o rituales.
+Y aquí el misterio se vuelve mucho más interesante.
+Porque un objeto puede comportarse como una batería...
+sin haber sido construido como una batería.
+Es perfectamente posible que los componentes produzcan una reacción eléctrica sin que sus fabricantes comprendieran el fenómeno de la misma manera que nosotros.
+Pero también existe la posibilidad contraria.
+Que alguien hubiera descubierto accidentalmente una forma de generar electricidad...
+y que ese conocimiento se hubiera utilizado para un propósito que todavía no comprendemos.
+La pregunta entonces ya no es solamente:
+“¿Podían producir electricidad?”
+La pregunta es:
+“¿Sabían que podían hacerlo?”
+Y esa diferencia separa la arqueología de la especulación.
+Porque si realmente existió una tecnología eléctrica en la antigua Mesopotamia, debería existir algún rastro.
+Herramientas.
+Procedimientos.
+Textos.
+Objetos relacionados.
+Una tradición tecnológica.
+Algo.
+Pero hasta ahora no tenemos una cadena de evidencias que permita demostrar la existencia de una tecnología eléctrica mesopotámica desarrollada.
+Y aquí aparece una de las partes más incómodas de esta historia.
+La Batería de Bagdad podría ser exactamente lo que parece...
+un dispositivo electroquímico antiguo.
+Pero también podría ser un objeto con otra función cuyo diseño produce electricidad como consecuencia.
+El experimento moderno demuestra una posibilidad física.
+No demuestra una intención antigua.
+Y, aun así...
+hay algo que resulta difícil ignorar.
+El diseño reúne precisamente varios elementos necesarios para crear una célula electroquímica.
+Cerámica para contener.
+Cobre.
+Hierro.
+Y un material que puede sellar el conjunto.
+¿Simple coincidencia?
+¿Ingenio práctico?
+¿O una tecnología cuyo propósito se perdió?
+No tenemos la respuesta.
+Y quizá por eso la Batería de Bagdad ha sobrevivido durante décadas como uno de los grandes enigmas tecnológicos de la arqueología.
+No porque haya demostrado que los antiguos tenían una tecnología secreta.
+Sino porque todavía no sabemos exactamente qué estaban intentando hacer.
+La historia popular quiere una respuesta espectacular.
+Una civilización perdida.
+Un conocimiento prohibido.
+Una tecnología adelantada miles de años.
+Pero la evidencia disponible es mucho más inquietante.
+Porque no necesitamos inventar una conspiración.
+Tenemos algo real.
+Un objeto antiguo.
+Una configuración capaz de producir electricidad.
+Experimentos modernos que confirman esa posibilidad.
+Y una pregunta histórica que continúa abierta.
+Si aquella corriente eléctrica fue intencional...
+¿para qué la utilizaban?
+Y si no lo fue...
+¿por qué el objeto tiene precisamente esta configuración?
+Tal vez la Batería de Bagdad no sea la primera batería de la historia.
+Tal vez sea algo mucho más difícil de explicar.
+La prueba de que una tecnología puede desaparecer...
+sin dejar una explicación clara de por qué existió.
+Y mientras no aparezca esa evidencia...
+la pequeña vasija de cerámica seguirá guardando su secreto.
+No sabemos si contenía electricidad.
+Pero sí sabemos que todavía contiene una pregunta.
+Y esa pregunta...
+lleva casi 2.000 años esperando una respuesta.
