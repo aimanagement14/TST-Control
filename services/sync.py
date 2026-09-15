@@ -61,7 +61,6 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
     """
     # Import local para evitar ciclo: app.py -> services.sync -> app.
     from app import (
-        PROJECTS_DIR,
         get_db,
         get_profile,
         list_profile_prompts,
@@ -70,7 +69,7 @@ def sync_project_folder(project_id: int) -> tuple[Path, list[str]]:
     with get_db() as conn:
         project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
         if not project:
-            return PROJECTS_DIR / "_missing", []
+            raise LookupError(f"project {project_id} not found")
         project = dict(project)
         profile = get_profile(project["profile_id"])
 
@@ -452,8 +451,6 @@ def _write_legacy_model(
             "script_long": "Guion 5 min",
             "script_short": "Guion 1 min",
             "scenes": "Escenas",
-            "metadata_youtube": "Metadata YouTube",
-            "metadata_shorts": "Metadata Shorts",
             "metadata_youtube_long": "Metadata YouTube 5 min",
             "metadata_youtube_short": "Metadata YouTube 1 min",
             "metadata_facebook_long": "Metadata Facebook 5 min",

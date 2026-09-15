@@ -13,6 +13,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.atl/
 .coverage
 htmlcov/
 
@@ -49,7 +50,9 @@ static/uploads/
 # Salida runtime de verify_project.py (proyecto sintetico con PROJECT_ID=2).
 # `projects/` SÍ se versiona con proyectos reales del usuario (Fosiles,
 # Arboles, etc.), pero la regeneracion automatica de la verificacion no
-# debe contaminar `git status`.
+# debe contaminar `git status`. verify_project.py crea dos artefactos:
+#   - Verificacion_pipeline_2 (smoke test principal, secciones 1-7)
+#   - Otro_Nombre_Con_Acentos_2 (sección 5: prueba el renombrado)
 projects/Verificacion_pipeline_*/
 projects/Verificacion_pipeline_*.zip
 projects/Otro_Nombre_Con_Acentos_*/

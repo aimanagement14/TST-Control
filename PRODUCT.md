@@ -18,15 +18,14 @@ Centro de control de preproducción para el canal de documentales de misterio / 
 
 ## Positioning
 
-Lo que un vecino no podría copiar honestamente: **un pipeline completo de preproducción que corre entero en local, en un único proceso Python, sin nube, sin cuentas y sin costes por uso** — desde el tema hasta el ZIP entregable al pipeline de producción. Los prompts SYS por etapa, calibrados para el nicho misterio / alternativo, son el activo editorial; el grafo n8n-style por perfil permite encadenar prompts custom sobre ellos.
+Lo que un vecino no podría copiar honestamente: **un pipeline completo de preproducción que corre entero en local, en un único proceso Python, sin nube, sin cuentas y sin costes por uso** — desde el tema hasta el ZIP entregable al pipeline de producción. Los prompts SYS por etapa, calibrados para el nicho misterio / alternativo, son el activo editorial.
 
 ## Operating Context
 
 - Flujo de un solo autor en Windows: una persona, una máquina, un proceso Flask local (`http://localhost:5000`).
 - Modo LLM manual por defecto: la herramienta genera los prompts SYS + USER estructurados; el usuario los pega en ChatGPT / Claude / Gemini y devuelve la respuesta, que se parsea automáticamente. Sin clave de API, sin coste, sin telemetría.
 - Modo LLM API opcional: cualquier endpoint OpenAI-compatible (MiniMax text API, Azure OpenAI, Ollama local, LM Studio, servidor custom) configurable por presets.
-- Cada proyecto recorre las 8 etapas del pipeline; los prompts viven a nivel de **perfil**, no de proyecto, y se editan en un editor visual de grafo (React Flow v12 vía importmap, sin build step).
-- Runner por proyecto: ejecución nodo a nodo sobre el mismo grafo del perfil, con estados `idle / running / ok / error`.
+- Cada proyecto recorre las 8 etapas del pipeline; los prompts viven a nivel de **perfil**, no de proyecto, y se editan vía el blueprint `/profiles` (sin build step).
 - Cada tema produce **dos formatos de vídeo**: documental 5 min (YouTube) + corto 1 min (Shorts / Reels / TikTok), cada uno con su guion, metadata y miniatura.
 - La unidad de entrega al pipeline aguas abajo es el **ZIP exportado** (`projects/<nombre>.zip`), con un Markdown por sección + `paquete_completo.json`.
 
@@ -34,11 +33,9 @@ Lo que un vecino no podría copiar honestamente: **un pipeline completo de prepr
 
 - Pipeline de 8 etapas: investigación → concepto → guiones (5 min + 1 min) → escenas → metadata → miniaturas → control de calidad → exportar.
 - Prompts SYS + USER persistidos por perfil (`profile_prompts`), leídos vía `resolve_stage_prompt()` con fallback a `config.json`.
-- Editor visual de grafo por perfil: 9 nodos fijos pre-creados (uno por etapa del pipeline) + nodos custom con `{{ inputs.<key> }}` para encadenar outputs previos.
-- Runner por proyecto con persistencia de cada ejecución en `node_executions` (output + estado + duración).
 - Perfiles configurables: `content_type`, `audience`, `tone`, `style`, `mystery_level`, `drama_level`, `narration_speed`, `platforms`.
 - QC engine: bloquea solo por errores; warnings e infos no impiden la exportación. Cubre conteo de palabras, duraciones objetivo, hook / CTA / estructura, repeticiones, mínimo de escenas, mínimo de fuentes, afirmaciones sin verificar.
-- Stack deliberadamente simple: un solo `app.py`, SQLite vía `sqlite3` (sin ORM), Jinja2, sin bundler JS salvo el módulo ESM del editor de grafo.
+- Stack deliberadamente simple: un solo `app.py`, SQLite vía `sqlite3` (sin ORM), Jinja2, sin bundler JS.
 - Migraciones de esquema controladas por `_schema_migrations` (idempotentes).
 - Sin nube, sin cuentas, sin telemetría; el único outbound runtime es la llamada al LLM cuando el modo API está activo.
 - Decisión pendiente: si el próximo trabajo visual es **refinamiento** del tema oscuro cinematográfico actual o un **mundo nuevo** que lo reemplace. PRODUCT.md solo registra verdad de producto, no decide eso.

@@ -5,14 +5,12 @@ Investigar y Concepto son etapas de proyecto: viven una sola vez en
 etapas por video: cada rama de ``videos`` aporta su propio guion,
 escenas, metadata, miniatura y resultado de QC.
 
-Esta capa resuelve los dos extremos:
+Contrato de pureza:
 
-- ``project_stage_status(project)`` agrega por etapa. Para etapas
-  por-video devuelve ``True`` sólo cuando **todos** los videos
-  tienen esa etapa completa.
-- ``pipeline_view(project)`` adjunta ``cell.videos`` con el detalle
-  por video en cada etapa per-video, para alimentar el stepper y la
-  Hoja de ruta.
+- PURAS (no necesitan Flask): ``video_stage_status``, ``stage_breakdown_for``.
+- REQUIEREN contexto Flask: ``_stage_url`` (``url_for``),
+  ``build_video_urls`` y ``attach_breakdown_urls`` (``has_app_context``
+  la convierte en no-op fuera de una app).
 """
 
 from __future__ import annotations

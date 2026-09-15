@@ -31,6 +31,12 @@ Guía para agentes de IA que trabajan en este proyecto.
     los prompts SYS/USER.
   - `qc.py` — reglas QC; `error` bloquea la transición a `ready`,
     `warning`/`info` no.
+  - `sync.py` — sincronización de la carpeta del proyecto con la BD
+    (`sync_project_folder`, `safe_project_dir`, `delete_project_folder`).
+  - `stages.py` — estado per-video de cada etapa del pipeline
+    (`video_stage_status`, `pipeline_view`, `build_video_urls`).
+  - `manual.py` — modo manual exclusivo v2.0 (`call_llm` que devuelve el
+    bloque `## [MODO MANUAL]`).
 - `blueprints/` — `profiles_bp` con las rutas `/profiles` extraído del
   monolito. Cada blueprint declara su `url_prefix` y usa local imports para
   evitar ciclos con `app`.

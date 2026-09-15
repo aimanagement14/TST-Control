@@ -2251,11 +2251,11 @@ def test_new_project_export_bundle_includes_legacy_data(tmp_path):
                 "updated_at, video_id) VALUES (1, 'long', 'Guion long', 'texto long', "
                 "10, '2025-01-01', 1)"
             ).lastrowid
-            sid_short = conn.execute(
+            conn.execute(
                 "INSERT INTO scripts (project_id, type, title, body_full, word_count, "
                 "updated_at, video_id) VALUES (1, 'short', 'Guion short', 'texto short', "
                 "5, '2025-01-01', 2)"
-            ).lastrowid
+            )
             conn.execute(
                 "INSERT INTO scenes (project_id, script_id, scene_number, narration, "
                 "visual_description, duration_seconds, updated_at) VALUES "

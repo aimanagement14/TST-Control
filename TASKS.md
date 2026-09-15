@@ -15,6 +15,10 @@ publicarse una versión.
   `blueprints/profiles.py` (`profiles_bp`) y `blueprints/settings.py`
   (`settings_bp`). `strict_slashes=False` para no romper los tests.
   Renombrar endpoints a `profiles.view` y `settings.view`.
+  **Cumplido en T2.2; `/settings` revertido en v2.0.0** al
+  retirar `blueprints/settings.py`, `templates/settings.html` y la
+  pestaña "Configuración" del nav (CHANGELOG 2.0.0). Solo sobrevive
+  `profiles_bp` con `profiles.view`.
 - [x] **H1** Commitear `projects/Todo_sobre_La_Piedra_Rúnica_13/`
   (nuevo) + etapas 01–06 de `projects/Todo_sobre_la_Antártida_12/`
   que estaban untracked.
@@ -33,9 +37,11 @@ publicarse una versión.
 
 ### Pendiente para futuro sprint
 
-- [ ] Llevar ruff y mypy a `required=True` en `scripts/validate.py`
-  una vez resueltos los 35 hallazgos de ruff y 7 de mypy (anotado
-  en `scripts/validate.py` con `required=False` por ahora).
+- [ ] Resolver el **1 hallazgo actual de ruff** (F841 en
+  `test_core.py:2254`) — bloquea `ruff check` que ya corre con
+  `required=True` en `scripts/validate.py:121`. Decidir también si
+  subir `mypy` de `required=False` a `required=True`; hoy reporta
+  6 avisos «annotation-unchecked» como informativos.
 - [ ] Evaluar extracción de las 8 rutas por etapa
   (`research`/`concept`/`scripts`/`scenes`/`metadata`/`thumbnails`/
   `qc`/`export`) a blueprints dedicados. La bloqueante es

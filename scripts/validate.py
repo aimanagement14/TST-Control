@@ -118,7 +118,8 @@ def main() -> int:
     # sigue informativo para no romper commits que aún no se han
     # reformateado.
     if shutil.which("ruff"):
-        step("ruff check .", ["ruff", "check", "."], required=True)
+        if not step("ruff check .", ["ruff", "check", "."], required=True):
+            failed.append("ruff check")
         step("ruff format --check .", ["ruff", "format", "--check", "."], required=False)
     else:
         print("\n  [skip] ruff no instalado (recomendado)")
