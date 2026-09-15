@@ -29,10 +29,16 @@ usuario. Renombrar este archivo o cambiar el id es trivial.
 
 import io
 import json
+import os
 import shutil
 import sys
 import zipfile
 from pathlib import Path
+
+# Necesario para importar app sin RuntimeError. CI ya exporta
+# FLASK_SECRET_KEY en `.github/workflows/ci.yml`; este setdefault evita
+# romper ejecuciones locales donde la variable no está seteada.
+os.environ.setdefault("FLASK_SECRET_KEY", "verify-secret-not-for-prod")
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

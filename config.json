@@ -2,8 +2,7 @@
   "app": {
     "name": "Todo Sobre Todo",
     "tagline": "Centro de producción de contenido",
-    "version": "2.1.0",
-    "secret_key": "dev-local-tst-secret-key-change-in-prod-9f2c1b8e"
+    "version": "2.1.0"
   },
   "prompts": {
     "research": {
@@ -76,6 +75,21 @@
     "items_per_page": 20
   },
   "visual_style": {
-    "keywords": "Cinematic Hyperrealism, Orange & Teal Color Grading, Volumetric Lighting, Atmospheric Fog, Ultra Detailed Textures, Realistic Shadows, Epic Scale, Documentary Cinematography, Filmic Lighting, Natural Depth of Field, High Dynamic Range, Realistic Environmental Details, Cinematic Composition, Documentary Premium Quality"
+    "keywords": [
+      "Cinematic Hyperrealism",
+      "Orange & Teal Color Grading",
+      "Volumetric Lighting",
+      "Atmospheric Fog",
+      "Ultra Detailed Textures",
+      "Realistic Shadows",
+      "Epic Scale",
+      "Documentary Cinematography",
+      "Filmic Lighting",
+      "Natural Depth of Field",
+      "High Dynamic Range",
+      "Realistic Environmental Details",
+      "Cinematic Composition",
+      "Documentary Premium Quality"
+    ]
   }
 }

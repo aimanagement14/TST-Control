@@ -39,3 +39,6 @@ jobs:
 
       - name: Run end-to-end verification
         run: python verify_project.py
+
+      - name: Run validate (pyflakes + tests + e2e + ruff + mypy)
+        run: python scripts/validate.py

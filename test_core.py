@@ -6,10 +6,16 @@ Tests automatizados para los componentes críticos:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Tests necesitan un secret_key para importar app, pero no firman nada
+# crítico (no hay sesiones persistentes en este proyecto). Usamos un valor
+# dummy; CI sobreescribe con `FLASK_SECRET_KEY: ci-secret-not-used-for-signing`.
+os.environ.setdefault("FLASK_SECRET_KEY", "test-suite-secret-not-for-prod")
 
 import app
 from services.parsers import (
@@ -1206,11 +1212,13 @@ def test_config_visual_style_keywords_is_shared():
     """Solo hay UNA lista canónica de keywords visuales en CONFIG."""
     ks = app.CONFIG.get("visual_style", {}).get("keywords")
     assert ks, "Falta visual_style.keywords en CONFIG"
+    assert isinstance(ks, list), (
+        f"visual_style.keywords debe ser JSON list, recibí {type(ks).__name__}"
+    )
     expected_count = 14
-    items = [s.strip() for s in ks.split(",")]
-    assert len(items) == expected_count, f"keywords tiene {len(items)} items, esperaba {expected_count}"
+    assert len(ks) == expected_count, f"keywords tiene {len(ks)} items, esperaba {expected_count}"
     for must in ["Cinematic Hyperrealism", "Orange & Teal Color Grading", "Documentary Premium Quality"]:
-        assert must in items, f"Falta keyword obligatoria: {must}"
+        assert must in ks, f"Falta keyword obligatoria: {must}"
     print("  ✓ visual_style.keywords centraliza las 14 keywords visuales")
 
 
@@ -1222,8 +1230,9 @@ def test_visual_prompts_reference_shared_keyword_token():
         assert "{{app.visual_style_keywords}}" in sys_text or "{{app.visual_style_keywords}}" in fmt_text, (
             f"{stage} no usa la variable compartida"
         )
-        canon = app.CONFIG["visual_style"]["keywords"]
-        full_list = canon in sys_text or canon in fmt_text
+        canon_list = app.CONFIG["visual_style"]["keywords"]
+        canon_str = ", ".join(canon_list) if isinstance(canon_list, list) else canon_list
+        full_list = canon_str in sys_text or canon_str in fmt_text
         assert not full_list, f"{stage} todavía tiene la lista literal completa hardcoded"
     print("  ✓ scenes / thumbnail_* usan la variable en lugar de la lista literal")
 
@@ -1434,6 +1443,79 @@ def test_default_profile_seeds_seven_roadmap_stages(tmp_path):
     sort_orders = [r["sort_order"] for r in rows]
     assert sort_orders == list(range(7)), sort_orders
     print("  ✓ perfil por defecto siembra 7 roadmap_stages activos en orden")
+
+
+def test_roadmap_sort_order_dedupes_duplicates(tmp_path):
+    """init_db() renumera roadmap_stages 0-based cuando hay duplicados."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        # Forzar duplicados: shift todo +1, después poner research y concept
+        # ambos en 1 (igual que el bug original del sembrado de profile 1).
+        conn.execute(
+            "UPDATE roadmap_stages SET sort_order = sort_order + 1 WHERE profile_id=1"
+        )
+        conn.execute(
+            "UPDATE roadmap_stages SET sort_order = 1 "
+            "WHERE profile_id=1 AND name IN ('research', 'concept')"
+        )
+        # Desmarcar la migración para forzar que corra de nuevo.
+        conn.execute(
+            "DELETE FROM _schema_migrations WHERE name='fix_roadmap_stages_sort_order'"
+        )
+        before = [r["sort_order"] for r in conn.execute(
+            "SELECT sort_order FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order, id"
+        ).fetchall()]
+        assert before[0] == before[1] == 1, f"preparación falló: {before}"
+        conn.commit()
+    app.init_db()
+    with app.get_db() as conn:
+        rows = conn.execute(
+            "SELECT name, sort_order FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order, id"
+        ).fetchall()
+        sort_orders = [r["sort_order"] for r in rows]
+        names = [r["name"] for r in rows]
+        assert sort_orders == list(range(7)), sort_orders
+        assert names == list(app.DEFAULT_ROADMAP_STAGES), names
+        # La migración quedó marcada como aplicada.
+        marked = conn.execute(
+            "SELECT 1 FROM _schema_migrations WHERE name='fix_roadmap_stages_sort_order'"
+        ).fetchone()
+        assert marked is not None, "migración no quedó marcada como aplicada"
+    print("  ✓ init_db() deduplica sort_order a 0-based preservando orden")
+
+
+def test_investigacion_renamed_to_research(tmp_path):
+    """init_db() renombra ``Investigacion`` → ``research`` para alinear con DEFAULT_ROADMAP_STAGES."""
+    _setup_qc_db(tmp_path)
+    with app.get_db() as conn:
+        # Simular el estado legacy: profile 1 con ``name='Investigacion'``.
+        conn.execute(
+            "UPDATE roadmap_stages SET name='Investigacion' "
+            "WHERE profile_id=1 AND name='research'"
+        )
+        # Desmarcar la migración para forzar que corra.
+        conn.execute(
+            "DELETE FROM _schema_migrations WHERE name='rename_investigacion_to_research'"
+        )
+        before = conn.execute(
+            "SELECT name FROM roadmap_stages WHERE profile_id=1 AND sort_order=0"
+        ).fetchone()["name"]
+        assert before == "Investigacion", f"preparación falló: {before}"
+        conn.commit()
+    app.init_db()
+    with app.get_db() as conn:
+        rows = conn.execute(
+            "SELECT name FROM roadmap_stages WHERE profile_id=1 ORDER BY sort_order, id"
+        ).fetchall()
+        names = [r["name"] for r in rows]
+        assert "Investigacion" not in names, names
+        assert names == list(app.DEFAULT_ROADMAP_STAGES), names
+        # La migración quedó marcada.
+        marked = conn.execute(
+            "SELECT 1 FROM _schema_migrations WHERE name='rename_investigacion_to_research'"
+        ).fetchone()
+        assert marked is not None, "migración no quedó marcada como aplicada"
+    print("  ✓ init_db() renombra Investigacion → research en roadmap_stages")
 
 
 def test_new_profile_seeds_seven_roadmap_stages(tmp_path):
@@ -2428,6 +2510,8 @@ def main():
 
     print("\n=== TESTS DEL MODELO DE HOJA DE RUTA ===")
     _with_tmp("default_profile_seeds_seven", test_default_profile_seeds_seven_roadmap_stages)
+    _with_tmp("roadmap_sort_order_dedupes", test_roadmap_sort_order_dedupes_duplicates)
+    _with_tmp("investigacion_renamed_research", test_investigacion_renamed_to_research)
     _with_tmp("new_profile_seeds_seven", test_new_profile_seeds_seven_roadmap_stages)
     _with_tmp("new_project_seeds_seven", test_new_project_seeds_seven_project_stages)
     _with_tmp("project_stage_get_renders", test_project_stage_get_renders)

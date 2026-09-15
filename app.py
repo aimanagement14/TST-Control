@@ -16,6 +16,7 @@ import shutil
 import sqlite3
 import sys
 import zipfile
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -76,11 +77,12 @@ with open(CONFIG_PATH, encoding="utf-8") as f:
 PROJECTS_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
-_secret_key = os.environ.get("FLASK_SECRET_KEY") or CONFIG.get("app", {}).get("secret_key", "")
+_secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not _secret_key:
     raise RuntimeError(
         "FLASK_SECRET_KEY no definida. Exporta la variable de entorno "
-        "(recomendado) o define 'app.secret_key' en config.json solo para dev local."
+        "(obligatorio). Genera una con: "
+        'python -c "import secrets; print(secrets.token_hex(32))"'
     )
 app.secret_key = _secret_key
 app.config["JSON_AS_ASCII"] = False
@@ -271,11 +273,6 @@ CREATE TABLE IF NOT EXISTS qc_issues (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-);
-
 CREATE TABLE IF NOT EXISTS profile_prompts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL,
@@ -389,11 +386,16 @@ def init_db():
         _migrate_qc_per_video(conn)
         _migrate_to_roadmap_model(conn)
         _ensure_roadmap_integrity(conn)
+        _migrate_fix_roadmap_sort_orders(conn)
+        _migrate_rename_investigacion_to_research(conn)
         # Tablas del editor de grafo + runner, retiradas del monolito en
         # la auditoría 2026-09-11 (ADR). Si quedaban restos en BD los
         # eliminamos para no contaminar exports ni dejar schemas zombis.
         conn.execute("DROP TABLE IF EXISTS profile_graph_nodes")
         conn.execute("DROP TABLE IF EXISTS node_executions")
+        # `settings` quedó huérfana tras eliminar `/settings` (ADR 2026-09-07).
+        # 0 referencias en código, 0 filas en BD: limpieza pura.
+        conn.execute("DROP TABLE IF EXISTS settings")
 
 
 # ---------------------------------------------------------------------------
@@ -585,6 +587,8 @@ def _migrate_project_videos(conn):
 _ROADMAP_MIGRATION = "migrate_to_roadmap_model"
 _VIDEOS_MIGRATION = "migrate_project_videos"
 _QC_PER_VIDEO_MIGRATION = "migrate_qc_per_video"
+_ROADMAP_SORT_ORDER_FIX = "fix_roadmap_stages_sort_order"
+_RESEARCH_NAME_FIX = "rename_investigacion_to_research"
 
 
 def _migrate_qc_per_video(conn):
@@ -1128,6 +1132,95 @@ def _ensure_roadmap_integrity(conn):
                     "UPDATE project_stages SET response=?, updated_at=? WHERE id=?",
                     (legacy_response, now, existing["id"]),
                 )
+
+
+def _migrate_fix_roadmap_sort_orders(conn):
+    """Renumera ``roadmap_stages`` a 0-based cuando hay duplicados.
+
+    Idempotente: detecta perfiles con ``sort_order`` duplicados y los
+    renumera a ``0, 1, ..., N-1`` preservando el orden actual de las
+    filas. Si no hay duplicados, no toca nada (respeta personalizaciones
+    manuales). Siempre se marca como aplicada para no re-escanear en cada
+    ``init_db()``.
+
+    Necesario porque el sembrado original de profile 1 usó offset de 1,
+    dejando ``research`` y ``concept`` ambos en ``sort_order=1``. La UI
+    (``profiles.html:169`` con ``min="0"``) y los tests asumen 0-based.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM _schema_migrations WHERE name=?",
+        (_ROADMAP_SORT_ORDER_FIX,),
+    ).fetchone()
+    if row:
+        return
+
+    profiles = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT DISTINCT profile_id FROM roadmap_stages ORDER BY profile_id"
+        ).fetchall()
+    ]
+    for p in profiles:
+        pid = p["profile_id"]
+        stage_rows = list(
+            conn.execute(
+                "SELECT id FROM roadmap_stages WHERE profile_id=? ORDER BY sort_order, id",
+                (pid,),
+            ).fetchall()
+        )
+        sort_orders = [
+            r["sort_order"]
+            for r in conn.execute(
+                "SELECT sort_order FROM roadmap_stages WHERE profile_id=? ORDER BY sort_order, id",
+                (pid,),
+            ).fetchall()
+        ]
+        if not any(c > 1 for c in Counter(sort_orders).values()):
+            continue
+        for new_order, s in enumerate(stage_rows):
+            conn.execute(
+                "UPDATE roadmap_stages SET sort_order=? WHERE id=?",
+                (new_order, s["id"]),
+            )
+
+    conn.execute(
+        "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_ROADMAP_SORT_ORDER_FIX, now_iso()),
+    )
+
+
+def _migrate_rename_investigacion_to_research(conn):
+    """Renombra ``Investigacion`` → ``research`` en ``roadmap_stages``.
+
+    Idempotente: solo actualiza filas con ``name = 'Investigacion'``;
+    no hace nada si no hay ninguna. Marca como aplicada para no
+    re-escanear en cada ``init_db()``.
+
+    Necesario porque profile 1 se sembró con el nombre en español
+    mientras ``DEFAULT_ROADMAP_STAGES`` y el resto del código usan
+    ``research`` como clave canónica. Esto rompía:
+
+    - ``_build_legacy_response(conn, project, "research")``: el branch
+      para migrar contenido legacy nunca matcheaba.
+    - ``_mirror_research_legacy``: al guardar la etapa research en
+      profile 1, no se espejaba en la tabla ``research`` legacy.
+    - Cualquier lookup por nombre canónico (``stage_name == "research"``).
+    """
+    row = conn.execute(
+        "SELECT 1 FROM _schema_migrations WHERE name=?",
+        (_RESEARCH_NAME_FIX,),
+    ).fetchone()
+    if row:
+        return
+
+    conn.execute(
+        "UPDATE roadmap_stages SET name='research' WHERE name='Investigacion'"
+    )
+
+    conn.execute(
+        "INSERT INTO _schema_migrations (name, applied_at) VALUES (?, ?)",
+        (_RESEARCH_NAME_FIX, now_iso()),
+    )
 
 
 # ---------------------------------------------------------------------------

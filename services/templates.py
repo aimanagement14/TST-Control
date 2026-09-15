@@ -87,6 +87,26 @@ def _normalize_platforms(raw: Any) -> list[str]:
     return [p.strip() for p in text.split(",") if p.strip()]
 
 
+def _normalize_keywords(raw: Any) -> list[str]:
+    """Acepta JSON array, string CSV o ya-lista. Espejo de _normalize_platforms."""
+    if isinstance(raw, list):
+        return [str(k).strip() for k in raw if str(k).strip()]
+    if not raw:
+        return []
+    text = str(raw).strip()
+    if not text:
+        return []
+    if text.startswith("[") and text.endswith("]"):
+        try:
+            import json
+            data = json.loads(text)
+            if isinstance(data, list):
+                return [str(k).strip() for k in data if str(k).strip()]
+        except Exception:
+            pass
+    return [k.strip() for k in text.split(",") if k.strip()]
+
+
 def profile_context(profile: dict[str, Any] | None) -> dict[str, Any]:
     """Construye el sub-dict ``profile.*`` desde una fila de la tabla ``profiles``."""
     p = profile or {}
@@ -113,7 +133,10 @@ def app_context() -> dict[str, Any]:
     try:
         from app import CONFIG
         app_cfg = CONFIG.get("app", {}) or {}
-        visual_style_keywords = (CONFIG.get("visual_style", {}) or {}).get("keywords", "") or ""
+        keywords_list = _normalize_keywords(
+            (CONFIG.get("visual_style", {}) or {}).get("keywords")
+        )
+        visual_style_keywords = ", ".join(keywords_list)
     except Exception:
         pass
     return {
